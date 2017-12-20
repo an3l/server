@@ -6810,7 +6810,7 @@ lock_rec_convert_impl_to_expl_for_trx(
 	trx_t*			trx,	/*!< in/out: active transaction */
 	ulint			heap_no)/*!< in: rec heap number to lock */
 {
-	ut_ad(trx_is_referenced(trx));
+	ut_ad(trx->is_referenced());
 	ut_ad(page_rec_is_leaf(rec));
 	ut_ad(!rec_is_default_row(rec, index));
 
@@ -6834,7 +6834,7 @@ lock_rec_convert_impl_to_expl_for_trx(
 
 	lock_mutex_exit();
 
-	trx_release_reference(trx);
+	trx->release_reference();
 
 	DEBUG_SYNC_C("after_lock_rec_convert_impl_to_expl_for_trx");
 }
@@ -6878,7 +6878,7 @@ lock_rec_convert_impl_to_expl(
 	if (trx != 0) {
 		ulint	heap_no = page_rec_get_heap_no(rec);
 
-		ut_ad(trx_is_referenced(trx));
+		ut_ad(trx->is_referenced());
 
 		/* If the transaction is still active and has no
 		explicit x-lock set on the record, set one for it.
@@ -7627,7 +7627,6 @@ lock_trx_release_locks(
 		lock_mutex_enter();
 	}
 
-	trx_mutex_enter(trx);
 
 	/* The following assignment makes the transaction committed in memory
 	and makes its changes to data visible to other transactions.
@@ -7644,36 +7643,30 @@ lock_trx_release_locks(
 	committed. */
 
 	/*--------------------------------------*/
+	trx_mutex_enter(trx);
 	trx->state = TRX_STATE_COMMITTED_IN_MEMORY;
+	trx_mutex_exit(trx);
 	/*--------------------------------------*/
 
-	if (trx_is_referenced(trx)) {
+	if (trx->is_referenced()) {
 
 		ut_a(release_lock);
 
 		lock_mutex_exit();
 
-		while (trx_is_referenced(trx)) {
-
-			trx_mutex_exit(trx);
+		while (trx->is_referenced()) {
 
 			DEBUG_SYNC_C("waiting_trx_is_not_referenced");
 
 			/** Doing an implicit to explicit conversion
 			should not be expensive. */
 			ut_delay(ut_rnd_interval(0, srv_spin_wait_delay));
-
-			trx_mutex_enter(trx);
 		}
 
-		trx_mutex_exit(trx);
-
 		lock_mutex_enter();
-
-		trx_mutex_enter(trx);
 	}
 
-	ut_ad(!trx_is_referenced(trx));
+	ut_ad(!trx->is_referenced());
 
 	/* If the background thread trx_rollback_or_clean_recovered()
 	is still active then there is a chance that the rollback
@@ -7687,8 +7680,6 @@ lock_trx_release_locks(
 	the is_recovered flag. */
 
 	trx->is_recovered = false;
-
-	trx_mutex_exit(trx);
 
 	if (release_lock) {
 
