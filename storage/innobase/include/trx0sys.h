@@ -244,13 +244,6 @@ trx_sys_close(void);
 @return	whether the creation succeeded */
 bool
 trx_sys_create_rsegs();
-/*****************************************************************//**
-Get the number of transaction in the system, independent of their state.
-@return count of transactions in trx_sys_t::trx_list */
-UNIV_INLINE
-ulint
-trx_sys_get_n_rw_trx(void);
-/*======================*/
 
 /*********************************************************************
 Check if there are any active (non-prepared) transactions.
@@ -492,12 +485,35 @@ class rw_trx_hash_t
   {
     rw_trx_hash_element_t *element =
       reinterpret_cast<rw_trx_hash_element_t*>(arg + LF_HASH_OVERHEAD);
-    /*
-      XA transactions can live longer than InnoDB if they're not
-      explicitely committed or rolled back.
-    */
-    ut_ad(element->trx == 0 || element->trx->xid);
+    ut_ad(element->trx == 0);
     mutex_free(&element->mutex);
+  }
+
+
+  /**
+    Destructor callback for lock-free allocator.
+
+    This destructor is used at shutdown. It frees remaining transaction objects.
+
+    XA PREPARED transactions may remain if they haven't been committed or rolled
+    back. ACTIVE transactions may remain if startup was interrupted or server is
+    running in read-only mode or for certain srv_force_recovery levels.
+  */
+
+  static void rw_trx_hash_shutdown_destructor(uchar *arg)
+  {
+    rw_trx_hash_element_t *element =
+      reinterpret_cast<rw_trx_hash_element_t*>(arg + LF_HASH_OVERHEAD);
+    mutex_free(&element->mutex);
+    if (element->trx)
+    {
+      ut_ad(trx_state_eq(element->trx, TRX_STATE_PREPARED) ||
+            (trx_state_eq(element->trx, TRX_STATE_ACTIVE) &&
+             (!srv_was_started ||
+              srv_read_only_mode ||
+              srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO)));
+      trx_free_prepared(element->trx);
+    }
   }
 
 
@@ -517,6 +533,7 @@ class rw_trx_hash_t
                                       rw_trx_hash_element_t *element,
                                       trx_t *trx)
   {
+    ut_ad(element->trx == 0);
     element->trx= trx;
     element->id= trx->id;
     trx->rw_trx_hash_element= element;
@@ -548,6 +565,7 @@ public:
 
   void destroy()
   {
+    hash.alloc.destructor= rw_trx_hash_shutdown_destructor;
     lf_hash_destroy(&hash);
   }
 
