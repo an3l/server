@@ -981,9 +981,11 @@ static inline void trx_sys_add_trx_at_init(trx_t *trx, trx_undo_t *undo,
     trx_resurrect_table_locks(trx, undo);
     if (trx_state_eq(trx, TRX_STATE_ACTIVE))
       *rows_to_undo += trx->undo_no;
+    ut_d(trx->in_rw_trx_list= true);
   }
+  else
+    UT_LIST_ADD_FIRST(trx_sys->purge_list, trx);
 #ifdef UNIV_DEBUG
-  trx->in_rw_trx_list= true;
   if (trx->id > trx_sys->rw_max_trx_id)
     trx_sys->rw_max_trx_id= trx->id;
 #endif
@@ -1073,7 +1075,11 @@ trx_lists_init_at_db_start()
 	     it != end;
 	     ++it) {
 
-		UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, it->m_trx);
+		if (it->m_trx->state == TRX_STATE_ACTIVE
+		    || it->m_trx->state == TRX_STATE_PREPARED) {
+
+			UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, it->m_trx);
+		}
 	}
 	std::sort(trx_sys->rw_trx_ids.begin(), trx_sys->rw_trx_ids.end());
 }
@@ -2016,49 +2022,48 @@ trx_commit(
 	trx_commit_low(trx, mtr);
 }
 
-/****************************************************************//**
-Cleans up a transaction at database startup. The cleanup is needed if
-the transaction already got to the middle of a commit when the database
-crashed, and we cannot roll it back. */
-void
-trx_cleanup_at_db_startup(
-/*======================*/
-	trx_t*	trx)	/*!< in: transaction */
+
+/**
+  Cleans up a transaction at database startup.
+
+  The cleanup is needed if the transaction already got to the middle of a commit
+  when the database crashed, and we cannot roll it back.
+
+  trx_sys->purge_list and all trx objects it contains is sole property of
+  startup thread, so this function can be called only by startup thread.
+*/
+
+void trx_cleanup_recovered()
 {
-	ut_ad(trx->is_recovered);
-	ut_ad(!trx->rsegs.m_noredo.undo);
-	ut_ad(!trx->rsegs.m_redo.undo);
+  while (trx_t *trx= UT_LIST_GET_FIRST(trx_sys->purge_list))
+  {
+    ib::info() << "Cleaning up trx with id " << ib::hex(trx->id);
+    ut_ad(trx->is_recovered);
+    ut_ad(!trx->rsegs.m_noredo.undo);
+    ut_ad(!trx->rsegs.m_redo.undo);
+    ut_ad(!trx->in_rw_trx_list);
+    ut_ad(!trx->in_mysql_trx_list);
+    ut_ad(!trx->read_only);
 
-	if (trx_undo_t*& undo = trx->rsegs.m_redo.old_insert) {
-		ut_ad(undo->rseg == trx->rsegs.m_redo.rseg);
-		trx_undo_commit_cleanup(undo, false);
-		undo = NULL;
-	}
+    if (trx_undo_t*& undo= trx->rsegs.m_redo.old_insert)
+    {
+      ut_ad(undo->rseg == trx->rsegs.m_redo.rseg);
+      trx_undo_commit_cleanup(undo, false);
+      undo= NULL;
+    }
 
-	memset(&trx->rsegs, 0x0, sizeof(trx->rsegs));
-	trx->undo_no = 0;
-	trx->undo_rseg_space = 0;
-	trx->last_sql_stat_start.least_undo_no = 0;
+    memset(&trx->rsegs, 0x0, sizeof(trx->rsegs));
+    trx->undo_no= 0;
+    trx->undo_rseg_space= 0;
+    trx->last_sql_stat_start.least_undo_no= 0;
 
-	trx_sys_mutex_enter();
-
-	ut_a(!trx->read_only);
-
-	UT_LIST_REMOVE(trx_sys->rw_trx_list, trx);
-
-	ut_d(trx->in_rw_trx_list = FALSE);
-
-	trx_sys_mutex_exit();
-
-	/* Change the transaction state without mutex protection, now
-	that it no longer is in the trx_list. Recovered transactions
-	are never placed in the mysql_trx_list. */
-	ut_ad(trx->is_recovered);
-	ut_ad(!trx->in_rw_trx_list);
-	ut_ad(!trx->in_mysql_trx_list);
-	DBUG_LOG("trx", "Cleanup at startup: " << trx);
-	trx->state = TRX_STATE_NOT_STARTED;
+    UT_LIST_REMOVE(trx_sys->purge_list, trx);
+    DBUG_LOG("trx", "Cleanup at startup: " << trx);
+    trx->state= TRX_STATE_NOT_STARTED;
+    trx_free_resurrected(trx);
+  }
 }
+
 
 /********************************************************************//**
 Assigns a read view for a consistent read query. All the consistent reads

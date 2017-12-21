@@ -246,14 +246,21 @@ trx_commit_low(
 	trx_t*	trx,	/*!< in/out: transaction */
 	mtr_t*	mtr);	/*!< in/out: mini-transaction (will be committed),
 			or NULL if trx made no modifications */
-/****************************************************************//**
-Cleans up a transaction at database startup. The cleanup is needed if
-the transaction already got to the middle of a commit when the database
-crashed, and we cannot roll it back. */
-void
-trx_cleanup_at_db_startup(
-/*======================*/
-	trx_t*	trx);	/*!< in: transaction */
+
+
+/**
+  Cleans up a transaction at database startup.
+
+  The cleanup is needed if the transaction already got to the middle of a commit
+  when the database crashed, and we cannot roll it back.
+
+  trx_sys->purge_list and all trx objects it contains is sole property of
+  startup thread, so this function can be called only by startup thread.
+*/
+
+void trx_cleanup_recovered();
+
+
 /**********************************************************************//**
 Does the transaction commit for MySQL.
 @return DB_SUCCESS or error number */

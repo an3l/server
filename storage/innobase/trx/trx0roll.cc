@@ -54,8 +54,8 @@ Created 3/26/1996 Heikki Tuuri
 rollback */
 static const ulint TRX_ROLL_TRUNC_THRESHOLD = 1;
 
-/** true if trx_rollback_or_clean_all_recovered() thread is active */
-bool			trx_rollback_or_clean_is_active;
+/** true if trx_rollback_all_recovered() thread is active */
+bool			trx_rollback_is_active;
 
 /** In crash recovery, the current trx to be rolled back; NULL otherwise */
 const trx_t*		trx_roll_crash_recv_trx;
@@ -751,14 +751,6 @@ func_exit:
 	}
 
 	switch (trx->state) {
-	case TRX_STATE_COMMITTED_IN_MEMORY:
-		trx_mutex_exit(trx);
-		trx_sys_mutex_exit();
-		ib::info() << "Cleaning up trx with id " << ib::hex(trx->id);
-
-		trx_cleanup_at_db_startup(trx);
-		trx_free_resurrected(trx);
-		return(TRUE);
 	case TRX_STATE_ACTIVE:
 		if (!srv_is_being_started
 		    && !srv_undo_sources && srv_fast_shutdown) {
@@ -787,6 +779,8 @@ fake_prepared:
 			return(TRUE);
 		}
 		return(FALSE);
+	case TRX_STATE_COMMITTED_IN_MEMORY:
+		ut_ad(trx->xid);
 	case TRX_STATE_PREPARED:
 		goto func_exit;
 	case TRX_STATE_NOT_STARTED:
@@ -849,7 +843,7 @@ encountered in crash recovery.  If the transaction already was
 committed, then we clean up a possible insert undo log. If the
 transaction was not yet committed, then we roll it back. */
 void
-trx_rollback_or_clean_recovered(
+trx_rollback_recovered(
 /*============================*/
 	ibool	all)	/*!< in: FALSE=roll back dictionary transactions;
 			TRUE=roll back all non-PREPARED transactions */
@@ -916,7 +910,7 @@ Note: this is done in a background thread.
 @return a dummy parameter */
 extern "C"
 os_thread_ret_t
-DECLARE_THREAD(trx_rollback_or_clean_all_recovered)(
+DECLARE_THREAD(trx_rollback_all_recovered)(
 /*================================================*/
 	void*	arg MY_ATTRIBUTE((unused)))
 			/*!< in: a dummy parameter required by
@@ -929,9 +923,9 @@ DECLARE_THREAD(trx_rollback_or_clean_all_recovered)(
 	pfs_register_thread(trx_rollback_clean_thread_key);
 #endif /* UNIV_PFS_THREAD */
 
-	trx_rollback_or_clean_recovered(TRUE);
+	trx_rollback_recovered(TRUE);
 
-	trx_rollback_or_clean_is_active = false;
+	trx_rollback_is_active = false;
 
 	my_thread_end();
 	/* We count the number of threads in os_thread_exit(). A created

@@ -801,6 +801,9 @@ struct trx_sys_t {
   rw_trx_hash_t rw_trx_hash;
   const char pad6[CACHE_LINE_SIZE];
 
+  /** List of recovered committed transactions to clean-up. */
+  trx_ut_list_t purge_list;
+
 	ulint		n_prepared_trx;	/*!< Number of transactions currently
 					in the XA PREPARED state */
 

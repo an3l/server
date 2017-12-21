@@ -33,7 +33,7 @@ Created 3/26/1996 Heikki Tuuri
 #include "mtr0mtr.h"
 #include "trx0sys.h"
 
-extern bool		trx_rollback_or_clean_is_active;
+extern bool		trx_rollback_is_active;
 extern const trx_t*	trx_roll_crash_recv_trx;
 
 /*******************************************************************//**
@@ -73,7 +73,7 @@ encountered in crash recovery.  If the transaction already was
 committed, then we clean up a possible insert undo log. If the
 transaction was not yet committed, then we roll it back. */
 void
-trx_rollback_or_clean_recovered(
+trx_rollback_recovered(
 /*============================*/
 	ibool	all);	/*!< in: FALSE=roll back dictionary transactions;
 			TRUE=roll back all non-PREPARED transactions */
@@ -86,7 +86,7 @@ Note: this is done in a background thread.
 @return a dummy parameter */
 extern "C"
 os_thread_ret_t
-DECLARE_THREAD(trx_rollback_or_clean_all_recovered)(
+DECLARE_THREAD(trx_rollback_all_recovered)(
 /*================================================*/
 	void*	arg MY_ATTRIBUTE((unused)));
 			/*!< in: a dummy parameter required by

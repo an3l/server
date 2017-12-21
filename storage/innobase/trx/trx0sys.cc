@@ -471,6 +471,7 @@ trx_sys_create(void)
 	UT_LIST_INIT(trx_sys->serialisation_list, &trx_t::no_list);
 	UT_LIST_INIT(trx_sys->rw_trx_list, &trx_t::trx_list);
 	UT_LIST_INIT(trx_sys->mysql_trx_list, &trx_t::mysql_trx_list);
+	UT_LIST_INIT(trx_sys->purge_list, &trx_t::mysql_trx_list);
 
 	trx_sys->mvcc = UT_NEW_NOKEY(MVCC(1024));
 
@@ -621,6 +622,7 @@ trx_sys_close(void)
 	UT_DELETE(trx_sys->mvcc);
 
 	ut_a(UT_LIST_GET_LEN(trx_sys->rw_trx_list) == 0);
+	ut_ad(!UT_LIST_GET_LEN(trx_sys->purge_list));
 	ut_a(UT_LIST_GET_LEN(trx_sys->mysql_trx_list) == 0);
 	ut_a(UT_LIST_GET_LEN(trx_sys->serialisation_list) == 0);
 
