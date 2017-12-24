@@ -678,8 +678,6 @@ trx_disconnect_from_mysql(
 		trx_sys->mvcc->view_close(trx->read_view, true);
 	}
 
-	ut_ad(trx_sys_validate_trx_list());
-
 	if (prepared) {
 
 		ut_ad(trx_state_eq(trx, TRX_STATE_PREPARED));
@@ -1307,8 +1305,6 @@ trx_start_low(
 		}
 #endif /* UNIV_DEBUG */
 
-		ut_ad(trx_sys_validate_trx_list());
-
 		trx_sys_mutex_exit();
 		trx_sys->rw_trx_hash.insert(trx);
 
@@ -1674,7 +1670,6 @@ trx_erase_lists(
 
 		trx_sys_mutex_enter();
 		UT_LIST_REMOVE(trx_sys->rw_trx_list, trx);
-		ut_ad(trx_sys_validate_trx_list());
 
 		if (trx->read_view != NULL) {
 			trx_sys->mvcc->view_close(trx->read_view, true);
