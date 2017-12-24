@@ -284,7 +284,7 @@ int
 trx_recover_for_mysql(
 /*==================*/
 	XID*	xid_list,	/*!< in/out: prepared transactions */
-	ulint	len);		/*!< in: number of slots in xid_list */
+	uint	len);		/*!< in: number of slots in xid_list */
 /*******************************************************************//**
 This function is used to find one X/Open XA distributed transaction
 which is in the prepared state

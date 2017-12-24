@@ -532,6 +532,27 @@ class rw_trx_hash_t
   }
 
 
+  struct eliminate_duplicates_arg
+  {
+    trx_ids_t ids;
+    my_hash_walk_action action;
+    void *argument;
+  };
+
+
+  static my_bool eliminate_duplicates(rw_trx_hash_element_t *element,
+                                      eliminate_duplicates_arg *arg)
+  {
+    for (trx_ids_t::iterator it= arg->ids.begin(); it != arg->ids.end(); it++)
+    {
+      if (*it == element->id)
+        return 0;
+    }
+    arg->ids.push_back(element->id);
+    return arg->action(element, arg->argument);
+  }
+
+
 public:
   void init()
   {
@@ -714,6 +735,29 @@ public:
   int iterate(my_hash_walk_action action, void *argument)
   {
     return iterate(innobase_get_trx(), action, argument);
+  }
+
+
+  /**
+    Iterates the hash and eliminates duplicate elements.
+  */
+
+  int iterate_no_dups(trx_t *caller_trx, my_hash_walk_action action,
+                      void *argument)
+  {
+    eliminate_duplicates_arg arg;
+
+    arg.ids.reserve(size() + 32);
+    arg.action= action;
+    arg.argument= argument;
+    return iterate(caller_trx, reinterpret_cast<my_hash_walk_action>
+                   (eliminate_duplicates), &arg);
+  }
+
+
+  int iterate_no_dups(my_hash_walk_action action, void *argument)
+  {
+    return iterate_no_dups(innobase_get_trx(), action, argument);
   }
 };
 
