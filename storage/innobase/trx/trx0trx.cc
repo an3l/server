@@ -685,7 +685,6 @@ trx_disconnect_from_mysql(
 		ut_ad(trx_state_eq(trx, TRX_STATE_PREPARED));
 
 		trx->is_recovered = true;
-		trx_sys->n_prepared_recovered_trx++;
 	        trx->mysql_thd = NULL;
 		/* todo/fixme: suggest to do it at innodb prepare */
 		trx->will_lock = 0;
@@ -846,8 +845,6 @@ trx_resurrect_insert(
 				<< " was in the XA prepared state.";
 
 			trx->state = TRX_STATE_PREPARED;
-			trx_sys->n_prepared_trx++;
-			trx_sys->n_prepared_recovered_trx++;
 		} else {
 			trx->state = TRX_STATE_COMMITTED_IN_MEMORY;
 		}
@@ -899,13 +896,8 @@ trx_resurrect_update_in_prepared_state(
 		ib::info() << "Transaction " << trx_get_id_for_print(trx)
 			<< " was in the XA prepared state.";
 
-		if (trx_state_eq(trx, TRX_STATE_NOT_STARTED)) {
-			trx_sys->n_prepared_trx++;
-			trx_sys->n_prepared_recovered_trx++;
-		} else {
-			ut_ad(trx_state_eq(trx, TRX_STATE_PREPARED));
-		}
-
+		ut_ad(trx_state_eq(trx, TRX_STATE_NOT_STARTED) ||
+		      trx_state_eq(trx, TRX_STATE_PREPARED));
 		trx->state = TRX_STATE_PREPARED;
 	} else {
 		trx->state = TRX_STATE_COMMITTED_IN_MEMORY;
@@ -2733,7 +2725,6 @@ trx_prepare(
 	ut_a(trx->state == TRX_STATE_ACTIVE);
 	trx_sys_mutex_enter();
 	trx->state = TRX_STATE_PREPARED;
-	trx_sys->n_prepared_trx++;
 	trx_sys_mutex_exit();
 	/*--------------------------------------*/
 
