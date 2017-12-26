@@ -1517,7 +1517,7 @@ lock_sec_rec_some_has_impl(
 	max trx id to the log, and therefore during recovery, this value
 	for a page may be incorrect. */
 
-	if (max_trx_id < trx_rw_min_trx_id() && !recv_recovery_is_on()) {
+	if (max_trx_id < trx_sys->get_min_trx_id() && !recv_recovery_is_on()) {
 
 		trx = 0;
 
@@ -7091,7 +7091,7 @@ lock_sec_rec_read_check_and_lock(
 	if the max trx id for the page >= min trx id for the trx list or a
 	database recovery is running. */
 
-	if ((page_get_max_trx_id(block->frame) >= trx_rw_min_trx_id()
+	if ((page_get_max_trx_id(block->frame) >= trx_sys->get_min_trx_id()
 	     || recv_recovery_is_on())
 	    && !page_rec_is_supremum(rec)) {
 
