@@ -38,112 +38,6 @@ class MVCC;
 read should not see the modifications to the database. */
 
 class ReadView {
-	/** This is similar to a std::vector but it is not a drop
-	in replacement. It is specific to ReadView. */
-	class ids_t {
-		typedef trx_ids_t::value_type value_type;
-
-		/**
-		Constructor */
-		ids_t() : m_ptr(), m_size(), m_reserved() { }
-
-		/**
-		Destructor */
-		~ids_t() { UT_DELETE_ARRAY(m_ptr); }
-
-		/**
-		Try and increase the size of the array. Old elements are
-		copied across. It is a no-op if n is < current size.
-
-		@param n 		Make space for n elements */
-		void reserve(ulint n);
-
-		/**
-		Resize the array, sets the current element count.
-		@param n		new size of the array, in elements */
-		void resize(ulint n)
-		{
-			ut_ad(n <= capacity());
-
-			m_size = n;
-		}
-
-		/**
-		Reset the size to 0 */
-		void clear() { resize(0); }
-
-		/**
-		@return the capacity of the array in elements */
-		ulint capacity() const { return(m_reserved); }
-
-		/**
-		Copy and overwrite the current array contents
-
-		@param start		Source array
-		@param end		Pointer to end of array */
-		void assign(const value_type* start, const value_type* end);
-
-		/**
-		Insert the value in the correct slot, preserving the order.
-		Doesn't check for duplicates. */
-		void insert(value_type value);
-
-		/**
-		@return the value of the first element in the array */
-		value_type front() const
-		{
-			ut_ad(!empty());
-
-			return(m_ptr[0]);
-		}
-
-		/**
-		@return the value of the last element in the array */
-		value_type back() const
-		{
-			ut_ad(!empty());
-
-			return(m_ptr[m_size - 1]);
-		}
-
-		/**
-		Append a value to the array.
-		@param value		the value to append */
-		void push_back(value_type value);
-
-		/**
-		@return a pointer to the start of the array */
-		trx_id_t* data() { return(m_ptr); };
-
-		/**
-		@return a const pointer to the start of the array */
-		const trx_id_t* data() const { return(m_ptr); };
-
-		/**
-		@return the number of elements in the array */
-		ulint size() const { return(m_size); }
-
-		/**
-		@return true if size() == 0 */
-		bool empty() const { return(size() == 0); }
-
-	private:
-		// Prevent copying
-		ids_t(const ids_t&);
-		ids_t& operator=(const ids_t&);
-
-	private:
-		/** Memory for the array */
-		value_type*	m_ptr;
-
-		/** Number of active elements in the array */
-		ulint		m_size;
-
-		/** Size of m_ptr in elements */
-		ulint		m_reserved;
-
-		friend class ReadView;
-	};
 public:
 	ReadView();
 	~ReadView();
@@ -179,9 +73,7 @@ public:
 			return(true);
 		}
 
-		const ids_t::value_type*	p = m_ids.data();
-
-		return(!std::binary_search(p, p + m_ids.size(), id));
+		return(!std::binary_search(m_ids.begin(), m_ids.end(), id));
 	}
 
 	/**
@@ -255,14 +147,10 @@ public:
 #endif /* UNIV_DEBUG */
 private:
 	/**
-	Copy the transaction ids from the source vector */
-	inline void copy_trx_ids(const trx_ids_t& trx_ids);
-
-	/**
 	Opens a read view where exactly the transactions serialized before this
 	point in time are seen in the view.
 	@param id		Creator transaction id */
-	inline void prepare(trx_id_t id);
+	inline void prepare(trx_t *trx);
 
 	/**
 	Complete the read view creation */
@@ -309,7 +197,7 @@ private:
 
 	/** Set of RW transactions that was active when this snapshot
 	was taken */
-	ids_t		m_ids;
+	trx_ids_t	m_ids;
 
 	/** The view does not need to see the undo logs for transactions
 	whose transaction number is strictly smaller (<) than this value:

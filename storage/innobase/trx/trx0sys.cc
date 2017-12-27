@@ -446,9 +446,6 @@ trx_sys_create(void)
 	UT_LIST_INIT(trx_sys->purge_list, &trx_t::mysql_trx_list);
 
 	trx_sys->mvcc = UT_NEW_NOKEY(MVCC(1024));
-
-	new(&trx_sys->rw_trx_ids) trx_ids_t(ut_allocator<trx_id_t>(
-			mem_key_trx_sys_t_rw_trx_ids));
 	trx_sys->rw_trx_hash.init();
 }
 
@@ -586,9 +583,6 @@ trx_sys_close(void)
 
 	/* We used placement new to create this mutex. Call the destructor. */
 	mutex_free(&trx_sys->mutex);
-
-	trx_sys->rw_trx_ids.~trx_ids_t();
-
 	ut_free(trx_sys);
 
 	trx_sys = NULL;

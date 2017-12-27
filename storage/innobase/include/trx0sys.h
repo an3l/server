@@ -764,6 +764,8 @@ private:
   char pad0[CACHE_LINE_SIZE];
   trx_id_t m_max_trx_id;
   char pad1[CACHE_LINE_SIZE];
+  trx_id_t m_rw_trx_hash_version;
+  char pad11[CACHE_LINE_SIZE];
 
 
 public:
@@ -792,15 +794,6 @@ public:
 					mysql_trx_list may additionally contain
 					transactions that have not yet been
 					started in InnoDB. */
-
-	trx_ids_t	rw_trx_ids;	/*!< Array of Read write transaction IDs
-					for MVCC snapshot. A ReadView would take
-					a snapshot of these transactions whose
-					changes are not visible to it. We should
-					remove transactions from the list before
-					committing in memory and releasing locks
-					to ensure right order of removal and
-					consistent snapshot. */
 
 	/** Avoid false sharing */
 	char	pad3[CACHE_LINE_SIZE];
@@ -884,18 +877,32 @@ public:
     @return new, allocated trx id
   */
 
-  trx_id_t get_new_trx_id()
+  trx_id_t get_new_trx_id(bool locked= false)
   {
-    ut_ad(mutex_own(&trx_sys->mutex));
+restart:
     trx_id_t id= static_cast<trx_id_t>(my_atomic_add64_explicit(
       reinterpret_cast<int64*>(&m_max_trx_id), 1, MY_MEMORY_ORDER_RELAXED));
 
     if (!(id % TRX_SYS_TRX_ID_WRITE_MARGIN) && !srv_read_only_mode)
     {
-      mtr_t mtr;
-      mtr_start(&mtr);
-      mlog_write_ull(trx_sysf_get(&mtr) + TRX_SYS_TRX_ID_STORE, id, &mtr);
-      mtr_commit(&mtr);
+      if (!locked)
+      {
+        bump_rw_trx_hash_version();
+        mutex_enter(&trx_sys->mutex);
+      }
+      if (id / TRX_SYS_TRX_ID_WRITE_MARGIN ==
+          get_max_trx_id() / TRX_SYS_TRX_ID_WRITE_MARGIN)
+      {
+        mtr_t mtr;
+        mtr_start(&mtr);
+        mlog_write_ull(trx_sysf_get(&mtr) + TRX_SYS_TRX_ID_STORE, id, &mtr);
+        mtr_commit(&mtr);
+      }
+      if (!locked)
+      {
+        mutex_exit(&trx_sys->mutex);
+        goto restart;
+      }
     }
     return(id);
   }
@@ -903,7 +910,57 @@ public:
 
   void init_max_trx_id(trx_id_t value)
   {
-    m_max_trx_id= value;
+    m_max_trx_id= m_rw_trx_hash_version= value;
+  }
+
+
+  void register_rw(trx_t *trx)
+  {
+    /*
+      Only trx object owner thread or concurrent thread iterating
+      rw_trx_hash and holding trx->element->mutex is allowed to access
+      trx->in_rw_trx_list.
+
+      No extra protection is required if these conditions are met. We
+      just need to make sure it is updated when trx object is not in
+      rw_trx_hash.
+    */
+    ut_d(trx->in_rw_trx_list= true);
+
+    trx->id= trx_sys->get_new_trx_id();
+    rw_trx_hash.insert(trx);
+    trx_sys->bump_rw_trx_hash_version();
+  }
+
+
+  void unregister_rw(trx_t *trx)
+  {
+    rw_trx_hash.erase(trx);
+    ut_d(trx->in_rw_trx_list= false);
+  }
+
+
+  void snapshot_ids(trx_t *caller_trx, trx_ids_t *ids, trx_id_t *max_trx_id)
+  {
+    snapshot_ids_arg arg= { ids, caller_trx ? caller_trx->id : 0 };
+
+    while ((*max_trx_id= get_rw_trx_hash_version()) != get_max_trx_id())
+      ut_delay(1);
+
+//    ut_ad(!ids->size());
+    ids->clear(); // why the heck purge_sys->view didn't clear it?
+    ids->reserve(rw_trx_hash.size() + 32);
+    rw_trx_hash.iterate(caller_trx,
+                        reinterpret_cast<my_hash_walk_action>(copy_one_id),
+                        &arg);
+    std::sort(ids->begin(), ids->end());
+  }
+
+
+  void bump_rw_trx_hash_version()
+  {
+    my_atomic_add64_explicit(reinterpret_cast<int64*>(&m_rw_trx_hash_version),
+                             1, MY_MEMORY_ORDER_RELEASE);
   }
 
 
@@ -914,6 +971,30 @@ private:
     if (element->id < *id)
       *id= element->id;
     return 0;
+  }
+
+
+  struct snapshot_ids_arg
+  {
+    trx_ids_t *ids;
+    trx_id_t exclude_id;
+  };
+
+
+  static my_bool copy_one_id(rw_trx_hash_element_t *element,
+                             snapshot_ids_arg *arg)
+  {
+    if (element->id != arg->exclude_id)
+      arg->ids->push_back(element->id);
+    return 0;
+  }
+
+
+  trx_id_t get_rw_trx_hash_version()
+  {
+    return my_atomic_load64_explicit(reinterpret_cast<int64*>
+                                     (&m_rw_trx_hash_version),
+                                     MY_MEMORY_ORDER_ACQUIRE);
   }
 };
 
