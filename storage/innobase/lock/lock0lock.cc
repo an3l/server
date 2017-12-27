@@ -5759,74 +5759,6 @@ private:
 	ulint		m_index;
 };
 
-/** This iterates over both the RW and RO trx_sys lists. We need to keep
-track where the iterator was up to and we do that using an ordinal value. */
-
-class TrxListIterator {
-public:
-	TrxListIterator() : m_index()
-	{
-		/* We iterate over the RW trx list first. */
-
-		m_trx_list = &trx_sys->rw_trx_list;
-	}
-
-	/** Get the current transaction whose ordinality is m_index.
-	@return current transaction or 0 */
-
-	const trx_t* current()
-	{
-		return(reposition());
-	}
-
-	/** Advance the transaction current ordinal value and reset the
-	transaction lock ordinal value */
-
-	void next()
-	{
-		++m_index;
-		m_lock_iter.rewind();
-	}
-
-	TrxLockIterator& lock_iter()
-	{
-		return(m_lock_iter);
-	}
-
-private:
-	/** Reposition the "cursor" on the current transaction. If it
-	is the first time then the "cursor" will be positioned on the
-	first transaction.
-
-	@return transaction instance or 0 */
-	const trx_t* reposition() const
-	{
-		ulint	i;
-		trx_t*	trx;
-
-		/* Make the transaction at the ordinal value of m_index
-		the current transaction. ie. reposition/restore */
-
-		for (i = 0, trx = UT_LIST_GET_FIRST(*m_trx_list);
-		     trx != NULL && (i < m_index);
-		     trx = UT_LIST_GET_NEXT(trx_list, trx), ++i) {
-
-			check_trx_state(trx);
-		}
-
-		return(trx);
-	}
-
-	/** Ordinal value of the transaction in the current transaction list */
-	ulint			m_index;
-
-	/** Current transaction list */
-	trx_ut_list_t*		m_trx_list;
-
-	/** For iterating over a transaction's locks */
-	TrxLockIterator		m_lock_iter;
-};
-
 /** Prints transaction lock wait and MVCC state.
 @param[in,out]	file	file where to print
 @param[in]	trx	transaction */
@@ -5887,8 +5819,6 @@ lock_rec_fetch_page(
 
 		lock_mutex_exit();
 
-		mutex_exit(&trx_sys->mutex);
-
 		DEBUG_SYNC_C("innodb_monitor_before_lock_page_read");
 
 		/* Check if the space is exists or not. only
@@ -5908,8 +5838,6 @@ lock_rec_fetch_page(
 
 		lock_mutex_enter();
 
-		mutex_enter(&trx_sys->mutex);
-
 		return(true);
 	}
 
@@ -5920,33 +5848,32 @@ lock_rec_fetch_page(
 Prints info of locks for a transaction.
 @return true if all printed, false if latches were released. */
 static
-bool
+void
 lock_trx_print_locks(
 /*=================*/
 	FILE*		file,		/*!< in/out: File to write */
-	const trx_t*	trx,		/*!< in: current transaction */
-	TrxLockIterator&iter,		/*!< in: transaction lock iterator */
-	bool		load_block)	/*!< in: if true then read block
-					from disk */
+	const trx_t*	trx)		/*!< in: current transaction */
 {
-	const lock_t* lock;
+	TrxLockIterator iter;
+	bool load_block= true;
 
+restart:
 	/* Iterate over the transaction's locks. */
-	while ((lock = iter.current(trx)) != 0) {
+	while (const lock_t *lock = iter.current(trx)) {
 
 		if (lock_get_type_low(lock) == LOCK_REC) {
 
 			if (load_block) {
 
 				/* Note: lock_rec_fetch_page() will
-				release both the lock mutex and the
-				trx_sys_t::mutex if it does a read
+				release lock mutex if it does a read
 				from disk. */
 
 				if (lock_rec_fetch_page(lock)) {
 					/* We need to resync the
 					current transaction. */
-					return(false);
+					load_block = false;
+					goto restart;
 				}
 
 				/* It is a single table tablespace
@@ -5984,9 +5911,36 @@ lock_trx_print_locks(
 			break;
 		}
 	}
-
-	return(true);
 }
+
+
+static my_bool lock_print_info_all_transactions_callback(
+  rw_trx_hash_element_t *element, FILE *file)
+{
+  mutex_enter(&element->mutex);
+  if (trx_t *trx= element->trx)
+  {
+    check_trx_state(trx);
+    lock_trx_print_wait_and_mvcc_state(file, trx);
+
+    if (srv_print_innodb_lock_monitor)
+    {
+      trx->reference();
+      mutex_exit(&element->mutex);
+
+      /*
+        If we need to print the locked record contents then we
+        need to fetch the containing block from the buffer pool.
+      */
+      lock_trx_print_locks(file, trx);
+      trx->release_reference();
+      return 0;
+    }
+  }
+  mutex_exit(&element->mutex);
+  return 0;
+}
+
 
 /*********************************************************************//**
 Prints info of locks for each transaction. This function assumes that the
@@ -6001,8 +5955,6 @@ lock_print_info_all_transactions(
 
 	fprintf(file, "LIST OF TRANSACTIONS FOR EACH SESSION:\n");
 
-	mutex_enter(&trx_sys->mutex);
-
 	/* First print info on non-active transactions */
 
 	/* NOTE: information of auto-commit non-locking read-only
@@ -6010,62 +5962,14 @@ lock_print_info_all_transactions(
 	available from INFORMATION_SCHEMA.INNODB_TRX. */
 
 	PrintNotStarted	print_not_started(file);
+	mutex_enter(&trx_sys->mutex);
 	ut_list_map(trx_sys->mysql_trx_list, print_not_started);
-
-	const trx_t*	trx;
-	TrxListIterator	trx_iter;
-	const trx_t*	prev_trx = 0;
-
-	/* Control whether a block should be fetched from the buffer pool. */
-	bool		load_block = true;
-	bool		monitor = srv_print_innodb_lock_monitor;
-
-	while ((trx = trx_iter.current()) != 0) {
-
-		check_trx_state(trx);
-
-		if (trx != prev_trx) {
-			lock_trx_print_wait_and_mvcc_state(file, trx);
-			prev_trx = trx;
-
-			/* The transaction that read in the page is no
-			longer the one that read the page in. We need to
-			force a page read. */
-			load_block = true;
-		}
-
-		/* If we need to print the locked record contents then we
-		need to fetch the containing block from the buffer pool. */
-		if (monitor) {
-
-			/* Print the locks owned by the current transaction. */
-			TrxLockIterator& lock_iter = trx_iter.lock_iter();
-
-			if (!lock_trx_print_locks(
-					file, trx, lock_iter, load_block)) {
-
-				/* Resync trx_iter, the trx_sys->mutex and
-				the lock mutex were released. A page was
-				successfully read in.  We need to print its
-				contents on the next call to
-				lock_trx_print_locks(). On the next call to
-				lock_trx_print_locks() we should simply print
-				the contents of the page just read in.*/
-				load_block = false;
-
-				continue;
-			}
-		}
-
-		load_block = true;
-
-		/* All record lock details were printed without fetching
-		a page from disk, or we didn't need to print the detail. */
-		trx_iter.next();
-	}
-
-	lock_mutex_exit();
 	mutex_exit(&trx_sys->mutex);
+
+	trx_sys->rw_trx_hash.iterate_no_dups(
+		reinterpret_cast<my_hash_walk_action>
+		(lock_print_info_all_transactions_callback), file);
+	lock_mutex_exit();
 
 	ut_ad(lock_validate());
 }
