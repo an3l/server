@@ -19820,7 +19820,7 @@ wsrep_fake_trx_id(
 	THD		*thd)	/*!< in: user thread handle */
 {
 	mutex_enter(&trx_sys->mutex);
-	trx_id_t trx_id = trx_sys_get_new_trx_id();
+	trx_id_t trx_id = trx_sys->get_new_trx_id();
 	mutex_exit(&trx_sys->mutex);
 	WSREP_DEBUG("innodb fake trx id: " TRX_ID_FMT " thd: %s",
 		    trx_id, wsrep_thd_query(thd));

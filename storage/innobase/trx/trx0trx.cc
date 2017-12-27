@@ -1062,7 +1062,7 @@ trx_lists_init_at_db_start()
 			" cleaned up in total " << rows_to_undo << unit
 			<< " row operations to undo";
 
-		ib::info() << "Trx id counter is " << trx_sys->max_trx_id;
+		ib::info() << "Trx id counter is " << trx_sys->get_max_trx_id();
 	}
 
 	std::sort(trx_sys->rw_trx_ids.begin(), trx_sys->rw_trx_ids.end());
@@ -1182,7 +1182,7 @@ trx_t::assign_temp_rseg()
 
 	if (id == 0) {
 		mutex_enter(&trx_sys->mutex);
-		id = trx_sys_get_new_trx_id();
+		id = trx_sys->get_new_trx_id();
 		trx_sys->rw_trx_ids.push_back(id);
 		mutex_exit(&trx_sys->mutex);
 		trx_sys->rw_trx_hash.insert(this);
@@ -1283,7 +1283,7 @@ trx_start_low(
 
 		trx_sys_mutex_enter();
 
-		trx->id = trx_sys_get_new_trx_id();
+		trx->id = trx_sys->get_new_trx_id();
 
 		trx_sys->rw_trx_ids.push_back(trx->id);
 
@@ -1315,7 +1315,7 @@ trx_start_low(
 
 				ut_ad(!srv_read_only_mode);
 
-				trx->id = trx_sys_get_new_trx_id();
+				trx->id = trx_sys->get_new_trx_id();
 
 				trx_sys->rw_trx_ids.push_back(trx->id);
 
@@ -1352,7 +1352,7 @@ trx_serialise(trx_t* trx, trx_rseg_t* rseg)
 
 	trx_sys_mutex_enter();
 
-	trx->no = trx_sys_get_new_trx_id();
+	trx->no = trx_sys->get_new_trx_id();
 
 	/* Track the minimum serialisation number. */
 	UT_LIST_ADD_LAST(trx_sys->serialisation_list, trx);
@@ -3039,7 +3039,7 @@ trx_set_rw_mode(
 	ut_d(trx->in_rw_trx_list = true);
 
 	mutex_enter(&trx_sys->mutex);
-	trx->id = trx_sys_get_new_trx_id();
+	trx->id = trx_sys->get_new_trx_id();
 
 	trx_sys->rw_trx_ids.push_back(trx->id);
 

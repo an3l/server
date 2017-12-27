@@ -44,6 +44,7 @@ Created 3/26/1996 Heikki Tuuri
 #ifdef WITH_WSREP
 #include "trx0xa.h"
 #endif /* WITH_WSREP */
+#include "mtr0log.h"
 
 typedef UT_LIST_BASE_NODE_T(trx_t) trx_ut_list_t;
 
@@ -132,21 +133,6 @@ trx_sysf_rseg_set_page_no(
 	ulint		page_no,	/*!< in: page number, FIL_NULL if
 					the slot is reset to unused */
 	mtr_t*		mtr);		/*!< in: mtr */
-/*****************************************************************//**
-Allocates a new transaction id.
-@return new, allocated trx id */
-UNIV_INLINE
-trx_id_t
-trx_sys_get_new_trx_id();
-/*===================*/
-/*****************************************************************//**
-Determines the maximum transaction id.
-@return maximum currently allocated trx id; will be stale after the
-next call to trx_sys_get_new_trx_id() */
-UNIV_INLINE
-trx_id_t
-trx_sys_get_max_trx_id(void);
-/*========================*/
 
 #ifdef UNIV_DEBUG
 /* Flag to control TRX_RSEG_N_SLOTS behavior debugging. */
@@ -419,6 +405,11 @@ FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID. */
 
 /** Size of the doublewrite block in pages */
 #define TRX_SYS_DOUBLEWRITE_BLOCK_SIZE	FSP_EXTENT_SIZE
+
+/** When a trx id which is zero modulo this number (which must be a power of
+two) is assigned, the field TRX_SYS_TRX_ID_STORE on the transaction system
+page is updated */
+#define TRX_SYS_TRX_ID_WRITE_MARGIN	((trx_id_t) 256)
 /* @} */
 
 trx_t* innobase_get_trx();
@@ -764,20 +755,24 @@ public:
 
 /** The transaction system central memory data structure. */
 struct trx_sys_t {
+private:
+  /**
+    The smallest number not yet assigned as a transaction id or transaction
+    number. Accessed and updated with atomic operations.
+  */
 
+  char pad0[CACHE_LINE_SIZE];
+  trx_id_t m_max_trx_id;
+  char pad1[CACHE_LINE_SIZE];
+
+
+public:
 	TrxSysMutex	mutex;		/*!< mutex protecting most fields in
 					this structure except when noted
 					otherwise */
 
 	MVCC*		mvcc;		/*!< Multi version concurrency control
 					manager */
-	volatile trx_id_t
-			max_trx_id;	/*!< The smallest number not yet
-					assigned as a transaction id or
-					transaction number. This is declared
-					volatile because it can be accessed
-					without holding any mutex during
-					AC-NL-RO view creation. */
 	trx_ut_list_t	serialisation_list;
 					/*!< Ordered on trx_t::no of all the
 					currenrtly active RW transactions */
@@ -787,7 +782,7 @@ struct trx_sys_t {
 #endif /* UNIV_DEBUG */
 
 	/** Avoid false sharing */
-	const char	pad2[CACHE_LINE_SIZE];
+	char	pad2[CACHE_LINE_SIZE];
 	trx_ut_list_t	mysql_trx_list;	/*!< List of transactions created
 					for MySQL. All user transactions are
 					on mysql_trx_list. The rw_trx_hash
@@ -808,11 +803,11 @@ struct trx_sys_t {
 					consistent snapshot. */
 
 	/** Avoid false sharing */
-	const char	pad3[CACHE_LINE_SIZE];
+	char	pad3[CACHE_LINE_SIZE];
 	/** Temporary rollback segments */
 	trx_rseg_t*	temp_rsegs[TRX_SYS_N_RSEGS];
 	/** Avoid false sharing */
-	const char	pad4[CACHE_LINE_SIZE];
+	char	pad4[CACHE_LINE_SIZE];
 
 	trx_rseg_t*	rseg_array[TRX_SYS_N_RSEGS];
 					/*!< Pointer array to rollback
@@ -833,9 +828,9 @@ struct trx_sys_t {
     Works faster when it is on it's own cache line (tested).
   */
 
-  const char pad5[CACHE_LINE_SIZE];
+  char pad5[CACHE_LINE_SIZE];
   rw_trx_hash_t rw_trx_hash;
-  const char pad6[CACHE_LINE_SIZE];
+  char pad6[CACHE_LINE_SIZE];
 
   /** List of recovered committed transactions to clean-up. */
   trx_ut_list_t purge_list;
@@ -848,15 +843,67 @@ struct trx_sys_t {
     must look at the trx->state to find out if the minimum trx id transaction
     itself is active, or already committed.)
 
-    @return the minimum trx id, or trx_sys->max_trx_id if the trx list is empty
+    @return the minimum trx id, or trx_sys->m_max_trx_id if the trx list is
+            empty
   */
 
   trx_id_t get_min_trx_id(void)
   {
-    trx_id_t id= trx_sys_get_max_trx_id();
+    trx_id_t id= get_max_trx_id();
     rw_trx_hash.iterate(reinterpret_cast<my_hash_walk_action>
                         (get_min_trx_id_callback), &id);
     return id;
+  }
+
+
+  /**
+    Determines the maximum transaction id.
+
+    @return maximum currently allocated trx id; will be stale after the
+            next call to trx_sys->get_new_trx_id()
+  */
+
+  trx_id_t get_max_trx_id(void)
+  {
+    return static_cast<trx_id_t>
+           (my_atomic_load64_explicit(reinterpret_cast<int64*>(&m_max_trx_id),
+                                      MY_MEMORY_ORDER_RELAXED));
+  }
+
+
+  /**
+    Allocates a new transaction id.
+
+    VERY important: after the database is started, m_max_trx_id value is
+    divisible by TRX_SYS_TRX_ID_WRITE_MARGIN, and the following if
+    will evaluate to TRUE when this function is first time called,
+    and the value for trx id will be written to disk-based header!
+    Thus trx id values will not overlap when the database is
+    repeatedly started!
+
+    @return new, allocated trx id
+  */
+
+  trx_id_t get_new_trx_id()
+  {
+    ut_ad(mutex_own(&trx_sys->mutex));
+    trx_id_t id= static_cast<trx_id_t>(my_atomic_add64_explicit(
+      reinterpret_cast<int64*>(&m_max_trx_id), 1, MY_MEMORY_ORDER_RELAXED));
+
+    if (!(id % TRX_SYS_TRX_ID_WRITE_MARGIN) && !srv_read_only_mode)
+    {
+      mtr_t mtr;
+      mtr_start(&mtr);
+      mlog_write_ull(trx_sysf_get(&mtr) + TRX_SYS_TRX_ID_STORE, id, &mtr);
+      mtr_commit(&mtr);
+    }
+    return(id);
+  }
+
+
+  void init_max_trx_id(trx_id_t value)
+  {
+    m_max_trx_id= value;
   }
 
 
@@ -869,11 +916,6 @@ private:
     return 0;
   }
 };
-
-/** When a trx id which is zero modulo this number (which must be a power of
-two) is assigned, the field TRX_SYS_TRX_ID_STORE on the transaction system
-page is updated */
-#define TRX_SYS_TRX_ID_WRITE_MARGIN	((trx_id_t) 256)
 
 /** Test if trx_sys->mutex is owned. */
 #define trx_sys_mutex_own() (trx_sys->mutex.is_owned())
