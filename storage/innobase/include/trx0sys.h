@@ -787,17 +787,10 @@ struct trx_sys_t {
 #endif /* UNIV_DEBUG */
 
 	/** Avoid false sharing */
-	const char	pad1[CACHE_LINE_SIZE];
-	trx_ut_list_t	rw_trx_list;	/*!< List of active and committed in
-					memory read-write transactions, sorted
-					on trx id, biggest first. Recovered
-					transactions are always on this list. */
-
-	/** Avoid false sharing */
 	const char	pad2[CACHE_LINE_SIZE];
 	trx_ut_list_t	mysql_trx_list;	/*!< List of transactions created
 					for MySQL. All user transactions are
-					on mysql_trx_list. The rw_trx_list
+					on mysql_trx_list. The rw_trx_hash
 					can contain system transactions and
 					recovered transactions that will not
 					be in the mysql_trx_list.

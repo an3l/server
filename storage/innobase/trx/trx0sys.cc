@@ -469,7 +469,6 @@ trx_sys_create(void)
 	mutex_create(LATCH_ID_TRX_SYS, &trx_sys->mutex);
 
 	UT_LIST_INIT(trx_sys->serialisation_list, &trx_t::no_list);
-	UT_LIST_INIT(trx_sys->rw_trx_list, &trx_t::trx_list);
 	UT_LIST_INIT(trx_sys->mysql_trx_list, &trx_t::mysql_trx_list);
 	UT_LIST_INIT(trx_sys->purge_list, &trx_t::mysql_trx_list);
 

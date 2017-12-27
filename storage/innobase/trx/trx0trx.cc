@@ -955,13 +955,11 @@ trx_resurrect_update(
 }
 
 static inline void trx_sys_add_trx_at_init(trx_t *trx, trx_undo_t *undo,
-                                           ib_uint64_t *rows_to_undo,
-                                           TrxIdSet *set)
+                                           ib_uint64_t *rows_to_undo)
 {
   ut_ad(trx->id != 0);
   ut_ad(trx->is_recovered);
 
-  set->insert(TrxTrack(trx->id, trx));
   if (trx_state_eq(trx, TRX_STATE_ACTIVE) ||
       trx_state_eq(trx, TRX_STATE_PREPARED))
   {
@@ -985,7 +983,6 @@ static inline void trx_sys_add_trx_at_init(trx_t *trx, trx_undo_t *undo,
 void
 trx_lists_init_at_db_start()
 {
-	TrxIdSet set;
 	ib_uint64_t	rows_to_undo	= 0;
 	ut_a(srv_is_being_started);
 	ut_ad(!srv_was_started);
@@ -1018,7 +1015,7 @@ trx_lists_init_at_db_start()
 		     undo = UT_LIST_GET_NEXT(undo_list, undo)) {
 			trx_t*	trx = trx_resurrect_insert(undo, rseg);
 			trx->start_time = start_time;
-			trx_sys_add_trx_at_init(trx, undo, &rows_to_undo, &set);
+			trx_sys_add_trx_at_init(trx, undo, &rows_to_undo);
 		}
 
 		/* Ressurrect other transactions. */
@@ -1027,8 +1024,16 @@ trx_lists_init_at_db_start()
 		     undo = UT_LIST_GET_NEXT(undo_list, undo)) {
 
 			/* Check if trx_id was already registered first. */
-			TrxIdSet::iterator it = set.find(TrxTrack(undo->trx_id));
-			trx_t *trx= (it == set.end() ? 0 : it->m_trx);
+			trx_t *trx= trx_sys->rw_trx_hash.find(undo->trx_id);
+			/* Check purge_list as well. */
+			if (trx == NULL) {
+				for (trx= UT_LIST_GET_FIRST(trx_sys->purge_list);
+				trx != NULL;
+				trx = UT_LIST_GET_NEXT(mysql_trx_list, trx)) {
+					if (trx->id == undo->trx_id)
+						break;
+				}
+			}
 
 			if (trx == NULL) {
 				trx = trx_allocate_for_background();
@@ -1039,11 +1044,12 @@ trx_lists_init_at_db_start()
 			}
 
 			trx_resurrect_update(trx, undo, rseg);
-			trx_sys_add_trx_at_init(trx, undo, &rows_to_undo, &set);
+			trx_sys_add_trx_at_init(trx, undo, &rows_to_undo);
 		}
 	}
 
-	if (set.size()) {
+	if (uint32_t size = UT_LIST_GET_LEN(trx_sys->purge_list) +
+			    trx_sys->rw_trx_hash.size()) {
 		const char*	unit		= "";
 
 		if (rows_to_undo > 1000000000) {
@@ -1051,7 +1057,7 @@ trx_lists_init_at_db_start()
 			rows_to_undo = rows_to_undo / 1000000;
 		}
 
-		ib::info() << set.size()
+		ib::info() << size
 			<< " transaction(s) which must be rolled back or"
 			" cleaned up in total " << rows_to_undo << unit
 			<< " row operations to undo";
@@ -1059,18 +1065,6 @@ trx_lists_init_at_db_start()
 		ib::info() << "Trx id counter is " << trx_sys->max_trx_id;
 	}
 
-	TrxIdSet::iterator	end = set.end();
-
-	for (TrxIdSet::iterator it = set.begin();
-	     it != end;
-	     ++it) {
-
-		if (it->m_trx->state == TRX_STATE_ACTIVE
-		    || it->m_trx->state == TRX_STATE_PREPARED) {
-
-			UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, it->m_trx);
-		}
-	}
 	std::sort(trx_sys->rw_trx_ids.begin(), trx_sys->rw_trx_ids.end());
 }
 
@@ -1296,8 +1290,6 @@ trx_start_low(
 		ut_ad(trx->rsegs.m_redo.rseg != 0
 		      || srv_read_only_mode
 		      || srv_force_recovery >= SRV_FORCE_NO_TRX_UNDO);
-
-		UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, trx);
 
 #ifdef UNIV_DEBUG
 		if (trx->id > trx_sys->rw_max_trx_id) {
@@ -1651,7 +1643,7 @@ trx_update_mod_tables_timestamp(
 Erase the transaction from running transaction lists and serialization
 list. Active RW transaction list of a MVCC snapshot(ReadView::prepare)
 won't include this transaction after this call. All implicit locks are
-also released by this call as trx is removed from rw_trx_list.
+also released by this call as trx is removed from rw_trx_hash.
 @param[in] trx		Transaction to erase, must have an ID > 0
 @param[in] serialised	true if serialisation log was written */
 static
@@ -1669,8 +1661,6 @@ trx_erase_lists(
 	} else {
 
 		trx_sys_mutex_enter();
-		UT_LIST_REMOVE(trx_sys->rw_trx_list, trx);
-
 		if (trx->read_view != NULL) {
 			trx_sys->mvcc->view_close(trx->read_view, true);
 		}
@@ -2901,7 +2891,7 @@ trx_start_if_not_started_xa_low(
 			/* If the transaction is tagged as read-only then
 			it can only write to temp tables and for such
 			transactions we don't want to move them to the
-			trx_sys_t::rw_trx_list. */
+			trx_sys_t::rw_trx_hash. */
 			if (!trx->read_only) {
 				trx_set_rw_mode(trx);
 			}
@@ -3063,8 +3053,6 @@ trx_set_rw_mode(
 		trx_sys->rw_max_trx_id = trx->id;
 	}
 #endif /* UNIV_DEBUG */
-
-	UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, trx);
 
 	mutex_exit(&trx_sys->mutex);
 	trx_sys->rw_trx_hash.insert(trx);

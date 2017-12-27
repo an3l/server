@@ -436,7 +436,7 @@ trx_set_dict_operation(
 Determines if a transaction is in the given state.
 The caller must hold trx_sys->mutex, or it must be the thread
 that is serving a running transaction.
-A running RW transaction must be in trx_sys->rw_trx_list.
+A running RW transaction must be in trx_sys->rw_trx_hash.
 @return TRUE if trx->state == state */
 UNIV_INLINE
 bool
@@ -591,7 +591,7 @@ with an explicit check for the read-only status.
 ((t)->read_only && trx_is_autocommit_non_locking((t)))
 
 /**
-Assert that the transaction is in the trx_sys_t::rw_trx_list */
+Assert that the transaction is in the trx_sys_t::rw_trx_hash */
 #define assert_trx_in_rw_list(t) do {					\
 	ut_ad(!(t)->read_only);						\
 	ut_ad((t)->in_rw_trx_list					\
@@ -639,7 +639,7 @@ transaction pool.
 #ifdef UNIV_DEBUG
 /*******************************************************************//**
 Assert that an autocommit non-locking select cannot be in the
-rw_trx_list and that it is a read-only transaction.
+rw_trx_hash and that it is a read-only transaction.
 The tranasction must be in the mysql_trx_list. */
 # define assert_trx_nonlocking_or_in_list(t)				\
 	do {								\
@@ -659,7 +659,7 @@ The tranasction must be in the mysql_trx_list. */
 #else /* UNIV_DEBUG */
 /*******************************************************************//**
 Assert that an autocommit non-locking slect cannot be in the
-rw_trx_list and that it is a read-only transaction.
+rw_trx_hash and that it is a read-only transaction.
 The tranasction must be in the mysql_trx_list. */
 # define assert_trx_nonlocking_or_in_list(trx) ((void)0)
 #endif /* UNIV_DEBUG */
@@ -972,13 +972,13 @@ public:
 	list. During this switch we assign it a rollback segment.
 
 	When a transaction is NOT_STARTED, it can be in_mysql_trx_list if
-	it is a user transaction. It cannot be in rw_trx_list.
+	it is a user transaction. It cannot be in rw_trx_hash.
 
 	ACTIVE->PREPARED->COMMITTED is only possible when trx->in_rw_trx_list.
 	The transition ACTIVE->PREPARED is protected by trx_sys->mutex.
 
 	ACTIVE->COMMITTED is possible when the transaction is in
-	rw_trx_list.
+	rw_trx_hash.
 
 	Transitions to COMMITTED are protected by both lock_sys->mutex
 	and trx->mutex.
@@ -992,9 +992,6 @@ public:
 	ReadView*	read_view;	/*!< consistent read view used in the
 					transaction, or NULL if not yet set */
 
-	UT_LIST_NODE_T(trx_t)
-			trx_list;	/*!< list of transactions;
-					protected by trx_sys->mutex. */
 	UT_LIST_NODE_T(trx_t)
 			no_list;	/*!< Required during view creation
 					to check for the view limit for
@@ -1120,7 +1117,7 @@ public:
 	/** The following two fields are mutually exclusive. */
 	/* @{ */
 
-	bool		in_rw_trx_list;	/*!< true if in trx_sys->rw_trx_list */
+	bool		in_rw_trx_list;	/*!< true if in trx_sys->rw_trx_hash */
 	/* @} */
 #endif /* UNIV_DEBUG */
 	UT_LIST_NODE_T(trx_t)
