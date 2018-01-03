@@ -396,9 +396,11 @@ static Sys_var_vers_asof Sys_vers_asof_timestamp(
        SESSION_VAR(vers_asof_timestamp.type), NO_CMD_LINE,
        Sys_var_vers_asof::asof_keywords, DEFAULT(SYSTEM_TIME_UNSPECIFIED));
 
+#ifdef DBUG_OFF
 static Sys_var_mybool Sys_vers_force(
-       "system_versioning_force", "Force system versioning for all created tables",
+       "debug_system_versioning_force", "Force system versioning for all created tables",
        SESSION_VAR(vers_force), CMD_LINE(OPT_ARG), DEFAULT(FALSE));
+#endif
 
 static Sys_var_mybool Sys_vers_innodb_algorithm_simple(
        "system_versioning_innodb_algorithm_simple",
