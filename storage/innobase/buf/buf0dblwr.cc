@@ -1,7 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 1995, 2017, Oracle and/or its affiliates. All Rights Reserved.
-Copyright (c) 2013, 2017, MariaDB Corporation.
+Copyright (c) 2013, 2018, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -601,25 +601,36 @@ buf_dblwr_process()
 		const bool is_all_zero = buf_page_is_zeroes(
 			read_buf, page_size);
 
+		bool success = true;
+
 		if (is_all_zero) {
 			/* We will check if the copy in the
 			doublewrite buffer is valid. If not, we will
 			ignore this page (there should be redo log
 			records to initialize it). */
 		} else {
-			if (fil_page_is_compressed_encrypted(read_buf) ||
-			    fil_page_is_compressed(read_buf)) {
-				/* Decompress the page before
+			/* Page is always fist compressed and then
+			encrypted. Here we can only decompress pages
+			if they are not encrypted. */
+			if (fil_page_is_compressed(read_buf)) {
+
+				/* Verify post compression checksum and
+				if it matches decompress the page before
 				validating the checksum. */
-				fil_decompress_page(
+				if(!fil_verify_compression_checksum(read_buf,
+						space_id, page_no)
+				   || !fil_decompress_page(
 					NULL, read_buf, srv_page_size,
-					NULL, true);
+					NULL)) {
+					success = false;
+				}
 			}
 
-			if (fil_space_verify_crypt_checksum(
-				    read_buf, page_size, space_id, page_no)
-			   || !buf_page_is_corrupted(
-				   true, read_buf, page_size, space)) {
+			if (success
+			    && (fil_space_verify_crypt_checksum(
+					read_buf, page_size, space_id, page_no)
+			        || !buf_page_is_corrupted(
+					true, read_buf, page_size, space))) {
 				/* The page is good; there is no need
 				to consult the doublewrite buffer. */
 				continue;
@@ -633,17 +644,26 @@ buf_dblwr_process()
 		}
 
 		/* Next, validate the doublewrite page. */
-		if (fil_page_is_compressed_encrypted(page) ||
-		    fil_page_is_compressed(page)) {
-			/* Decompress the page before
+		/* Page is always fist compressed and then
+		encrypted. Here we can only decompress pages
+		if they are not encrypted. */
+		if (fil_page_is_compressed(page)) {
+			/* Verify post compression checksum and
+			if it matches decompress the page before
 			validating the checksum. */
-			fil_decompress_page(
-				NULL, page, srv_page_size, NULL, true);
+			if(!fil_verify_compression_checksum(page,
+					space_id, page_no)
+			   || !fil_decompress_page(
+					NULL, page, srv_page_size,
+					NULL)) {
+				success = false;
+			}
 		}
 
-		if (!fil_space_verify_crypt_checksum(page, page_size,
+		if (!success
+		    || (!fil_space_verify_crypt_checksum(page, page_size,
 						     space_id, page_no)
-		    && buf_page_is_corrupted(true, page, page_size, space)) {
+			&& buf_page_is_corrupted(true, page, page_size, space))) {
 			if (!is_all_zero) {
 				ib::warn() << "A doublewrite copy of page "
 					<< page_id << " is corrupted.";

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (C) 2013, 2017 MariaDB Corporation. All Rights Reserved.
+Copyright (C) 2013, 2018 MariaDB Corporation. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -18,6 +18,8 @@ this program; if not, write to the Free Software Foundation, Inc.,
 
 #ifndef fil0pagecompress_h
 #define fil0pagecompress_h
+
+#ifndef UNIV_INNOCHECKSUM
 
 #include "fsp0fsp.h"
 #include "fsp0pagecompress.h"
@@ -49,21 +51,44 @@ fil_compress_page(
 	ulint*	out_len);	/*!< out: actual length of compressed
 				page */
 
-/****************************************************************//**
+/**
 For page compressed pages decompress the page after actual read
-operation. */
+operation.
+@param[in]	page_buf	Preallocated temporal buffer where
+				compression is done and then copied
+				to the buffer.
+@param[in,out]	buf		Compressed page and after suggesful
+				decompresses operation uncompressed page.
+@param[in]	len		Length of output buffer.
+@param[out]	write_size	Actual payload size of the compressed data.
+@return true when operation succeeded or false when failed */
 UNIV_INTERN
-void
+bool
 fil_decompress_page(
-/*================*/
-	byte*	page_buf,	/*!< in: preallocated buffer or NULL */
-	byte*	buf,		/*!< out: buffer from which to read; in aio
-				this must be appropriately aligned */
-	ulong	len,		/*!< in: length of output buffer.*/
-	ulint*	write_size,	/*!< in/out: Actual payload size of
-				the compressed data. */
-	bool	return_error=false);
-				/*!< in: true if only an error should
-				be produced when decompression fails.
-				By default this parameter is false. */
-#endif
+	byte*	page_buf,
+	byte*	buf,
+	ulong	len,
+	ulint*	write_size)
+	MY_ATTRIBUTE((warn_unused_result));
+
+#endif /* !UNIV_INNOCHECKSUM */
+
+/**
+Verify that stored post compression checksum matches calculated
+checksum. Note that old format did not have a checksum and
+in that case either original pre-compression page checksum will
+fail after decompression or page decompression fails.
+
+@param[in,out]	page		page frame
+@param[in]	space_id	Tablespace identifier
+@param[in]	offset		Page offset
+@return true if post compression checksum matches, false otherwise */
+UNIV_INTERN
+bool
+fil_verify_compression_checksum(
+	const byte*		page,
+	ulint			space_id,
+	ulint			offset)
+	MY_ATTRIBUTE((warn_unused_result));
+
+#endif /* fil0pagecompress_h */

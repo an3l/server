@@ -1,7 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 1995, 2017, Oracle and/or its affiliates. All Rights Reserved.
-Copyright (c) 2014, 2017, MariaDB Corporation.
+Copyright (c) 2014, 2018, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -5796,7 +5796,7 @@ fil_iterate(
 							dst, //dst
 							callback.get_page_size(),
 							src, // src
-							&err); // src
+							&err);
 
 				if (err != DB_SUCCESS) {
 					return(err);
@@ -5816,8 +5816,10 @@ fil_iterate(
 			/* If the original page is page_compressed, we need
 			to decompress page before we can update it. */
 			if (page_compressed) {
-				fil_decompress_page(NULL, dst, ulong(size),
-						    NULL);
+				if (!fil_decompress_page(NULL, dst, ulong(size),
+						NULL)) {
+					return (DB_PAGE_CORRUPTED);
+				}
 				updated = true;
 			}
 

@@ -1,6 +1,6 @@
 /*
    Copyright (c) 2005, 2016, Oracle and/or its affiliates. All rights reserved.
-   Copyright (c) 2014, 2017, MariaDB Corporation.
+   Copyright (c) 2014, 2018, MariaDB Corporation.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -70,6 +70,7 @@ typedef void fil_space_t;
 #include "ut0crc32.h"            /* ut_crc32_init() */
 #include "fsp0pagecompress.h"    /* fil_get_compression_alg_name */
 #include "fil0crypt.h"           /* fil_space_verify_crypt_checksum */
+#include "fil0pagecompress.h"    /* fil_verify_compression_checksum */
 
 #include <string.h>
 
@@ -480,13 +481,9 @@ is_page_corrupted(
 		buf + FIL_PAGE_ARCH_LOG_NO_OR_SPACE_ID);
 
 	/* We can't trust only a page type, thus we take account
-	also fsp_flags or crypt_data on page 0 */
-	if ((page_type == FIL_PAGE_PAGE_COMPRESSED && is_compressed) ||
-	    (page_type == FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED &&
-	     is_compressed && is_encrypted)) {
-		/* Page compressed tables do not contain post compression
-		checksum. */
-		return (false);
+	also fsp_flags. */
+	if (page_type == FIL_PAGE_PAGE_COMPRESSED && is_compressed) {
+		return(!fil_verify_compression_checksum(buf, space_id, cur_page_num));
 	}
 
 	if (page_size.is_compressed()) {

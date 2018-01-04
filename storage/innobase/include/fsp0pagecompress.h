@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (C) 2013, 2017, MariaDB Corporation. All Rights Reserved.
+Copyright (C) 2013, 2018, MariaDB Corporation. All Rights Reserved.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -38,6 +38,7 @@ Created 11/12/2013 Jan Lindström jan.lindstrom@skysql.com
 #define PAGE_SNAPPY_ALGORITHM	6
 #define PAGE_ALGORITHM_LAST	PAGE_SNAPPY_ALGORITHM
 
+#ifndef UNIV_INNOCHECKSUM
 /**********************************************************************//**
 Reads the page compression level from the first page of a tablespace.
 @return	page compression level, or 0 if uncompressed */
@@ -46,6 +47,7 @@ ulint
 fsp_header_get_compression_level(
 /*=============================*/
 	const page_t*	page);	/*!< in: first page of a tablespace */
+#endif /* !UNIV_INNOCHECKSUM */
 
 /********************************************************************//**
 Extract the page compression level from tablespace flags.

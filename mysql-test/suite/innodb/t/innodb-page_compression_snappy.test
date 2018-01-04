@@ -4,10 +4,18 @@
 
 call mtr.add_suppression("InnoDB: Compression failed for space [0-9]+ name test/innodb_page_compressed[0-9] len [0-9]+ err 2 write_size [0-9]+.");
 
+let $innodb_compression_algorithm_orig=`SELECT @@innodb_compression_algorithm`;
+
 # snappy
 set global innodb_compression_algorithm = snappy;
+select @@innodb_compression_algorithm;
 
-# All page compression test use the same
+# All page compression tests use the same
 --source include/innodb-page-compression.inc
 
 -- echo #done
+
+# reset system
+--disable_query_log
+EVAL SET GLOBAL innodb_compression_algorithm = $innodb_compression_algorithm_orig;
+--enable_query_log

@@ -1,7 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 1995, 2016, Oracle and/or its affiliates. All Rights Reserved.
-Copyright (c) 2017, MariaDB Corporation.
+Copyright (c) 2017, 2018, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -29,6 +29,8 @@ Created Aug 11, 2011 Vasil Dimov
 #include "ut0crc32.h"
 #include "ut0rnd.h"
 #include "buf0checksum.h"
+#include "mtr0types.h"
+#include "mach0data.h"
 
 #ifndef UNIV_INNOCHECKSUM
 #include "srv0srv.h"
@@ -146,4 +148,45 @@ buf_checksum_algorithm_name(srv_checksum_algorithm_t algo)
 
 	ut_error;
 	return(NULL);
+}
+
+/** Calculates the CRC32 checksum of a page compressed page. The value is
+stored to the page when it is written to a file and also checked for
+a match when reading from the file. Checksum is calculated from
+actual payload of the compressed page and some header fields.
+
+@param[in]	page			buffer page (UNIV_PAGE_SIZE bytes)
+@return checksum */
+uint32_t
+buf_calc_compressed_crc32(
+	const byte*	page)
+{
+	/* In page compressed pages compression method is stored to field
+	FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION, thus add it to checksum.
+	In pages first compressed and then encrypted same field
+	contains key version after compression. */
+
+	ut_crc32_func_t	crc32_func = ut_crc32;
+
+	ulint header_len = mach_read_from_2(page + FIL_PAGE_TYPE) == FIL_PAGE_PAGE_COMPRESSED ?
+		FIL_PAGE_SPACE_ID - FIL_PAGE_OFFSET :
+		FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION - FIL_PAGE_OFFSET;
+
+	const uint32_t	c1 = crc32_func(
+		page + FIL_PAGE_OFFSET,
+		header_len);
+
+	/* Calculate checksum from actual payload including stored size
+	field. In encrypted case add also compression method field. */
+	ulint payload_len = mach_read_from_2(page+FIL_PAGE_DATA)+FIL_PAGE_COMPRESSED_SIZE;
+
+	if (mach_read_from_2(page + FIL_PAGE_TYPE) == FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED) {
+		payload_len += FIL_PAGE_COMPRESSION_METHOD_SIZE;
+	}
+
+	const uint32_t	c2 = crc32_func(
+		page + FIL_PAGE_DATA,
+		payload_len);
+
+	return(c1 ^ c2);
 }

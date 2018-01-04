@@ -1,7 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 2000, 2017, Oracle and/or its affiliates. All Rights Reserved.
-Copyright (c) 2013, 2017, MariaDB Corporation.
+Copyright (c) 2013, 2018, MariaDB Corporation.
 Copyright (c) 2008, 2009 Google Inc.
 Copyright (c) 2009, Percona Inc.
 Copyright (c) 2012, Facebook Inc.
@@ -2107,6 +2107,7 @@ convert_error_code_to_mysql(
 						code should be introduced */
 
 	case DB_CORRUPTION:
+	case DB_PAGE_CORRUPTED:
 		return(HA_ERR_CRASHED);
 
 	case DB_OUT_OF_FILE_SPACE:
@@ -6575,6 +6576,8 @@ no_such_table:
 					space()->chain.start->name);
 				ret_err = HA_ERR_DECRYPTION_FAILED;
 			}
+		} else if (ib_table->corrupted) {
+			ret_err = HA_ERR_CRASHED;
 		}
 
 		dict_table_close(ib_table, FALSE, FALSE);

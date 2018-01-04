@@ -1,0 +1,67 @@
+call mtr.add_suppression("InnoDB:  Page \[page id: space=[0-9]+, page number=[0-9]+\] may be corrupted. Post compression checksum [0-9]+ stored [0-9]+.");
+call mtr.add_suppression("InnoDB: Database page corruption on disk or a failed file read of tablespace test/t[0-9]+ page \[page id: space=[0-9]+, page number=[0-9]+\]. You may have to recover from a backup.");
+call mtr.add_suppression("mysqld: Index for table .* is corrupt; try to repair it");
+call mtr.add_suppression("InnoDB: We detected index corruption in an InnoDB type table.*");
+call mtr.add_suppression("InnoDB: Background Page read failed to read or decrypt \[page id: space=[0-9]+, page number=[0-9]+\]");
+call mtr.add_suppression("InnoDB: Page \[page id: space=[0-9]+, page number= [0-9]+\] in file ./test/t[0-9]+.ibd may be corrupted. Post compression checksum .*");
+SET GLOBAL innodb_file_format = `Barracuda`;
+SET GLOBAL innodb_file_per_table = ON;
+set global innodb_compression_algorithm = 1;
+CREATE TABLE t1 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1 ENCRYPTED=YES ENCRYPTION_KEY_ID=4;
+CREATE TABLE t2 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1 ENCRYPTED=YES ENCRYPTION_KEY_ID=4;
+CREATE TABLE t3 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1 ENCRYPTED=YES ENCRYPTION_KEY_ID=4;
+CREATE TABLE t4 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t5 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t6 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t7 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t8 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t9 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t10 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t11 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+# Restart server with 30s timeout to avoid recovery
+# t1 Corrupt FIL_PAGE_TYPE
+# t2 Corrupt FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION
+# t3 Corrupt post encryption checksum
+# t4 Corrupt FIL_PAGE_COMPRESSED_SIZE
+# t5 Corrupt FIL_PAGE_COMPRESSION_METHOD
+# t6 Corrupt FIL_PAGE_COMPRESSION_METHOD (not encrypted)
+# t7 Corrupt post compression checksum
+# t8 Corrupt compressed data
+# t9 BUF_NO_CHECKSUM_MAGIC 0xDEADBEEFUL + corrupt  FIL_PAGE_COMPRESSED_SIZE
+# t10 BUF_NO_CHECKSUM_MAGIC 0xDEADBEEFUL + corrupt  FIL_PAGE_COMPRESSED_METHOD
+# t11 BUF_NO_CHECKSUM_MAGIC 0xDEADBEEFUL + corrupt compressed data
+# Run innochecksum on t11
+# Run innochecksum on t10
+# Run innochecksum on t9
+# Run innochecksum on t8
+# Run innochecksum on t7
+# Run innochecksum on t6
+# Run innochecksum on t5
+# Run innochecksum on t4
+# Run innochecksum on t3
+# Run innochecksum on t2
+# Run innochecksum on t1
+# Start server again
+select * from t1;
+Got one of the listed errors
+select * from t2;
+ERROR HY000: Index for table 't2' is corrupt; try to repair it
+select * from t3;
+ERROR HY000: Index for table 't3' is corrupt; try to repair it
+select * from t4;
+ERROR HY000: Index for table 't4' is corrupt; try to repair it
+select * from t5;
+ERROR HY000: Index for table 't5' is corrupt; try to repair it
+select * from t6;
+ERROR HY000: Index for table 't6' is corrupt; try to repair it
+select * from t7;
+ERROR HY000: Index for table 't7' is corrupt; try to repair it
+select * from t8;
+ERROR HY000: Index for table 't8' is corrupt; try to repair it
+select * from t9;
+ERROR HY000: Index for table 't9' is corrupt; try to repair it
+select * from t10;
+ERROR HY000: Index for table 't10' is corrupt; try to repair it
+select * from t11;
+ERROR HY000: Index for table 't11' is corrupt; try to repair it
+drop table t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11;

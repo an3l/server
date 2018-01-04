@@ -1,6 +1,12 @@
 call mtr.add_suppression("InnoDB: Compression failed for space [0-9]+ name test/innodb_page_compressed[0-9] len [0-9]+ err 2 write_size [0-9]+.");
 set global innodb_file_format = `Barracuda`;
 set global innodb_file_per_table = on;
+call mtr.add_suppression("mysqld: Index for table .* is corrupt; try to repair it");
+call mtr.add_suppression("InnoDB: Page \[page id: space=[0-9]+, page number= [0-9]+\] in file .* may be corrupted. .*");
+call mtr.add_suppression("InnoDB: Database page corruption on disk or a failed file read of tablespace .*");
+call mtr.add_suppression("InnoDB: We detected index corruption in an InnoDB type table. .*");
+create database comp_test;
+use comp_test;
 create table innodb_normal (c1 int not null auto_increment primary key, b char(200)) engine=innodb;
 create table innodb_page_compressed1 (c1 int not null auto_increment primary key, b char(200)) engine=innodb page_compressed=1 page_compression_level=1;
 create table innodb_page_compressed2 (c1 int not null auto_increment primary key, b char(200)) engine=innodb page_compressed=1 page_compression_level=2;
@@ -58,6 +64,7 @@ NOT FOUND /AaAaAaAa/ in innodb_page_compressed7.ibd
 NOT FOUND /AaAaAaAa/ in innodb_page_compressed8.ibd
 # innodb_page_compressed9 page compressed expected NOT FOUND
 NOT FOUND /AaAaAaAa/ in innodb_page_compressed9.ibd
+use comp_test;
 select count(*) from innodb_page_compressed1;
 count(*)
 10000
@@ -85,14 +92,19 @@ count(*)
 select count(*) from innodb_page_compressed9;
 count(*)
 10000
-drop table innodb_normal;
-drop table innodb_page_compressed1;
-drop table innodb_page_compressed2;
-drop table innodb_page_compressed3;
-drop table innodb_page_compressed4;
-drop table innodb_page_compressed5;
-drop table innodb_page_compressed6;
-drop table innodb_page_compressed7;
-drop table innodb_page_compressed8;
-drop table innodb_page_compressed9;
+# Restart server with 30s timeout to avoid recovery
+# Corrupting tablespaces...
+# Corruption done
+# Start server again
+use comp_test;
+select * from innodb_page_compressed1;
+ERROR HY000: Index for table 'innodb_page_compressed1' is corrupt; try to repair it
+select * from innodb_page_compressed2;
+ERROR HY000: Index for table 'innodb_page_compressed2' is corrupt; try to repair it
+select * from innodb_page_compressed3;
+ERROR HY000: Index for table 'innodb_page_compressed3' is corrupt; try to repair it
+select * from innodb_page_compressed4;
+ERROR HY000: Index for table 'innodb_page_compressed4' is corrupt; try to repair it
+use test;
+drop database comp_test;
 #done

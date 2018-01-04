@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (C) 2013, 2017, MariaDB Corporation.
+Copyright (C) 2013, 2018, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -26,15 +26,20 @@ Updated 14/02/2015
 
 #include "fil0fil.h"
 #include "fil0pagecompress.h"
+#include "mtr0types.h"
+#include "mach0data.h"
+#include "page0size.h"
+#include "buf0buf.h"
+#include "buf0checksum.h"
+#include "fsp0pagecompress.h"
 
+#ifndef UNIV_INNOCHECKSUM
 #include <debug_sync.h>
 #include <my_dbug.h>
 
 #include "mem0mem.h"
 #include "hash0hash.h"
 #include "os0file.h"
-#include "mach0data.h"
-#include "buf0buf.h"
 #include "buf0flu.h"
 #include "log0recv.h"
 #include "fsp0fsp.h"
@@ -279,8 +284,6 @@ fil_compress_page(
 
 	/* Set up the page header */
 	memcpy(out_buf, buf, FIL_PAGE_DATA);
-	/* Set up the checksum */
-	mach_write_to_4(out_buf+FIL_PAGE_SPACE_OR_CHKSUM, BUF_NO_CHECKSUM_MAGIC);
 
 	/* Set up the compression algorithm */
 	mach_write_to_8(out_buf+FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION, comp_method);
@@ -297,10 +300,13 @@ fil_compress_page(
 	/* Set up the actual payload lenght */
 	mach_write_to_2(out_buf+FIL_PAGE_DATA, write_size);
 
+	/* Set up the checksum */
+	mach_write_to_4(out_buf+FIL_PAGE_SPACE_OR_CHKSUM, buf_calc_compressed_crc32(out_buf));
+
 #ifdef UNIV_DEBUG
 	/* Verify */
 	ut_ad(fil_page_is_compressed(out_buf) || fil_page_is_compressed_encrypted(out_buf));
-	ut_ad(mach_read_from_4(out_buf+FIL_PAGE_SPACE_OR_CHKSUM) == BUF_NO_CHECKSUM_MAGIC);
+	ut_ad(mach_read_from_4(out_buf+FIL_PAGE_SPACE_OR_CHKSUM) == buf_calc_compressed_crc32(out_buf));
 	ut_ad(mach_read_from_2(out_buf+FIL_PAGE_DATA) == write_size);
 	ut_ad(mach_read_from_8(out_buf+FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION) == (ulint)comp_method ||
 		mach_read_from_2(out_buf+FIL_PAGE_DATA+FIL_PAGE_COMPRESSED_SIZE) == (ulint)comp_method);
@@ -314,7 +320,7 @@ fil_compress_page(
 		uncomp_page = static_cast<byte *>(ut_malloc_nokey(UNIV_PAGE_SIZE));
 		memcpy(comp_page, out_buf, UNIV_PAGE_SIZE);
 
-		fil_decompress_page(uncomp_page, comp_page, ulong(len), NULL);
+		ut_ad(fil_decompress_page(uncomp_page, comp_page, ulong(len), NULL));
 
 		if (buf_page_is_corrupted(false, uncomp_page, univ_page_size,
 					  space)) {
@@ -402,22 +408,24 @@ exit_free:
 
 }
 
-/****************************************************************//**
+/**
 For page compressed pages decompress the page after actual read
-operation. */
+operation.
+@param[in]	page_buf	Preallocated temporal buffer where
+				compression is done and then copied
+				to the buffer.
+@param[in,out]	buf		Compressed page and after suggesful
+				decompresses operation uncompressed page.
+@param[in]	len		Length of output buffer.
+@param[out]	write_size	Actual payload size of the compressed data.
+@return true when operation succeeded or false when failed */
 UNIV_INTERN
-void
+bool
 fil_decompress_page(
-/*================*/
-	byte*	page_buf,	/*!< in: preallocated buffer or NULL */
-	byte*	buf,		/*!< out: buffer from which to read; in aio
-				this must be appropriately aligned */
-	ulong	len,		/*!< in: length of output buffer.*/
-	ulint*	write_size,	/*!< in/out: Actual payload size of
-				the compressed data. */
-	bool	return_error)	/*!< in: true if only an error should
-				be produced when decompression fails.
-				By default this parameter is false. */
+	byte*	page_buf,
+	byte*	buf,
+	ulong	len,
+	ulint*	write_size)
 {
 	int err = 0;
 	ulint actual_size = 0;
@@ -441,7 +449,7 @@ fil_decompress_page(
 		break;
 	default:
 		/* The page is not in our format. */
-		return;
+		return true;
 	}
 
 	// If no buffer was given, we need to allocate temporal buffer
@@ -450,23 +458,6 @@ fil_decompress_page(
 		memset(in_buf, 0, UNIV_PAGE_SIZE);
 	} else {
 		in_buf = page_buf;
-	}
-
-	/* Before actual decompress, make sure that page type is correct */
-
-	if (mach_read_from_4(buf+FIL_PAGE_SPACE_OR_CHKSUM)
-	    != BUF_NO_CHECKSUM_MAGIC
-	    || (ptype != FIL_PAGE_PAGE_COMPRESSED
-		&& ptype != FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED)) {
-		ib::error() << "Corruption: We try to uncompress corrupted "
-			"page CRC "
-			<< mach_read_from_4(buf+FIL_PAGE_SPACE_OR_CHKSUM)
-			<< " type " << ptype  << " len " << len << ".";
-
-		if (return_error) {
-			goto error_return;
-		}
-		ut_error;
 	}
 
 	/* Get compression algorithm */
@@ -478,17 +469,10 @@ fil_decompress_page(
 
 	/* Get the actual size of compressed page */
 	actual_size = mach_read_from_2(buf+FIL_PAGE_DATA);
+
 	/* Check if payload size is corrupted */
 	if (actual_size == 0 || actual_size > UNIV_PAGE_SIZE) {
-		ib::error() << "Corruption: We try to uncompress corrupted page"
-			    << " actual size: " << actual_size
-			    << " compression method: "
-			    << fil_get_compression_alg_name(compression_alg)
-			    << ".";
-		if (return_error) {
-			goto error_return;
-		}
-		ut_error;
+		goto error_return;
 	}
 
 	/* Store actual payload size of the compressed data. This pointer
@@ -506,10 +490,7 @@ fil_decompress_page(
 
 		/* If uncompress fails it means that page is corrupted */
 		if (err != Z_OK) {
-			goto err_exit;
-			if (return_error) {
-				goto error_return;
-			}
+			goto error_return;
 		}
 		break;
 
@@ -518,10 +499,7 @@ fil_decompress_page(
 		err = LZ4_decompress_fast((const char *)buf+header_len, (char *)in_buf, len);
 
 		if (err != (int)actual_size) {
-			goto err_exit;
-			if (return_error) {
-				goto error_return;
-			}
+			goto error_return;
 		}
 		break;
 #endif /* HAVE_LZ4 */
@@ -536,10 +514,7 @@ fil_decompress_page(
 
 		if (err != LZO_E_OK || (olen == 0 || olen > UNIV_PAGE_SIZE)) {
 			len = olen;
-			goto err_exit;
-			if (return_error) {
-				goto error_return;
-			}
+			goto error_return;
 		}
 		break;
         }
@@ -566,10 +541,7 @@ fil_decompress_page(
 
 		if (ret != LZMA_OK || (dst_pos == 0 || dst_pos > UNIV_PAGE_SIZE)) {
 			len = dst_pos;
-			goto err_exit;
-			if (return_error) {
-				goto error_return;
-			}
+			goto error_return;
 		}
 
 		break;
@@ -589,10 +561,7 @@ fil_decompress_page(
 
 		if (err != BZ_OK || (dst_pos == 0 || dst_pos > UNIV_PAGE_SIZE)) {
 			len = dst_pos;
-			goto err_exit;
-			if (return_error) {
-				goto error_return;
-			}
+			goto error_return;
 		}
 		break;
 	}
@@ -612,20 +581,14 @@ fil_decompress_page(
 		if (cstatus != SNAPPY_OK || (olen == 0 || olen > UNIV_PAGE_SIZE)) {
 			err = (int)cstatus;
 			len = olen;
-			goto err_exit;
-			if (return_error) {
-				goto error_return;
-			}
+			goto error_return;
 		}
 
 		break;
 	}
 #endif /* HAVE_SNAPPY */
 	default:
-		goto err_exit;
-		if (return_error) {
-			goto error_return;
-		}
+		goto error_return;
 		break;
 	}
 
@@ -635,14 +598,17 @@ fil_decompress_page(
 	really any other options. */
 	memcpy(buf, in_buf, len);
 
+	if (page_buf != in_buf) {
+		ut_free(in_buf);
+	}
+
+	return true;
+
 error_return:
 	if (page_buf != in_buf) {
 		ut_free(in_buf);
 	}
 
-	return;
-
-err_exit:
 	/* Note that as we have found the page is corrupted, so
 	all this could be incorrect. */
 	ulint space_id = mach_read_from_4(buf+FIL_PAGE_SPACE_ID);
@@ -657,7 +623,69 @@ err_exit:
 		    << " compression method: "
 		    << fil_get_compression_alg_name(compression_alg) << ".";
 
-	buf_page_print(buf, univ_page_size);
 	fil_space_release_for_io(space);
-	ut_ad(0);
+
+	return false;
+}
+#endif /* !UNIV_INNOCHECKSUM */
+
+/**
+Verify that stored post compression checksum matches calculated
+checksum. Note that old format did not have a checksum and
+in that case either original pre-compression page checksum will
+fail after decompression or page decompression fails.
+
+@param[in,out]	page		page frame
+@param[in]	space_id	Tablespace identifier
+@param[in]	offset		Page offset
+@return true if post compression checksum matches, false otherwise */
+#ifndef UNIV_INNOCHECKSUM
+UNIV_INTERN
+#endif
+bool
+fil_verify_compression_checksum(
+	const byte*		page,
+	ulint			space_id,
+	ulint			offset)
+{
+	ut_ad(page
+	      && (mach_read_from_2(page+FIL_PAGE_TYPE) == FIL_PAGE_PAGE_COMPRESSED
+		  || mach_read_from_2(page+FIL_PAGE_TYPE) == FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED));
+
+	uint32_t checksum = mach_read_from_4(page+FIL_PAGE_SPACE_OR_CHKSUM);
+
+	/* If no real checksum treat page as good. */
+	if (checksum == BUF_NO_CHECKSUM_MAGIC) {
+		return (true);
+	}
+
+	uint32_t cchecksum = buf_calc_compressed_crc32(page);
+
+	if (checksum != cchecksum) {
+		ulint comp_method = mach_read_from_2(page+FIL_PAGE_TYPE) == FIL_PAGE_PAGE_COMPRESSED ?
+			mach_read_from_8(page+FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION) :
+			mach_read_from_2(page+FIL_PAGE_DATA+FIL_PAGE_COMPRESSED_SIZE);
+
+#ifdef UNIV_INNOCHECKSUM
+		fprintf(log_file ? log_file : stderr,
+			"Page " ULINTPF ":" ULINTPF " may be corrupted."
+			" Post compression checksum %u"
+			" stored %u compression_method %s\n",
+			space_id, offset, checksum, cchecksum,
+			fil_get_compression_alg_name(comp_method));
+#else /*! UNIV_INNOCHECKSUM */
+		FilSpace space(space_id, true);
+
+		ib::error() << "Page [page id: space=" << space_id
+			    << ", page number= " << offset << "]"
+			    << " in file "
+			    << (space() ? space()->chain.start->name : "(import)")
+			    << " may be corrupted."
+			    << " Post compression checksum " << checksum
+			    << " stored " << cchecksum
+			    << " compression_method " << fil_get_compression_alg_name(comp_method);
+#endif
+	}
+
+	return (checksum == cchecksum);
 }

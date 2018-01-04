@@ -1,0 +1,190 @@
+# Don't test under embedded as we restart server
+-- source include/not_embedded.inc
+# Require InnoDB
+-- source include/have_innodb.inc
+-- source include/have_file_key_management_plugin.inc
+
+if (!$INNOCHECKSUM) {
+  --echo Need innochecksum binary
+  --die Need innochecksum binary
+}
+
+call mtr.add_suppression("InnoDB:  Page \[page id: space=[0-9]+, page number=[0-9]+\] may be corrupted. Post compression checksum [0-9]+ stored [0-9]+.");
+call mtr.add_suppression("InnoDB: Database page corruption on disk or a failed file read of tablespace test/t[0-9]+ page \[page id: space=[0-9]+, page number=[0-9]+\]. You may have to recover from a backup.");
+call mtr.add_suppression("mysqld: Index for table .* is corrupt; try to repair it");
+call mtr.add_suppression("InnoDB: We detected index corruption in an InnoDB type table.*");
+call mtr.add_suppression("InnoDB: Background Page read failed to read or decrypt \[page id: space=[0-9]+, page number=[0-9]+\]");
+call mtr.add_suppression("InnoDB: Page \[page id: space=[0-9]+, page number= [0-9]+\] in file ./test/t[0-9]+.ibd may be corrupted. Post compression checksum .*");
+
+--disable_warnings
+SET GLOBAL innodb_file_format = `Barracuda`;
+SET GLOBAL innodb_file_per_table = ON;
+# zlib
+set global innodb_compression_algorithm = 1;
+--enable_warnings
+
+CREATE TABLE t1 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1 ENCRYPTED=YES ENCRYPTION_KEY_ID=4;
+CREATE TABLE t2 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1 ENCRYPTED=YES ENCRYPTION_KEY_ID=4;
+CREATE TABLE t3 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1 ENCRYPTED=YES ENCRYPTION_KEY_ID=4;
+CREATE TABLE t4 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t5 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t6 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t7 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t8 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t9 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t10 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+CREATE TABLE t11 (a INT AUTO_INCREMENT PRIMARY KEY, b TEXT) ENGINE=InnoDB PAGE_COMPRESSED=1;
+
+--disable_query_log
+BEGIN;
+let $i=1000;
+while $($i > 0) {
+INSERT INTO t1 VALUES (NULL,'abcdefghijklmnopqrstuvwxyz');
+dec $i;
+}
+
+INSERT INTO t2 SELECT * FROM t1;
+INSERT INTO t3 SELECT * FROM t1;
+INSERT INTO t4 SELECT * FROM t1;
+INSERT INTO t5 SELECT * FROM t1;
+INSERT INTO t6 SELECT * FROM t1;
+INSERT INTO t7 SELECT * FROM t1;
+INSERT INTO t8 SELECT * FROM t1;
+INSERT INTO t9 SELECT * FROM t1;
+INSERT INTO t10 SELECT * FROM t1;
+INSERT INTO t11 SELECT * FROM t1;
+COMMIT;
+--enable_query_log
+
+let $MYSQLD_DATADIR=`select @@datadir`;
+let INNODB_PAGE_SIZE=`select @@innodb_page_size`;
+let MYSQLD_DATADIR=`select @@datadir`;
+
+--echo # Restart server with 30s timeout to avoid recovery
+--let $shutdown_timeout= 30
+--source include/shutdown_mysqld.inc
+
+#
+# MDEV-13103: InnoDB crash recovery fails to decompress a page in buf_dblwr_process()
+#
+
+--echo # t1 Corrupt FIL_PAGE_TYPE
+--echo # t2 Corrupt FIL_PAGE_FILE_FLUSH_LSN_OR_KEY_VERSION
+--echo # t3 Corrupt post encryption checksum
+--echo # t4 Corrupt FIL_PAGE_COMPRESSED_SIZE
+--echo # t5 Corrupt FIL_PAGE_COMPRESSION_METHOD
+--echo # t6 Corrupt FIL_PAGE_COMPRESSION_METHOD (not encrypted)
+--echo # t7 Corrupt post compression checksum
+--echo # t8 Corrupt compressed data
+--echo # t9 BUF_NO_CHECKSUM_MAGIC 0xDEADBEEFUL + corrupt  FIL_PAGE_COMPRESSED_SIZE
+--echo # t10 BUF_NO_CHECKSUM_MAGIC 0xDEADBEEFUL + corrupt  FIL_PAGE_COMPRESSED_METHOD
+--echo # t11 BUF_NO_CHECKSUM_MAGIC 0xDEADBEEFUL + corrupt compressed data
+
+#
+# We corrupt page 4 as page 0 is not encrypted/compressed and we do
+# not want to mess up with IBUF (page 2) or INODE (page 3) pages.
+#
+perl;
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t1.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 24, SEEK_SET) or die "seek";
+print FILE pack("N", "0xff");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t2.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 26, SEEK_SET) or die "seek";
+print FILE pack("N*", "0xdeaddead");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t3.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 30, SEEK_SET) or die "seek";
+print FILE pack("N", "0xbadf");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t4.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 40, SEEK_SET) or die "seek";
+print FILE pack("n", "0xff");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t5.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 44, SEEK_SET) or die "seek";
+print FILE pack("h", "0xff");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t6.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 26, SEEK_SET) or die "seek";
+print FILE pack("NN", "0xffff");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t7.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 0, SEEK_SET) or die "seek";
+print FILE pack("NN", "0xffff");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t8.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 50, SEEK_SET) or die "seek";
+print FILE pack("H*", "deadbeefdeadbeefdeadbeef");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t9.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 +  0, SEEK_SET) or die "seek";
+print FILE pack("NN", "0xdeadfeef");
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 40, SEEK_SET) or die "seek";
+print FILE pack("N", "0xdead");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t10.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 0, SEEK_SET) or die "seek";
+print FILE pack("NN", "0xdeadfeef");
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 26, SEEK_SET) or die "seek";
+print FILE pack("N", "0xdead");
+close FILE or die "close";
+open(FILE, "+<", "$ENV{MYSQLD_DATADIR}/test/t11.ibd") or die "open";
+binmode FILE;
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 0, SEEK_SET) or die "seek";
+print FILE pack("NN", "0xdeadfeef");
+seek(FILE, $ENV{'INNODB_PAGE_SIZE'} * 4 + 50, SEEK_SET) or die "seek";
+print FILE pack("H*", "deadbeefdeadbeefdeadbeefdeadbeef");
+close FILE or die "close";
+EOF
+
+#-- disable_result_log
+
+let $i=11;
+while $($i > 0) {
+--echo # Run innochecksum on t$i
+let t_IBD = $MYSQLD_DATADIR/test/t$i.ibd;
+--error 0,1
+--exec $INNOCHECKSUM $t_IBD
+dec $i;
+}
+#--enable_result_log
+
+--echo # Start server again
+--source include/start_mysqld.inc
+
+--error ER_GET_ERRMSG, ER_NOT_KEYFILE
+select * from t1;
+--error ER_NOT_KEYFILE
+select * from t2;
+--error ER_NOT_KEYFILE
+select * from t3;
+--error ER_NOT_KEYFILE
+select * from t4;
+--error ER_NOT_KEYFILE
+select * from t5;
+--error ER_NOT_KEYFILE
+select * from t6;
+--error ER_NOT_KEYFILE
+select * from t7;
+--error ER_NOT_KEYFILE
+select * from t8;
+--error ER_NOT_KEYFILE
+select * from t9;
+--error ER_NOT_KEYFILE
+select * from t10;
+--error ER_NOT_KEYFILE
+select * from t11;
+
+drop table t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11;
+

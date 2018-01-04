@@ -68,7 +68,7 @@ EOF
 
 --echo # Now t1 is corrupted but we should not crash
 
---error 1030,1712,1932
+--error 1030,1712,1932,ER_NOT_KEYFILE
 SELECT * FROM t1;
 
 --error 126,1030,1034,1712,1932

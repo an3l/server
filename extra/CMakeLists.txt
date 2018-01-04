@@ -80,6 +80,7 @@ IF(WITH_INNOBASE_STORAGE_ENGINE OR WITH_XTRADB_STORAGE_ENGINE)
       ../storage/innobase/buf/buf0buf.cc
       ../storage/innobase/page/page0zip.cc
       ../storage/innobase/fil/fil0crypt.cc
+      ../storage/innobase/fil/fil0pagecompress.cc
       )
 
 

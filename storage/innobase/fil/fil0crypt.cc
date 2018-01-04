@@ -1,6 +1,6 @@
 /*****************************************************************************
 Copyright (C) 2013, 2015, Google Inc. All Rights Reserved.
-Copyright (c) 2014, 2017, MariaDB Corporation.
+Copyright (c) 2014, 2018, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -675,8 +675,8 @@ fil_space_encrypt(
 			comp_mem = (byte *)malloc(UNIV_PAGE_SIZE);
 			uncomp_mem = (byte *)malloc(UNIV_PAGE_SIZE);
 			memcpy(comp_mem, src_frame, UNIV_PAGE_SIZE);
-			fil_decompress_page(uncomp_mem, comp_mem,
-					    srv_page_size, NULL);
+			ut_ad(fil_decompress_page(uncomp_mem, comp_mem,
+					srv_page_size, NULL));
 			src = uncomp_mem;
 		}
 
@@ -686,8 +686,8 @@ fil_space_encrypt(
 		/* Need to decompress the page if it was also compressed */
 		if (page_compressed_encrypted) {
 			memcpy(comp_mem, tmp_mem, UNIV_PAGE_SIZE);
-			fil_decompress_page(tmp_mem, comp_mem,
-					    srv_page_size, NULL);
+			ut_ad(fil_decompress_page(tmp_mem, comp_mem,
+					srv_page_size, NULL));
 		}
 
 		bool corrupted = buf_page_is_corrupted(true, tmp_mem, page_size, space);
@@ -2555,13 +2555,6 @@ fil_space_verify_crypt_checksum(
 		return(true);
 	}
 
-	/* Compressed and encrypted pages do not have checksum. Assume not
-	corrupted. Page verification happens after decompression in
-	buf_page_io_complete() using buf_page_is_corrupted(). */
-	if (mach_read_from_2(page+FIL_PAGE_TYPE) == FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED) {
-		return (true);
-	}
-
 	uint32 cchecksum1, cchecksum2;
 
 	/* Calculate checksums */
@@ -2642,7 +2635,7 @@ fil_space_verify_crypt_checksum(
 			" stored [%u:%u] key_version %u\n",
 			space, offset, checksum, checksum1, checksum2,
 			key_version);
-#else /* UNIV_INNOCHECKSUM */
+#else /* !UNIV_INNOCHECKSUM */
 		ib::error()
 			<< " Page " << space << ":" << offset
 			<< " may be corrupted."

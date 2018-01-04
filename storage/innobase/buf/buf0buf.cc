@@ -2,7 +2,7 @@
 
 Copyright (c) 1995, 2016, Oracle and/or its affiliates. All Rights Reserved.
 Copyright (c) 2008, Google Inc.
-Copyright (c) 2013, 2017, MariaDB Corporation.
+Copyright (c) 2013, 2018, MariaDB Corporation.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -437,9 +437,11 @@ buf_pool_register_chunk(
 /** Decrypt a page.
 @param[in,out]	bpage	Page control block
 @param[in,out]	space	tablespace
-@return whether the operation was successful */
+@return DB_SUCCESS or DB_PAGE_CORRUPTED
+@retval DB_SUCCESS if page decompression and/or decrypt succeeded
+@retval DB_PAGE_CORRUPTED if page decompression and/or decrypt failed */
 static
-bool
+dberr_t
 buf_page_decrypt_after_read(buf_page_t* bpage, fil_space_t* space)
 	MY_ATTRIBUTE((nonnull));
 
@@ -832,15 +834,21 @@ buf_page_is_corrupted(
 	flags because page compression flag means file must have been
 	created with 10.1 (later than 5.5 code base). In 10.1 page
 	compressed tables do not contain post compression checksum and
-	FIL_PAGE_END_LSN_OLD_CHKSUM field stored.  Note that space can
-	be null if we are in fil_check_first_page() and first page
-	is not compressed or encrypted. Page checksum is verified
-	after decompression (i.e. normally pages are already
-	decompressed at this stage). */
+	FIL_PAGE_END_LSN_OLD_CHKSUM field stored.
+
+	Note that space can be null if we are in fil_check_first_page() but
+	first page is not compressed or encrypted.
+
+	Note that space can be null if we are in Datafile::find_space_id()
+	and that point pages are not yet decompressed/decrypted.
+
+	Page checksum is verified after decompression (i.e. normally pages
+	are already decompressed at this stage). */
 	if ((page_type == FIL_PAGE_PAGE_COMPRESSED ||
 	     page_type == FIL_PAGE_PAGE_COMPRESSED_ENCRYPTED)
 #ifndef UNIV_INNOCHECKSUM
-	    && space && FSP_FLAGS_HAS_PAGE_COMPRESSION(space->flags)
+	    && (!space
+		|| (space && FSP_FLAGS_HAS_PAGE_COMPRESSION(space->flags)))
 #endif
 	) {
 		return(false);
@@ -5822,7 +5830,6 @@ buf_page_check_corrupt(buf_page_t* bpage, fil_space_t* space)
 	still be corrupted if used key does not match. */
 	still_encrypted = crypt_data
 		&& crypt_data->type != CRYPT_SCHEME_UNENCRYPTED
-		&& !bpage->encrypted
 		&& fil_space_verify_crypt_checksum(
 			dst_frame, bpage->size,
 			bpage->id.space(), bpage->id.page_no());
@@ -5917,12 +5924,15 @@ buf_page_io_complete(buf_page_t* bpage, bool evict)
 			return DB_TABLESPACE_DELETED;
 		}
 
-		buf_page_decrypt_after_read(bpage, space);
+		dberr_t	err = buf_page_decrypt_after_read(bpage, space);
 
 		byte*	frame = bpage->zip.data
 			? bpage->zip.data
 			: reinterpret_cast<buf_block_t*>(bpage)->frame;
-		dberr_t	err;
+
+		if (err != DB_SUCCESS) {
+			goto database_corrupted;
+		}
 
 		if (bpage->zip.data && uncompressed) {
 			my_atomic_addlint(&buf_pool->n_pend_unzip, 1);
@@ -7425,9 +7435,11 @@ buf_page_encrypt_before_write(
 /** Decrypt a page.
 @param[in,out]	bpage	Page control block
 @param[in,out]	space	tablespace
-@return whether the operation was successful */
+@return DB_SUCCESS or DB_PAGE_CORRUPTED
+@retval DB_SUCCESS if page decompression and/or decrypt succeeded
+@retval DB_PAGE_CORRUPTED if page decompression and/or decrypt failed */
 static
-bool
+dberr_t
 buf_page_decrypt_after_read(buf_page_t* bpage, fil_space_t* space)
 {
 	ut_ad(space->n_pending_ios > 0);
@@ -7442,11 +7454,11 @@ buf_page_decrypt_after_read(buf_page_t* bpage, fil_space_t* space)
 	bool page_compressed = fil_page_is_compressed(dst_frame);
 	bool page_compressed_encrypted = fil_page_is_compressed_encrypted(dst_frame);
 	buf_pool_t* buf_pool = buf_pool_from_bpage(bpage);
-	bool success = true;
+	dberr_t err = DB_SUCCESS;
 
 	if (bpage->id.page_no() == 0) {
 		/* File header pages are not encrypted/compressed */
-		return (true);
+		return (err);
 	}
 
 	/* Page is encrypted if encryption information is found from
@@ -7464,10 +7476,14 @@ buf_page_decrypt_after_read(buf_page_t* bpage, fil_space_t* space)
 		ut_d(fil_page_type_validate(dst_frame));
 
 		/* decompress using comp_buf to dst_frame */
-		fil_decompress_page(slot->comp_buf,
-				    dst_frame,
-				    ulong(size.logical()),
-				    &bpage->write_size);
+		if (!fil_verify_compression_checksum(dst_frame,
+				bpage->id.space(), bpage->id.page_no())
+		    || !fil_decompress_page(slot->comp_buf,
+				dst_frame,
+				ulong(size.logical()),
+				&bpage->write_size)) {
+			err = DB_PAGE_CORRUPTED;
+		}
 
 		/* Mark this slot as free */
 		slot->reserved = false;
@@ -7476,6 +7492,7 @@ buf_page_decrypt_after_read(buf_page_t* bpage, fil_space_t* space)
 		ut_d(fil_page_type_validate(dst_frame));
 	} else {
 		buf_tmp_buffer_t* slot = NULL;
+		bool success=true;
 
 		if (key_version) {
 			/* Verify encryption checksum before we even try to
@@ -7486,8 +7503,9 @@ buf_page_decrypt_after_read(buf_page_t* bpage, fil_space_t* space)
 				if (space->crypt_data->type
 				    != CRYPT_SCHEME_UNENCRYPTED) {
 					bpage->encrypted = true;
+					err = DB_PAGE_CORRUPTED;
 				}
-				return (false);
+				return (err);
 			}
 
 			/* Find free slot from temporary memory array */
@@ -7511,10 +7529,14 @@ buf_page_decrypt_after_read(buf_page_t* bpage, fil_space_t* space)
 
 			ut_d(fil_page_type_validate(dst_frame));
 			/* decompress using comp_buf to dst_frame */
-			fil_decompress_page(slot->comp_buf,
+			if (!fil_verify_compression_checksum(dst_frame,
+					bpage->id.space(), bpage->id.page_no())
+			    || !fil_decompress_page(slot->comp_buf,
 					    dst_frame,
 					    ulong(size.logical()),
-					    &bpage->write_size);
+					    &bpage->write_size)) {
+				err = DB_PAGE_CORRUPTED;
+			}
 			ut_d(fil_page_type_validate(dst_frame));
 		}
 
@@ -7525,7 +7547,7 @@ buf_page_decrypt_after_read(buf_page_t* bpage, fil_space_t* space)
 	}
 
 	ut_ad(space->n_pending_ios > 0);
-	return (success);
+	return (err);
 }
 
 /**
