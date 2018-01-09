@@ -5925,6 +5925,15 @@ static int get_schema_column_record(THD *thd, TABLE_LIST *tables,
       else
         buf.set(STRING_WITH_LEN("VIRTUAL GENERATED"), cs);
     }
+    else if (field->flags & VERS_SYSTEM_FIELD)
+    {
+      if (field->flags & VERS_SYS_START_FLAG)
+        table->field[21]->store(STRING_WITH_LEN("ROW START"), cs);
+      else
+        table->field[21]->store(STRING_WITH_LEN("ROW END"), cs);
+      table->field[21]->set_notnull();
+      table->field[20]->store(STRING_WITH_LEN("ALWAYS"), cs);
+    }
     else
       table->field[20]->store(STRING_WITH_LEN("NEVER"), cs);
     /*Invisible can coexist with auto_increment and virtual */
