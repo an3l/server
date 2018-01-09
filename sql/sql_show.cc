@@ -5433,7 +5433,10 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
     else
     {
       DBUG_ASSERT(share->tmp_table == NO_TMP_TABLE);
-      table->field[3]->store(STRING_WITH_LEN("BASE TABLE"), cs);
+      if (share->versioned)
+        table->field[3]->store(STRING_WITH_LEN("SYSTEM VERSIONED"), cs);
+      else
+        table->field[3]->store(STRING_WITH_LEN("BASE TABLE"), cs);
     }
 
     for (int i= 4; i < 20; i++)
