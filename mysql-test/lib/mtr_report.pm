@@ -388,7 +388,7 @@ sub mtr_report_stats ($$$$) {
    	 print "All $tot_tests tests were successful.\n\n";
   	}
 	else{
-	print "The entire test was successful. \n\n"; 
+         print "The entire test was successful. \n\n"; 
 	}
   }
 
