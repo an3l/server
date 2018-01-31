@@ -602,9 +602,8 @@ enum open_frm_error open_table_def(THD *thd, TABLE_SHARE *share, uint flags)
     if ((flags & GTS_TABLE) && (flags & GTS_USE_DISCOVERY))
     {
       ha_discover_table(thd, share);
-      error_given= true;
+      DBUG_RETURN(share->error);
     }
-    goto err_not_open;
   }
 
   if (mysql_file_read(file, head, sizeof(head), MYF(MY_NABP)))
