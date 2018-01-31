@@ -5099,6 +5099,16 @@ int ha_discover_table(THD *thd, TABLE_SHARE *share)
 
   DBUG_ASSERT(share->error == OPEN_FRM_OPEN_ERROR);   // share is not OK yet
 
+  if (engines_with_discover)
+  {
+    if(share->db_plugin)
+        discover_handlerton(thd, share->db_plugin, share);
+    else
+        plugin_foreach(thd, discover_handlerton,
+                        MYSQL_STORAGE_ENGINE_PLUGIN, share);
+  
+  }
+ 
   DBUG_RETURN(share->error != OPEN_FRM_OK);
 }
 
@@ -5274,9 +5284,12 @@ bool ha_table_exists(THD *thd, const char *db, const char *table_name,
     if (!hton)
       flags|= GTS_NOLOCK;
 
+    Table_exists_error_handler no_such_table_handler;
+    thd->push_internal_handler(&no_such_table_handler);
     table.init_one_table(db, strlen(db), table_name, strlen(table_name),
                          table_name, TL_READ);
     TABLE_SHARE *share= tdc_acquire_share(thd, &table, flags);
+    thd->pop_internal_handler();
 
     if (hton && share)
     {
@@ -5284,7 +5297,8 @@ bool ha_table_exists(THD *thd, const char *db, const char *table_name,
       tdc_release_share(share);
     }
 
-    DBUG_RETURN(share!=NULL);
+    // the table doesn't exist if we've caught ER_NO_SUCH_TABLE and nothing else
+    DBUG_RETURN(!no_such_table_handler.safely_trapped_errors());
   }
 
   DBUG_RETURN(FALSE);
