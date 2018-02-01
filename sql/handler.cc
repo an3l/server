@@ -5100,7 +5100,8 @@ int ha_discover_table(THD *thd, TABLE_SHARE *share)
 
   DBUG_ASSERT(share->error == OPEN_FRM_OPEN_ERROR);   // share is not OK yet
 
-  if (engines_with_discover){
+  if (engines_with_discover)
+  {
       if (share->db_plugin)
         discover_handlerton(thd, share->db_plugin, share);
       else

@@ -1,0 +1,6 @@
+--echo # Anel
+--echo # Bug
+--echo # 
+create table t(t int);
+drop table t;
+
