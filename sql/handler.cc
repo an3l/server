@@ -5249,13 +5249,15 @@ bool ha_table_exists(THD *thd, const char *db, const char *table_name,
                          table_name, TL_READ);
     TABLE_SHARE *share= tdc_acquire_share(thd, &table, flags);
 
+    if (!share)
+      DBUG_RETURN(0);
+
     if (hton && share)
     {
       *hton= share->db_type();
       tdc_release_share(share);
     }
 
-    DBUG_RETURN(share!=NULL);
   }
 
   DBUG_RETURN(FALSE);
