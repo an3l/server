@@ -1,0 +1,15 @@
+# from inc.inc
+if (`SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.ENGINES WHERE engine = 'test_sql_discovery' AND support='YES'`)
+{
+  --skip Test requires test_sql_discovery engine
+}
+
+# 
+# test to create a table 
+#
+
+# --error ER_NO_SUCH_TABLE
+
+create table t(t int);
+drop table t;
+
