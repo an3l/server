@@ -4648,6 +4648,106 @@ end:
 
 
 /**
+  @brief          Fill records for temporary tables by reading info from tableobject
+    
+  @param[in]      thd                      thread handler
+  @param[in]      table                    I_S table 
+  @param[in]      tmp_table                temporary table 
+  @param[in]      db                       database name
+  @param[in]      mem_root                 memory root for allocating cloned
+                                           handlers, must have the lifetime of the current thread
+                                           
+  @return         Operation status
+    @retval       0           success
+    @retval       1           error
+*/
+
+static int store_temporary_table_record(THD *thd, TABLE *table,
+                                        TABLE *tmp_table, const char *db,
+                                        MEM_ROOT *mem_root)
+{
+  CHARSET_INFO *cs=system_charset_info;  
+  DBUG_ENTER("store_temporary_table_record");
+
+  if(db && my_strcasecmp(cs, db, tmp_table->s->db.str))
+      DBUG_RETURN(0);
+
+  restore_record(table, s->default_values);
+
+  // session_id
+  table->field[0]->store((longlong) thd->thread_id, TRUE);
+
+  // database
+  table->field[1]->store(tmp_table->s->db.str, tmp_table->s->db.length, cs);
+  
+  // table
+  table->field[2]->store(tmp_table->s->table_name.str, tmp_table->s->table_name.length, cs);
+
+  // engine
+  handler *handle = tmp_table->file;
+  // Assume that invoking handler::table_type() on a shared handler is safe
+  const char* engine_type = (char *)(handle ? handle->table_type(): "UNKNOWN");
+  table->field[3]->store(engine_type,strlen(engine_type), cs);
+
+  // name
+ /* if(tmp_table->s->path.str)
+  {
+    char *p = strstr(tmp_table->s->path.str,"#sql");
+  }
+  */
+  // file stats ...
+  DBUG_RETURN(schema_table_store_record(thd, table));
+    }
+
+
+/**
+  @brief          Fill I_S tables with global temporary tables 
+    
+  @param[in]      thd                      thread handler
+  @param[in]      tables                   I_S table 
+  @param[in]      cond                     'WHERE' condition
+  @param[in]      table_name               table name
+
+      @return         Operation status
+    @retval       0           success
+    @retval       1           error
+*/
+
+static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
+                                        Item *cond)
+{
+  DBUG_ENTER("fill_global_temporary_tables");
+  
+  mysql_mutex_lock(&LOCK_thread_count);
+  THD* thd_item;
+  // I_List<THD> threads;
+  THD* first_thd =first_global_thread(); // Here is main problem Vin, first_global_thread() wasn't declared in this scope - but if this is global thread why is this error thrown ? Bellow is rest of the code, used as a minimal working example for a specific scenario
+      
+  /*
+  for(thd_item =first_thd;thd_item=next_global_thread(thd_item);)
+  {
+    // mysql_mutex_lock(&thd_item->LOCK_temporary_tables);
+    
+    for(TABLE* tmp=thd_item->temporary_tables; tmp; tmp=tmp->next)
+    {
+        if(store_temporary_table_record(thd_item,tables->table,tmp,
+                                        thd->lex->select_lex.db,
+                                        thd->mem_root))
+            {
+           // mysql_mutex_unlock(&thd_item->LOCK_temporary_tables);
+            mysql_mutex_unlock(&LOCK_thread_count);
+            DBUG_RETURN(1);
+        }
+    }
+    
+   // mysql_mutex_unlock(&thd_item->LOCK_temporary_tables);    
+  }
+  */
+  mysql_mutex_unlock(&LOCK_thread_count);
+  DBUG_RETURN(0);
+}
+
+/**
   @brief          Fill I_S table for SHOW TABLE NAMES commands
 
   @param[in]      thd                      thread handler
@@ -8086,43 +8186,43 @@ ST_SCHEMA_TABLE *get_schema_table(enum enum_schema_tables schema_table_idx)
   @retval  NULL           Can't create table
 */
 
-TABLE *create_schema_table(THD *thd, TABLE_LIST *table_list)
-{
-  int field_count= 0;
-  Item *item;
-  TABLE *table;
-  List<Item> field_list;
-  ST_SCHEMA_TABLE *schema_table= table_list->schema_table;
-  ST_FIELD_INFO *fields_info= schema_table->fields_info;
-  CHARSET_INFO *cs= system_charset_info;
-  MEM_ROOT *mem_root= thd->mem_root;
-  DBUG_ENTER("create_schema_table");
+    TABLE *create_schema_table(THD *thd, TABLE_LIST *table_list)
+    {
+      int field_count= 0;
+      Item *item;
+      TABLE *table;
+      List<Item> field_list;
+      ST_SCHEMA_TABLE *schema_table= table_list->schema_table;
+      ST_FIELD_INFO *fields_info= schema_table->fields_info;
+      CHARSET_INFO *cs= system_charset_info;
+      MEM_ROOT *mem_root= thd->mem_root;
+      DBUG_ENTER("create_schema_table");
 
-  for (; fields_info->field_name; fields_info++)
-  {
-    size_t field_name_length= strlen(fields_info->field_name);
-    switch (fields_info->field_type) {
-    case MYSQL_TYPE_TINY:
-    case MYSQL_TYPE_LONG:
-    case MYSQL_TYPE_SHORT:
-    case MYSQL_TYPE_LONGLONG:
-    case MYSQL_TYPE_INT24:
-      if (!(item= new (mem_root)
-            Item_return_int(thd, fields_info->field_name,
-                            fields_info->field_length,
-                            fields_info->field_type,
-                            fields_info->value)))
+      for (; fields_info->field_name; fields_info++)
       {
-        DBUG_RETURN(0);
-      }
-      item->unsigned_flag= (fields_info->field_flags & MY_I_S_UNSIGNED);
-      break;
-    case MYSQL_TYPE_DATE:
-      if (!(item=new (mem_root)
-            Item_return_date_time(thd, fields_info->field_name,
-                                  (uint)field_name_length,
-                                  fields_info->field_type)))
-        DBUG_RETURN(0);
+        size_t field_name_length= strlen(fields_info->field_name);
+        switch (fields_info->field_type) {
+        case MYSQL_TYPE_TINY:
+        case MYSQL_TYPE_LONG:
+        case MYSQL_TYPE_SHORT:
+        case MYSQL_TYPE_LONGLONG:
+        case MYSQL_TYPE_INT24:
+          if (!(item= new (mem_root)
+                Item_return_int(thd, fields_info->field_name,
+                                fields_info->field_length,
+                                fields_info->field_type,
+                                fields_info->value)))
+          {
+            DBUG_RETURN(0);
+          }
+          item->unsigned_flag= (fields_info->field_flags & MY_I_S_UNSIGNED);
+          break;
+        case MYSQL_TYPE_DATE:
+          if (!(item=new (mem_root)
+                Item_return_date_time(thd, fields_info->field_name,
+                                      (uint)field_name_length,
+                                      fields_info->field_type)))
+            DBUG_RETURN(0);
       break;
     case MYSQL_TYPE_TIME:
       if (!(item=new (mem_root)
@@ -9725,6 +9825,26 @@ ST_FIELD_INFO spatial_ref_sys_fields_info[]=
 };
 #endif /*HAVE_SPATIAL*/
 
+ST_FIELD_INFO temporary_table_fields_info[]=
+{
+  {"SESSION_ID", 4, MYSQL_TYPE_LONGLONG, 0, 0, "Session", SKIP_OPEN_TABLE},
+  {"TABLE_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Db", SKIP_OPEN_TABLE},
+  {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Temp_tables_in_", SKIP_OPEN_TABLE},
+  {"ENGINE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Engine", OPEN_FRM_ONLY}
+  /*
+  {"NAME", FN_REFLEN, MYSQL_TYPE_STRING, 0, 0, "Name", SKIP_OPEN_TABLE},
+  {"TABLE_ROWS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
+   MY_I_S_UNSIGNED, "Rows", OPEN_FULL_TABLE},
+  {"AVG_ROW_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
+   MY_I_S_UNSIGNED, "Avg Row", OPEN_FULL_TABLE},
+  {"DATA_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
+   MY_I_S_UNSIGNED, "Data Length", OPEN_FULL_TABLE},
+  {"INDEX_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
+   MY_I_S_UNSIGNED, "Index Size", OPEN_FULL_TABLE},
+  {"CREATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Create Time", OPEN_FULL_TABLE},
+  {"UPDATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Update Time", OPEN_FULL_TABLE},
+  {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE} */
+};
 
 /*
   Description of ST_FIELD_INFO in table.h
@@ -9767,6 +9887,8 @@ ST_SCHEMA_TABLE schema_tables[]=
    hton_fill_schema_table, 0, 0, -1, -1, 0, 0},
   {"GLOBAL_STATUS", variables_fields_info, 0,
    fill_status, make_old_format, 0, 0, -1, 0, 0},
+  {"GLOBAL_TEMPORARY_TABLES", temporary_table_fields_info,0, fill_global_temporary_tables,make_old_format , 0, 2, 3, 0, OPEN_TABLE_ONLY|OPTIMIZE_I_S_TABLE}, // it was make_temporary_tables_old_format ; instead of the first 0, it was create_schema_table, but couldn't perform conversion
+
   {"GLOBAL_VARIABLES", variables_fields_info, 0,
    fill_variables, make_old_format, 0, 0, -1, 0, 0},
   {"KEY_CACHES", keycache_fields_info, 0,
@@ -9834,7 +9956,7 @@ ST_SCHEMA_TABLE schema_tables[]=
    fill_spatial_ref_sys, make_old_format, 0, -1, -1, 0, 0},
 #endif /*HAVE_SPATIAL*/
   {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-};
+    };
 
 
 int initialize_schema_table(st_plugin_int *plugin)
