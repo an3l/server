@@ -64,6 +64,7 @@
 #endif
 #include "vtmd.h"
 #include "transaction.h"
+#include "thread_pool_priv.h"
 
 enum enum_i_s_events_fields
 {
@@ -4663,7 +4664,7 @@ end:
 */
 
 static int store_temporary_table_record(THD *thd, TABLE *table,
-                                        TABLE *tmp_table, const char *db,
+                                            TABLE *tmp_table, LEX_CSTRING *db,
                                         MEM_ROOT *mem_root)
 {
   CHARSET_INFO *cs=system_charset_info;  
@@ -4710,7 +4711,7 @@ static int store_temporary_table_record(THD *thd, TABLE *table,
 
       @return         Operation status
     @retval       0           success
-    @retval       1           error
+        @retval       1           error
 */
 
 static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
@@ -4721,14 +4722,14 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
   mysql_mutex_lock(&LOCK_thread_count);
   THD* thd_item;
   // I_List<THD> threads;
-  THD* first_thd =first_global_thread(); // Here is main problem Vin, first_global_thread() wasn't declared in this scope - but if this is global thread why is this error thrown ? Bellow is rest of the code, used as a minimal working example for a specific scenario
+ // THD* first_thd =first_global_thread(); // Here is main problem Vin, first_global_thread() wasn't declared in this scope - but if this is global thread why is this error thrown ? Bellow is rest of the code, used as a minimal working example for a specific scenario
       
-  /*
-  for(thd_item =first_thd;thd_item=next_global_thread(thd_item);)
+  
+  for(thd_item =first_global_thread();thd_item=next_global_thread(thd_item);)
   {
     // mysql_mutex_lock(&thd_item->LOCK_temporary_tables);
     
-    for(TABLE* tmp=thd_item->temporary_tables; tmp; tmp=tmp->next)
+    for(TABLE* tmp=(TABLE*)thd_item->temporary_tables; tmp; tmp=tmp->next)
     {
         if(store_temporary_table_record(thd_item,tables->table,tmp,
                                         thd->lex->select_lex.db,
@@ -4742,7 +4743,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
     
    // mysql_mutex_unlock(&thd_item->LOCK_temporary_tables);    
   }
-  */
+  
   mysql_mutex_unlock(&LOCK_thread_count);
   DBUG_RETURN(0);
 }
