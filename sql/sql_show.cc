@@ -4647,74 +4647,117 @@ end:
   DBUG_RETURN(result);
 }
 
+    /**
+      @brief          Change I_S table item list for SHOW [GLOBAL] TEMPORARY TABLES [FROM/IN db]
 
-/**
-  @brief          Fill records for temporary tables by reading info from tableobject
-    
-  @param[in]      thd                      thread handler
-  @param[in]      table                    I_S table 
-  @param[in]      tmp_table                temporary table 
-  @param[in]      db                       database name
-  @param[in]      mem_root                 memory root for allocating cloned
-                                           handlers, must have the lifetime of the current thread
-                                           
-  @return         Operation status
-    @retval       0           success
-    @retval       1           error
-*/
-
-static int store_temporary_table_record(THD *thd, TABLE *table,
-                                            TABLE *tmp_table, LEX_CSTRING *db,
-                                        MEM_ROOT *mem_root)
-{
-  CHARSET_INFO *cs=system_charset_info;  
-  DBUG_ENTER("store_temporary_table_record");
-
-  if(db && my_strcasecmp(cs, db, tmp_table->s->db.str))
-      DBUG_RETURN(0);
-
-  restore_record(table, s->default_values);
-
-  // session_id
-  table->field[0]->store((longlong) thd->thread_id, TRUE);
-
-  // database
-  table->field[1]->store(tmp_table->s->db.str, tmp_table->s->db.length, cs);
-  
-  // table
-  table->field[2]->store(tmp_table->s->table_name.str, tmp_table->s->table_name.length, cs);
-
-  // engine
-  handler *handle = tmp_table->file;
-  // Assume that invoking handler::table_type() on a shared handler is safe
-  const char* engine_type = (char *)(handle ? handle->table_type(): "UNKNOWN");
-  table->field[3]->store(engine_type,strlen(engine_type), cs);
-
-  // name
- /* if(tmp_table->s->path.str)
-  {
-    char *p = strstr(tmp_table->s->path.str,"#sql");
-  }
-  */
-  // file stats ...
-  DBUG_RETURN(schema_table_store_record(thd, table));
-    }
-
-
-/**
-  @brief          Fill I_S tables with global temporary tables 
-    
-  @param[in]      thd                      thread handler
-  @param[in]      tables                   I_S table 
-  @param[in]      cond                     'WHERE' condition
-  @param[in]      table_name               table name
+      @param[in]      thd                      thread handler
+      @param[in]      schema_table             I_S table
 
       @return         Operation status
-    @retval       0           success
-        @retval       1           error
-*/
+        @retval       0                        success
+        @retval       1                        error
+    */
+    int make_temporary_tables_old_format(THD *thd, ST_SCHEMA_TABLE *schema_table)
+    {
+      char tmp[128];
+      String buffer(tmp,sizeof(tmp), thd->charset());
+      LEX *lex= thd->lex;
+      Name_resolution_context *context= &lex->select_lex.context;
 
-static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
+      if (thd->lex->option_type == OPT_GLOBAL) {
+        ST_FIELD_INFO *field_info= &schema_table->fields_info[0];
+        Item_field *field= new Item_field(context, NullS, NullS, field_info->field_name);
+        if (add_item_to_list(thd, field))
+          return 1;
+        field->item_name.copy(field_info->old_name, strlen(field_info->old_name), system_charset_info);
+      }
+
+      ST_FIELD_INFO *field_info= &schema_table->fields_info[2];
+      buffer.length(0);
+      buffer.append(field_info->old_name);
+      buffer.append(lex->select_lex.db);
+
+      if (lex->wild && lex->wild->ptr())
+      {
+        buffer.append(STRING_WITH_LEN(" ("));
+        buffer.append(lex->wild->ptr());
+        buffer.append(')');
+      }
+
+      Item_field *field= new Item_field(context, NullS, NullS, field_info->field_name);    
+      if (add_item_to_list(thd, field))
+        return 1;
+
+      field->item_name.copy(buffer.ptr(), buffer.length(), system_charset_info);
+      return 0;
+    }
+    /**
+      @brief          Fill records for temporary tables by reading info from tableobject
+        
+      @param[in]      thd                      thread handler
+      @param[in]      table                    I_S table 
+      @param[in]      tmp_table                temporary table 
+      @param[in]      db                       database name
+      @param[in]      mem_root                 memory root for allocating cloned
+                                               handlers, must have the lifetime of the current thread
+                                               
+      @return         Operation status
+        @retval       0           success
+        @retval       1           error
+    */
+
+    static int store_temporary_table_record(THD *thd, TABLE *table,
+                                            TABLE *tmp_table, const char *db,
+                                            MEM_ROOT *mem_root)
+    {
+      CHARSET_INFO *cs=system_charset_info;  
+      DBUG_ENTER("store_temporary_table_record");
+
+      if(db && my_strcasecmp(cs, db, tmp_table->s->db.str))
+          DBUG_RETURN(0);
+
+      restore_record(table, s->default_values);
+
+      // session_id
+      table->field[0]->store((longlong) thd->thread_id, TRUE);
+
+      // database
+      table->field[1]->store(tmp_table->s->db.str, tmp_table->s->db.length, cs);
+      
+      // table
+      table->field[2]->store(tmp_table->s->table_name.str, tmp_table->s->table_name.length, cs);
+
+      // engine
+      handler *handle = tmp_table->file;
+      // Assume that invoking handler::table_type() on a shared handler is safe
+      const char* engine_type = (char *)(handle ? handle->table_type(): "UNKNOWN");
+      table->field[3]->store(engine_type,strlen(engine_type), cs);
+
+      // name
+     /* if(tmp_table->s->path.str)
+      {
+        char *p = strstr(tmp_table->s->path.str,"#sql");
+      }
+      */
+      // file stats ...
+      DBUG_RETURN(schema_table_store_record(thd, table));
+        }
+
+
+    /**
+      @brief          Fill I_S tables with global temporary tables 
+        
+      @param[in]      thd                      thread handler
+      @param[in]      tables                   I_S table 
+      @param[in]      cond                     'WHERE' condition
+      @param[in]      table_name               table name
+
+          @return         Operation status
+        @retval       0           success
+            @retval       1           error
+    */
+
+    static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
                                         Item *cond)
 {
   DBUG_ENTER("fill_global_temporary_tables");
@@ -4732,7 +4775,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
     for(TABLE* tmp=(TABLE*)thd_item->temporary_tables; tmp; tmp=tmp->next)
     {
         if(store_temporary_table_record(thd_item,tables->table,tmp,
-                                        thd->lex->select_lex.db,
+                                        thd->lex->select_lex.db.str,
                                         thd->mem_root))
             {
            // mysql_mutex_unlock(&thd_item->LOCK_temporary_tables);
@@ -9888,7 +9931,7 @@ ST_SCHEMA_TABLE schema_tables[]=
    hton_fill_schema_table, 0, 0, -1, -1, 0, 0},
   {"GLOBAL_STATUS", variables_fields_info, 0,
    fill_status, make_old_format, 0, 0, -1, 0, 0},
-  {"GLOBAL_TEMPORARY_TABLES", temporary_table_fields_info,0, fill_global_temporary_tables,make_old_format , 0, 2, 3, 0, OPEN_TABLE_ONLY|OPTIMIZE_I_S_TABLE}, // it was make_temporary_tables_old_format ; instead of the first 0, it was create_schema_table, but couldn't perform conversion
+  {"GLOBAL_TEMPORARY_TABLES", temporary_table_fields_info,0, fill_global_temporary_tables,make_temporary_tables_old_format , 0, 2, 3, 0, OPEN_TABLE_ONLY|OPTIMIZE_I_S_TABLE}, // it was make_temporary_tables_old_format ; instead of the first 0, it was create_schema_table, but couldn't perform conversion
 
   {"GLOBAL_VARIABLES", variables_fields_info, 0,
    fill_variables, make_old_format, 0, 0, -1, 0, 0},

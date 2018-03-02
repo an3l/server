@@ -635,7 +635,7 @@ struct xid_t {
     memcpy(data+MYSQL_XID_OFFSET, &tmp, sizeof(tmp));
     gtrid_length=MYSQL_XID_GTRID_LEN;
   }
-  void set(long g, long b, const char *d)
+      void set(long g, long b, const char *d)
   {
     formatID= 1;
     gtrid_length= g;
@@ -784,6 +784,7 @@ enum enum_schema_tables
   SCH_EXPLAIN,
   SCH_FILES,
   SCH_GLOBAL_STATUS,
+  SCH_GLOBAL_TEMPORARY_TABLES,
   SCH_GLOBAL_VARIABLES,
   SCH_KEY_CACHES,
   SCH_KEY_COLUMN_USAGE,
