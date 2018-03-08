@@ -64,7 +64,7 @@
 #endif
 #include "vtmd.h"
 #include "transaction.h"
-#include "thread_pool_priv.h"
+//#include "thread_pool_priv.h"
 
 enum enum_i_s_events_fields
 {
@@ -4766,8 +4766,38 @@ end:
       DBUG_ENTER("fill_global_temporary_tables");
       
       mysql_mutex_lock(&LOCK_thread_count);
-      
+      TABLE * tmp; 
       tables->table->field[0]->store((longlong) thd->thread_id,TRUE);
+      CHARSET_INFO *cs = system_charset_info;
+      // not working 
+      //Open_tables_backup*  open_tables_state;
+      //thd->reset_n_backup_open_tables_state(open_tables_state);
+      //thd->temporary_tables = open_tables_state->temporary_tables; 
+      
+      //not working
+      // TMP_TABLE_SHARE* share_tbl;
+      // share_tbl=&*thd->temporary_tables->m_first;
+      
+      //not working
+      //tables->table->field[1]->store(thd->temporary_tables->m_first->db.str,thd->temporary_tables->m_first->db.length,cs);
+      // not working
+      // tables->table->field[1]->store(thd->temporary_tables->s->db.str, thd->temporary_tables->s->db.length,cs);
+      //
+      //const char* dbb;
+      //TABLE * temp1;
+      //if(thd->temporary_tables!=0) 
+       // dbb = thd->temporary_tables[0].m_first->db.str;
+      // tables->table->field[1]->store(thd->temporary_tables[0]->m_first->db->str, thd->temporary_tables.m_first.db.length, cs);
+      if(thd->temporary_tables!=0)
+      {
+       // CURRENTLY HERE IS A PROBLEM: tmp is optimized out; for loop is acting weird: in fill?global_temporary_tables(thd,table, cond=<optimized out>)
+       // for(TABLE* tmp = (TABLE* )thd->temporary_tables; tmp; tmp->next)
+       // {
+            tmp = (TABLE *)thd->temporary_tables;
+            tables->table->field[1]->store((*tmp).s->db.str, (*tmp).s->db.length, cs);
+            tables->table->field[2]->store((*tmp).s->table_name.str, (*tmp).s->table_name.length, cs);
+       // }
+      }
       schema_table_store_record(thd,tables->table);
 
       //tables->table->field[1]->store(first_global_thread()->temporary_tables->m_first->db.str, first_global_thread()->temporary_tables->m_first->db.length,cs);
@@ -9942,7 +9972,7 @@ end:
        hton_fill_schema_table, 0, 0, -1, -1, 0, 0},
       {"GLOBAL_STATUS", variables_fields_info, 0,
        fill_status, make_old_format, 0, 0, -1, 0, 0},
-      {"GLOBAL_TEMPORARY_TABLES", temporary_table_fields_info,0, fill_global_temporary_tables,make_old_format , 0, 2, 3, 0, 0}, // it was make_temporary_tables_old_format ; instead of the first 0, it was create_schema_table, but couldn't perform conversion
+      {"GLOBAL_TEMPORARY_TABLES", temporary_table_fields_info,0, fill_global_temporary_tables,make_old_format , 0, 0, 0, 0, 0}, // it was make_temporary_tables_old_format ; instead of the first 0, it was create_schema_table, but couldn't perform conversion
 
   {"GLOBAL_VARIABLES", variables_fields_info, 0,
    fill_variables, make_old_format, 0, 0, -1, 0, 0},
