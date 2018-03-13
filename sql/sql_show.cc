@@ -64,7 +64,7 @@
 #endif
 #include "vtmd.h"
 #include "transaction.h"
-//#include "thread_pool_priv.h"
+#include "thread_pool_priv.h"
 
 enum enum_i_s_events_fields
 {
@@ -4760,74 +4760,35 @@ end:
             @retval       1           error
     */
 
-        static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
+
+// RADNA VERZIJA
+static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
                                             Item *cond)
     {
       DBUG_ENTER("fill_global_temporary_tables");
       
       mysql_mutex_lock(&LOCK_thread_count);
-      TABLE * tmp; 
-      tables->table->field[0]->store((longlong) thd->thread_id,TRUE);
+      
+      TABLE* tmp; 
+
       CHARSET_INFO *cs = system_charset_info;
-      // not working 
-      //Open_tables_backup*  open_tables_state;
-      //thd->reset_n_backup_open_tables_state(open_tables_state);
-      //thd->temporary_tables = open_tables_state->temporary_tables; 
-      
-      //not working
-      // TMP_TABLE_SHARE* share_tbl;
-      // share_tbl=&*thd->temporary_tables->m_first;
-      
-      //not working
-      //tables->table->field[1]->store(thd->temporary_tables->m_first->db.str,thd->temporary_tables->m_first->db.length,cs);
-      // not working
-      // tables->table->field[1]->store(thd->temporary_tables->s->db.str, thd->temporary_tables->s->db.length,cs);
-      //
-      //const char* dbb;
-      //TABLE * temp1;
-      //if(thd->temporary_tables!=0) 
-       // dbb = thd->temporary_tables[0].m_first->db.str;
-      // tables->table->field[1]->store(thd->temporary_tables[0]->m_first->db->str, thd->temporary_tables.m_first.db.length, cs);
-      if(thd->temporary_tables!=0)
+      for(THD* thd1=first_global_thread();thd1;thd1= next_global_thread(thd1))
       {
-       // CURRENTLY HERE IS A PROBLEM: tmp is optimized out; for loop is acting weird: in fill?global_temporary_tables(thd,table, cond=<optimized out>)
-       // for(TABLE* tmp = (TABLE* )thd->temporary_tables; tmp; tmp->next)
-       // {
-            tmp = (TABLE *)thd->temporary_tables;
+        if(thd1->temporary_tables!=0)
+        {
+            
+            All_tmp_tables_list* tl = thd1->temporary_tables; // I_P_List
+            TMP_TABLE_SHARE* tlshare = (*tl).front(); // inline function returns TMP_TABLE_SHARE*
+            // Some kind of iteration through the temporary tables...
+            tables->table->field[0]->store((longlong) thd1->thread_id,TRUE);
+            tmp = (TABLE *)thd1->temporary_tables;
             tables->table->field[1]->store((*tmp).s->db.str, (*tmp).s->db.length, cs);
             tables->table->field[2]->store((*tmp).s->table_name.str, (*tmp).s->table_name.length, cs);
-       // }
-      }
-      schema_table_store_record(thd,tables->table);
 
-      //tables->table->field[1]->store(first_global_thread()->temporary_tables->m_first->db.str, first_global_thread()->temporary_tables->m_first->db.length,cs);
-          
-     /* 
-      for(thd_item =first_global_thread();thd_item=next_global_thread(thd_item);)
-      {
-        // mysql_mutex_lock(&thd_item->LOCK_temporary_tables);
-        
-        for(TABLE* tmp=(TABLE*)thd_item->temporary_tables; tmp; tmp=tmp->next)
-        {
-            CHARSET_INFO *cs = system_charset_info;
-            restore_record(tables->table, s->default_values);
-            tables->table->field[0]->store((longlong) thd_item->thread_id,TRUE);
-            
-            if(store_temporary_table_record(thd_item,tables->table,tmp,
-                                            thd->lex->select_lex.db.str,
-                                            thd->mem_root))
-                {
-               // mysql_mutex_unlock(&thd_item->LOCK_temporary_tables);
-                mysql_mutex_unlock(&LOCK_thread_count);
-                DBUG_RETURN(1);
-            }
-            
+            schema_table_store_record(thd1,tables->table);
         }
-        
-       // mysql_mutex_unlock(&thd_item->LOCK_temporary_tables);    
       }
-    */
-      
+          
       mysql_mutex_unlock(&LOCK_thread_count);
       DBUG_RETURN(0);
     }
