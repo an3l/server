@@ -4769,23 +4769,26 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       
       mysql_mutex_lock(&LOCK_thread_count);
       
-      TABLE* tmp; 
-
       CHARSET_INFO *cs = system_charset_info;
       for(THD* thd1=first_global_thread();thd1;thd1= next_global_thread(thd1))
       {
         if(thd1->temporary_tables!=0)
         {
-            
             All_tmp_tables_list* tl = thd1->temporary_tables; // I_P_List
             TMP_TABLE_SHARE* tlshare = (*tl).front(); // inline function returns TMP_TABLE_SHARE*
-            // Some kind of iteration through the temporary tables...
+            TMP_TABLE_SHARE* tmp;// TMP_TABLE SHARE*
+            tmp= tlshare;
+  
+            while(tmp!=0)
+            {
             tables->table->field[0]->store((longlong) thd1->thread_id,TRUE);
-            tmp = (TABLE *)thd1->temporary_tables;
-            tables->table->field[1]->store((*tmp).s->db.str, (*tmp).s->db.length, cs);
-            tables->table->field[2]->store((*tmp).s->table_name.str, (*tmp).s->table_name.length, cs);
+            tables->table->field[1]->store((*tmp).db.str, (*tmp).db.length, cs);
+            tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, cs);
 
             schema_table_store_record(thd1,tables->table);
+            tlshare = tmp;
+            tmp=*((All_tmp_table_shares*)tl)->next_ptr(tlshare);
+            }
         }
       }
           
@@ -9876,7 +9879,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       {"SESSION_ID", 4, MYSQL_TYPE_LONGLONG, 0, 0, "Session", SKIP_OPEN_TABLE},
       {"TABLE_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Db", SKIP_OPEN_TABLE},
       {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Temp_tables_in_", SKIP_OPEN_TABLE},
-      {"ENGINE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Engine", OPEN_FRM_ONLY}
+      {"ENGINE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Engine", OPEN_FRM_ONLY},
       /*
       {"NAME", FN_REFLEN, MYSQL_TYPE_STRING, 0, 0, "Name", SKIP_OPEN_TABLE},
       {"TABLE_ROWS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
@@ -9889,7 +9892,8 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
        MY_I_S_UNSIGNED, "Index Size", OPEN_FULL_TABLE},
       {"CREATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Create Time", OPEN_FULL_TABLE},
       {"UPDATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Update Time", OPEN_FULL_TABLE},
-      {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE} */
+     */
+      {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE} 
     };
 
     /*
