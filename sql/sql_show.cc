@@ -4770,26 +4770,90 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       mysql_mutex_lock(&LOCK_thread_count);
       
       CHARSET_INFO *cs = system_charset_info;
+#ifndef NO_EMBEDDED_ACCESS_CHECKS
+      Security_context* sctx=thd->security_ctx;
+      uint db_access;
+#endif
       for(THD* thd1=first_global_thread();thd1;thd1= next_global_thread(thd1))
       {
+
+#ifndef DBUG_OFF
+          const char* tmp_proc_info=thd1->proc_info;
+          if(tmp_proc_info && !strncmp(tmp_proc_info, STRING_WITH_LEN("debug sync point: before_open_in_get_all_tables"))){
+            DEBUG_SYNC(thd1, "fill_global_temporary_tables_thd_item_at_tables_debug_sync");
+          }
+#endif
+        //thd1->lock_temporary_tables();
         if(thd1->temporary_tables!=0)
         {
             All_tmp_tables_list* tl = thd1->temporary_tables; // I_P_List
-            TMP_TABLE_SHARE* tlshare = (*tl).front(); // inline function returns TMP_TABLE_SHARE*
-            TMP_TABLE_SHARE* tmp;// TMP_TABLE SHARE*
-            tmp= tlshare;
-  
+            TMP_TABLE_SHARE* tmp = (*tl).front(); // inline function returns TMP_TABLE_SHARE*
+            //All_tmp_tables_list::Iterator it(tmp->all_tmp_tables);
             while(tmp!=0)
             {
-            tables->table->field[0]->store((longlong) thd1->thread_id,TRUE);
-            tables->table->field[1]->store((*tmp).db.str, (*tmp).db.length, cs);
-            tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, cs);
+              #ifndef NO_EMBEDDED_ACCESS_CHECKS
+              if(test_all_bits(sctx->master_access, DB_ACLS))
+                  db_access= DB_ACLS;
+              else
+                  db_access= (acl_get(sctx->host, sctx->ip,
+                            sctx->priv_user, (*tmp).db.str, 0)
+                    | sctx->master_access);
+              if (!(db_access & DB_ACLS) && check_grant_db(thd1,(*tmp).db.str)) {
+        //no access for temp tables within this db for user
+        continue;
+      }
 
-            schema_table_store_record(thd1,tables->table);
-            tlshare = tmp;
-            tmp=*((All_tmp_table_shares*)tl)->next_ptr(tlshare);
-            }
+#endif
+              DEBUG_SYNC(thd1, "fill_global_temporary_tables_before_storing_rec");
+              // session_id
+              tables->table->field[0]->store((longlong) thd1->thread_id,TRUE);
+              // table_schema
+              tables->table->field[1]->store((*tmp).db.str, (*tmp).db.length, cs);
+              // table_name
+              tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, cs);
+              
+              // engine
+              TABLE* ht = tmp->all_tmp_tables.front();
+
+              handler* handle=ht->file;
+              // Assume that invoking handler::table_type() on a shared handler is safe
+              const char* engine_type= (char*)(handle? handle->table_type(): "UNKNOWN");
+
+              tables->table->field[3]->store(engine_type,strlen(engine_type),cs);
+
+              // name
+              //const char *path = (char*)(*tmp).path.str;
+              const char *path = strstr((*tmp).path.str, "#sql");
+              int len = (*tmp).path.length-(path-(*tmp).path.str);
+              tables->table->field[4]->store(path,len,cs);
+
+              // table_rows
+              tables->table->field[5]->store((longlong)handle->stats.records,TRUE);
+              tables->table->field[5]->set_notnull();
+              // avg_row_length
+              // tables->table->field[6]->store((longlong)handle->stats.mean_rec_length,TRUE);
+             
+              // data_length
+              // tables->table->field[7]->store((longlong)handle->stats.data_file_length,TRUE);
+
+              // index_length
+              // tables->table->field[8]->store((longlong)handle->stats.index_file_length,TRUE);
+
+              // create_time
+              // if(handle->create_time){
+              // MYSQL_TIME time;
+              // thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)handle->stats.create_time);
+              // tables->table->field[9]->store_time(&time, MYSQL_TIMESTAMP_DATETIME);
+              // tables->table->field[9]->set_notnull();
+              //
+            // }
+
+
+              schema_table_store_record(thd1,tables->table);
+              tmp=*((All_tmp_table_shares*)tl)->next_ptr(tmp);
+           } 
         }
+        //unlock_temporary_tables();
       }
           
       mysql_mutex_unlock(&LOCK_thread_count);
@@ -9880,10 +9944,11 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       {"TABLE_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Db", SKIP_OPEN_TABLE},
       {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Temp_tables_in_", SKIP_OPEN_TABLE},
       {"ENGINE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Engine", OPEN_FRM_ONLY},
-      /*
+      
       {"NAME", FN_REFLEN, MYSQL_TYPE_STRING, 0, 0, "Name", SKIP_OPEN_TABLE},
       {"TABLE_ROWS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
        MY_I_S_UNSIGNED, "Rows", OPEN_FULL_TABLE},
+      /*
       {"AVG_ROW_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
        MY_I_S_UNSIGNED, "Avg Row", OPEN_FULL_TABLE},
       {"DATA_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
