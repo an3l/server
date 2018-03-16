@@ -4648,106 +4648,6 @@ end:
 }
 
     /**
-      @brief          Change I_S table item list for SHOW [GLOBAL] TEMPORARY TABLES [FROM/IN db]
-
-      @param[in]      thd                      thread handler
-      @param[in]      schema_table             I_S table
-
-      @return         Operation status
-        @retval       0                        success
-        @retval       1                        error
-    */
-/*
-    int make_temporary_tables_old_format(THD *thd, ST_SCHEMA_TABLE *schema_table)
-    {
-      char tmp[128];
-      String buffer(tmp,sizeof(tmp), thd->charset());
-      LEX *lex= thd->lex;
-      Name_resolution_context *context= &lex->select_lex.context;
-
-      if (thd->lex->option_type == OPT_GLOBAL) {
-        ST_FIELD_INFO *field_info= &schema_table->fields_info[0];
-        Item_field *field= new Item_field(context, NullS, NullS, field_info->field_name);
-        if (add_item_to_list(thd, field))
-          return 1;
-        field->item_name.copy(field_info->old_name, strlen(field_info->old_name), system_charset_info);
-      }
-
-      ST_FIELD_INFO *field_info= &schema_table->fields_info[2];
-      buffer.length(0);
-      buffer.append(field_info->old_name);
-      buffer.append(lex->select_lex.db);
-
-      if (lex->wild && lex->wild->ptr())
-      {
-        buffer.append(STRING_WITH_LEN(" ("));
-        buffer.append(lex->wild->ptr());
-        buffer.append(')');
-      }
-
-      Item_field *field= new Item_field(context, NullS, NullS, field_info->field_name);    
-      if (add_item_to_list(thd, field))
-        return 1;
-
-      field->item_name.copy(buffer.ptr(), buffer.length(), system_charset_info);
-      return 0;
-    }
-    */
-
-    /**
-      @brief          Fill records for temporary tables by reading info from tableobject
-        
-      @param[in]      thd                      thread handler
-      @param[in]      table                    I_S table 
-      @param[in]      tmp_table                temporary table 
-      @param[in]      db                       database name
-      @param[in]      mem_root                 memory root for allocating cloned
-                                               handlers, must have the lifetime of the current thread
-                                               
-      @return         Operation status
-        @retval       0           success
-        @retval       1           error
-    */
-
-    static int store_temporary_table_record(THD *thd, TABLE *table,
-                                            TABLE *tmp_table, const char *db,
-                                            MEM_ROOT *mem_root)
-    {
-      CHARSET_INFO *cs=system_charset_info;  
-      DBUG_ENTER("store_temporary_table_record");
-
-      if(db && my_strcasecmp(cs, db, tmp_table->s->db.str))
-          DBUG_RETURN(0);
-
-      restore_record(table, s->default_values);
-
-      // session_id
-      table->field[0]->store((longlong) thd->thread_id, TRUE);
-
-      // database
-      table->field[1]->store(tmp_table->s->db.str, tmp_table->s->db.length, cs);
-      
-      // table
-      table->field[2]->store(tmp_table->s->table_name.str, tmp_table->s->table_name.length, cs);
-
-      // engine
-      handler *handle = tmp_table->file;
-      // Assume that invoking handler::table_type() on a shared handler is safe
-      const char* engine_type = (char *)(handle ? handle->table_type(): "UNKNOWN");
-      table->field[3]->store(engine_type,strlen(engine_type), cs);
-
-      // name
-     /* if(tmp_table->s->path.str)
-      {
-        char *p = strstr(tmp_table->s->path.str,"#sql");
-      }
-      */
-      // file stats ...
-      DBUG_RETURN(schema_table_store_record(thd, table));
-        }
-
-
-    /**
       @brief          Fill I_S tables with global temporary tables 
         
       @param[in]      thd                      thread handler
@@ -4798,13 +4698,16 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
                   db_access= (acl_get(sctx->host, sctx->ip,
                             sctx->priv_user, (*tmp).db.str, 0)
                     | sctx->master_access);
-              if (!(db_access & DB_ACLS) && check_grant_db(thd1,(*tmp).db.str)) {
-        //no access for temp tables within this db for user
-        continue;
-      }
+              if (!(db_access & DB_ACLS) && check_grant_db(thd1,(*tmp).db.str)) 
+              {
+                  //no access for temp tables within this db for user
+                  continue;
+              }
 
 #endif
               DEBUG_SYNC(thd1, "fill_global_temporary_tables_before_storing_rec");
+              restore_record(tables->table,s->default_values);// ha_innobase::update_thd assertion m_prebuilt->table->n_ref_count >0 failed.
+              
               // session_id
               tables->table->field[0]->store((longlong) thd1->thread_id,TRUE);
               // table_schema
@@ -4826,10 +4729,22 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
               const char *path = strstr((*tmp).path.str, "#sql");
               int len = (*tmp).path.length-(path-(*tmp).path.str);
               tables->table->field[4]->store(path,len,cs);
-
+              
+              // File stats
+              handler* file = ht->file; // in PERCONA there are 2 objects is declared
+              if(file)
+              {
+                file = file->clone((*tmp).normalized_path.str,thd->mem_root); // same as bellow line
+               // file = file->clone((*ht).s->normalized_path.str,thd1->mem_root);// with this i get updated value in current thread, but I get the error when calling the select global from other thread if exists some temp table in previous thread.
+              }
+              if(file)
+              {
+               //file->info(HA_STATUS_CONST | HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
               // table_rows
-              tables->table->field[5]->store((longlong)handle->stats.records,TRUE);
+              tables->table->field[5]->store((longlong)file->stats.records,TRUE);
               tables->table->field[5]->set_notnull();
+              file->ha_close(); // if used on real handler error is raised, use it only when cloning handler.
+              }
               // avg_row_length
               // tables->table->field[6]->store((longlong)handle->stats.mean_rec_length,TRUE);
              
