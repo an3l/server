@@ -4674,7 +4674,10 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       Security_context* sctx=thd->security_ctx;
       uint db_access;
 #endif
-      for(THD* thd1=first_global_thread();thd1;thd1= next_global_thread(thd1))
+     // for(THD* thd1=first_global_thread();thd1;thd1= next_global_thread(thd1))
+      THD* thd1;
+      I_List_iterator<THD> it(threads);
+      while((thd1=it++))
       {
 
 #ifndef DBUG_OFF
@@ -4731,19 +4734,28 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
               tables->table->field[4]->store(path,len,cs);
               
               // File stats
-              handler* file = ht->file; // in PERCONA there are 2 objects is declared
+              handler* file = ht->db_stat ? ht->file : 0; // in PERCONA there are 2 objects is declared
+            /*  
               if(file)
               {
-                file = file->clone((*tmp).normalized_path.str,thd->mem_root); // same as bellow line
+                file = file->clone((*tmp).path.str,thd->mem_root); // same as bellow line
                // file = file->clone((*ht).s->normalized_path.str,thd1->mem_root);// with this i get updated value in current thread, but I get the error when calling the select global from other thread if exists some temp table in previous thread.
               }
+              */
               if(file)
               {
-               //file->info(HA_STATUS_CONST | HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
+
               // table_rows
+              int info_error=-1;
+              info_error=file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
+              //info_error=file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_VARIABLE_EXTRA | HA_STATUS_AUTO);
+              //HA_CREATE_INFO  create_info;
+              //memset(&create_info,0,sizeof(create_info));
+              //file->update_create_info(&create_info);
               tables->table->field[5]->store((longlong)file->stats.records,TRUE);
               tables->table->field[5]->set_notnull();
-              file->ha_close(); // if used on real handler error is raised, use it only when cloning handler.
+
+               file->ha_close(); // if used on real handler error is raised, use it only when cloning handler.
               }
               // avg_row_length
               // tables->table->field[6]->store((longlong)handle->stats.mean_rec_length,TRUE);
