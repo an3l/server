@@ -64,7 +64,6 @@
 #endif
 #include "vtmd.h"
 #include "transaction.h"
-#include "thread_pool_priv.h"
 
 enum enum_i_s_events_fields
 {
@@ -4719,11 +4718,11 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
               tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, cs);
               
               // engine
-              TABLE* ht = tmp->all_tmp_tables.front();
+              TABLE* current_table = tmp->all_tmp_tables.front();
 
-              handler* handle=ht->file;
+              handler* handle=current_table->file;
               // Assume that invoking handler::table_type() on a shared handler is safe
-              const char* engine_type= (char*)(handle? handle->table_type(): "UNKNOWN");
+              const char* engine_type= (char*)(handle ? handle->table_type(): "UNKNOWN");
 
               tables->table->field[3]->store(engine_type,strlen(engine_type),cs);
 
@@ -4734,48 +4733,42 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
               tables->table->field[4]->store(path,len,cs);
               
               // File stats
-              handler* file = ht->db_stat ? ht->file : 0; // in PERCONA there are 2 objects is declared
-            /*  
+              handler* file = current_table->db_stat ? current_table->file : 0; // in PERCONA there are 2 objects is declared
+             
               if(file)
               {
-                file = file->clone((*tmp).path.str,thd->mem_root); // same as bellow line
-               // file = file->clone((*ht).s->normalized_path.str,thd1->mem_root);// with this i get updated value in current thread, but I get the error when calling the select global from other thread if exists some temp table in previous thread.
+                //file = file->clone((*tmp).path.str,thd->mem_root); // same as bellow line
+                file = file->clone((*current_table).s->normalized_path.str,thd->mem_root);// with this i get updated value in current thread, but I get the error when calling the select global from other thread if exists some temp table in previous thread.
               }
-              */
+              
               if(file)
               {
 
               // table_rows
               int info_error=-1;
               info_error=file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
-              //info_error=file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_VARIABLE_EXTRA | HA_STATUS_AUTO);
-              //HA_CREATE_INFO  create_info;
-              //memset(&create_info,0,sizeof(create_info));
-              //file->update_create_info(&create_info);
+              
               tables->table->field[5]->store((longlong)file->stats.records,TRUE);
               tables->table->field[5]->set_notnull();
-
-               file->ha_close(); // if used on real handler error is raised, use it only when cloning handler.
-              }
               // avg_row_length
-              // tables->table->field[6]->store((longlong)handle->stats.mean_rec_length,TRUE);
+               tables->table->field[6]->store((longlong)file->stats.mean_rec_length,TRUE);
              
               // data_length
-              // tables->table->field[7]->store((longlong)handle->stats.data_file_length,TRUE);
+              tables->table->field[7]->store((longlong)file->stats.data_file_length,TRUE);
 
               // index_length
-              // tables->table->field[8]->store((longlong)handle->stats.index_file_length,TRUE);
+              tables->table->field[8]->store((longlong)file->stats.index_file_length,TRUE);
 
               // create_time
-              // if(handle->create_time){
-              // MYSQL_TIME time;
-              // thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)handle->stats.create_time);
-              // tables->table->field[9]->store_time(&time, MYSQL_TIMESTAMP_DATETIME);
-              // tables->table->field[9]->set_notnull();
-              //
-            // }
-
-
+               if(file->stats.create_time)
+               {
+                MYSQL_TIME time;
+                thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.create_time);
+                tables->table->field[9]->store_time(&time);
+                tables->table->field[9]->set_notnull();
+               }
+                file->ha_close();
+              }
               schema_table_store_record(thd1,tables->table);
               tmp=*((All_tmp_table_shares*)tl)->next_ptr(tmp);
            } 
@@ -9875,7 +9868,6 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       {"NAME", FN_REFLEN, MYSQL_TYPE_STRING, 0, 0, "Name", SKIP_OPEN_TABLE},
       {"TABLE_ROWS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
        MY_I_S_UNSIGNED, "Rows", OPEN_FULL_TABLE},
-      /*
       {"AVG_ROW_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
        MY_I_S_UNSIGNED, "Avg Row", OPEN_FULL_TABLE},
       {"DATA_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
@@ -9883,6 +9875,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       {"INDEX_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
        MY_I_S_UNSIGNED, "Index Size", OPEN_FULL_TABLE},
       {"CREATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Create Time", OPEN_FULL_TABLE},
+      /*
       {"UPDATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Update Time", OPEN_FULL_TABLE},
      */
       {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE} 
