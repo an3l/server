@@ -4658,9 +4658,6 @@ end:
         @retval       0           success
             @retval       1           error
     */
-
-
-// RADNA VERZIJA
 static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
                                             Item *cond)
     {
@@ -4673,7 +4670,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       Security_context* sctx=thd->security_ctx;
       uint db_access;
 #endif
-     // for(THD* thd1=first_global_thread();thd1;thd1= next_global_thread(thd1))
+     
       THD* thd1;
       I_List_iterator<THD> it(threads);
       while((thd1=it++))
@@ -4681,16 +4678,17 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
 
 #ifndef DBUG_OFF
           const char* tmp_proc_info=thd1->proc_info;
-          if(tmp_proc_info && !strncmp(tmp_proc_info, STRING_WITH_LEN("debug sync point: before_open_in_get_all_tables"))){
+          if(tmp_proc_info && !strncmp(tmp_proc_info, STRING_WITH_LEN("debug sync point: before_open_in_get_all_tables")))
+          {
             DEBUG_SYNC(thd1, "fill_global_temporary_tables_thd_item_at_tables_debug_sync");
           }
 #endif
-        //thd1->lock_temporary_tables();
+        
         if(thd1->temporary_tables!=0)
         {
-            All_tmp_tables_list* tl = thd1->temporary_tables; // I_P_List
-            TMP_TABLE_SHARE* tmp = (*tl).front(); // inline function returns TMP_TABLE_SHARE*
-            //All_tmp_tables_list::Iterator it(tmp->all_tmp_tables);
+            All_tmp_tables_list* tl = thd1->temporary_tables; 
+            TMP_TABLE_SHARE* tmp = (*tl).front(); 
+            
             while(tmp!=0)
             {
               #ifndef NO_EMBEDDED_ACCESS_CHECKS
@@ -4708,7 +4706,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
 
 #endif
               DEBUG_SYNC(thd1, "fill_global_temporary_tables_before_storing_rec");
-              restore_record(tables->table,s->default_values);// ha_innobase::update_thd assertion m_prebuilt->table->n_ref_count >0 failed.
+              restore_record(tables->table,s->default_values);
               
               // session_id
               tables->table->field[0]->store((longlong) thd1->thread_id,TRUE);
@@ -4727,29 +4725,27 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
               tables->table->field[3]->store(engine_type,strlen(engine_type),cs);
 
               // name
-              //const char *path = (char*)(*tmp).path.str;
               const char *path = strstr((*tmp).path.str, "#sql");
               int len = (*tmp).path.length-(path-(*tmp).path.str);
               tables->table->field[4]->store(path,len,cs);
               
               // File stats
-              handler* file = current_table->db_stat ? current_table->file : 0; // in PERCONA there are 2 objects is declared
+              handler* file = current_table->db_stat ? current_table->file : 0; 
              
               if(file)
               {
-                //file = file->clone((*tmp).path.str,thd->mem_root); // same as bellow line
-                file = file->clone((*current_table).s->normalized_path.str,thd->mem_root);// with this i get updated value in current thread, but I get the error when calling the select global from other thread if exists some temp table in previous thread.
+                file = file->clone((*current_table).s->normalized_path.str,thd->mem_root);
               }
               
               if(file)
               {
 
               // table_rows
-              int info_error=-1;
-              info_error=file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
+              file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
               
               tables->table->field[5]->store((longlong)file->stats.records,TRUE);
               tables->table->field[5]->set_notnull();
+
               // avg_row_length
                tables->table->field[6]->store((longlong)file->stats.mean_rec_length,TRUE);
              
@@ -4759,16 +4755,24 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
               // index_length
               tables->table->field[8]->store((longlong)file->stats.index_file_length,TRUE);
 
-              // create_time
+               MYSQL_TIME time;
+               // create_time
                if(file->stats.create_time)
                {
-                MYSQL_TIME time;
-                thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.create_time);
-                tables->table->field[9]->store_time(&time);
-                tables->table->field[9]->set_notnull();
+                 thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.create_time);
+                 tables->table->field[9]->store_time(&time);
+                 tables->table->field[9]->set_notnull();
                }
-                file->ha_close();
+               if(file->stats.update_time)
+               {
+                 thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.update_time);
+                 tables->table->field[10]->store_time(&time);
+                 tables->table->field[10]->set_notnull();
+               }
+
+               file->ha_close();
               }
+
               schema_table_store_record(thd1,tables->table);
               tmp=*((All_tmp_table_shares*)tl)->next_ptr(tmp);
            } 
@@ -9875,9 +9879,8 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables,
       {"INDEX_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
        MY_I_S_UNSIGNED, "Index Size", OPEN_FULL_TABLE},
       {"CREATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Create Time", OPEN_FULL_TABLE},
-      /*
+      
       {"UPDATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Update Time", OPEN_FULL_TABLE},
-     */
       {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE} 
     };
 
