@@ -1,0 +1,51 @@
+connect stcon1,localhost,root,,test;
+connect stcon2,localhost,root,,test;
+connection stcon1;
+drop table if exists t1,t2,t3;
+drop database if exists tempdb;
+create database if not exists tempdb;
+use test;
+create temporary table t1(t int);
+create temporary table t2(t int);
+create temporary table tempdb.t3(t int);
+insert into t1 values (1),(2),(3),(4);
+insert into tempdb.t3 values (5);
+select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables;
+table_schema	table_name	engine	table_rows
+tempdb	t3	MyISAM	1
+test	t1	MyISAM	4
+test	t2	MyISAM	0
+select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables where table_schema="tempdb";
+table_schema	table_name	engine	table_rows
+tempdb	t3	MyISAM	1
+select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables where table_schema="test";
+table_schema	table_name	engine	table_rows
+test	t1	MyISAM	4
+test	t2	MyISAM	0
+select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables where table_schema="temp";
+table_schema	table_name	engine	table_rows
+connection stcon2;
+drop table if exists tempdb.t2;
+create temporary table t1(t int);
+create temporary table tempdb.t2(t int);
+select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables;
+table_schema	table_name	engine	table_rows
+tempdb	t2	MyISAM	0
+tempdb	t3	MyISAM	1
+test	t1	MyISAM	0
+test	t1	MyISAM	4
+test	t2	MyISAM	0
+drop table tempdb.t2;
+drop table t1;
+disconnect stcon2;
+connection stcon1;
+select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables;
+table_schema	table_name	engine	table_rows
+tempdb	t3	MyISAM	1
+test	t1	MyISAM	4
+test	t2	MyISAM	0
+drop table t1,t2;
+drop table tempdb.t3;
+drop database tempdb;
+connection default;
+disconnect stcon1;
