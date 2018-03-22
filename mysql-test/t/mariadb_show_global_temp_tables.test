@@ -22,16 +22,15 @@ create temporary table tempdb.t3(t int);
 insert into t1 values (1),(2),(3),(4);
 insert into tempdb.t3 values (5);
 
-# "Session" is not same value always. mysql-test cannot test it always.
 # Show global temporary tables
 --sorted_result
-select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables;
+select * from information_schema.global_temporary_tables;
 --sorted_result
-select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables where table_schema="tempdb";
+select * from information_schema.global_temporary_tables where table_schema="tempdb";
 --sorted_result
-select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables where table_schema="test";
+select * from information_schema.global_temporary_tables where table_schema="test";
 --sorted_result
-select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables where table_schema="temp";
+select * from information_schema.global_temporary_tables where table_schema="temp";
 
 connection stcon2;
 
@@ -41,7 +40,7 @@ drop table if exists tempdb.t2;
 create temporary table t1(t int);
 create temporary table tempdb.t2(t int);
 --sorted_result
-select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables;
+select * from information_schema.global_temporary_tables;
 drop table tempdb.t2;
 drop table t1;
 
@@ -49,7 +48,7 @@ disconnect stcon2;
 
 connection stcon1;
 --sorted_result
-select table_schema,table_name,engine,table_rows from information_schema.global_temporary_tables;
+select * from information_schema.global_temporary_tables;
 
 drop table t1,t2;
 drop table tempdb.t3;
@@ -60,9 +59,3 @@ disconnect stcon1;
 
 # Wait till all disconnects are completed
 --source include/wait_until_count_sessions.inc
-
-
-
-
-
-

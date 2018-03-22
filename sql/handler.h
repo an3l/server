@@ -4619,7 +4619,6 @@ protected:
   void set_ha_share_ptr(Handler_share *arg_ha_share);
   void lock_shared_ha_data();
   void unlock_shared_ha_data();
-  // Anel
 private:
   bool cloned;
 };

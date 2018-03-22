@@ -2574,11 +2574,6 @@ handler *handler::clone(const char *name, MEM_ROOT *mem_root)
   if (new_handler->set_ha_share_ref(ha_share))
     goto err;
 
-  // Anel
-  if (!(new_handler->ref= (uchar*) alloc_root(mem_root,
-                                              ALIGN_SIZE(ref_length)*2)))
-    goto err;
-
   new_handler->cloned= true;
 
   /*
@@ -2631,7 +2626,6 @@ void **handler::ha_data(THD *thd) const
 
 THD *handler::ha_thd(void) const
 {
-  // Anel
   if(unlikely(cloned))
     return current_thd;
   DBUG_ASSERT(!table || !table->in_use || table->in_use == current_thd);
@@ -2687,10 +2681,7 @@ int handler::ha_open(TABLE *table_arg, const char *name, int mode,
   DBUG_ASSERT(alloc_root_inited(&table->mem_root));
 
   set_partitions_to_open(partitions_to_open);
-  // Anel
-  if(cloned){
-   DEBUG_SYNC(ha_thd(), "start_handler_ha_open_cloned");
-  }
+  
   if ((error=open(name,mode,test_if_locked)))
   {
     if ((error == EACCES || error == EROFS) && mode == O_RDWR &&
