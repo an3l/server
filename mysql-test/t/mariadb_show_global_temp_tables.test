@@ -1,0 +1,61 @@
+# Save the initial number of concurrent sessions
+--source include/count_sessions.inc
+
+#
+# Test of Information_schema.global_temporary_tables
+#
+
+connect(stcon1,localhost,root,,test);
+connect(stcon2,localhost,root,,test);
+
+connection stcon1;
+--disable_warnings
+drop table if exists t1,t2,t3;
+drop database if exists tempdb;
+create database if not exists tempdb;
+--enable_warnings
+
+use test;
+create temporary table t1(t int);
+create temporary table t2(t int);
+create temporary table tempdb.t3(t int);
+insert into t1 values (1),(2),(3),(4);
+insert into tempdb.t3 values (5);
+
+# Show global temporary tables
+--sorted_result
+select * from information_schema.global_temporary_tables;
+--sorted_result
+select * from information_schema.global_temporary_tables where table_schema="tempdb";
+--sorted_result
+select * from information_schema.global_temporary_tables where table_schema="test";
+--sorted_result
+select * from information_schema.global_temporary_tables where table_schema="temp";
+
+connection stcon2;
+
+--disable_warnings
+drop table if exists tempdb.t2;
+--enable_warnings
+create temporary table t1(t int);
+create temporary table tempdb.t2(t int);
+--sorted_result
+select * from information_schema.global_temporary_tables;
+drop table tempdb.t2;
+drop table t1;
+
+disconnect stcon2;
+
+connection stcon1;
+--sorted_result
+select * from information_schema.global_temporary_tables;
+
+drop table t1,t2;
+drop table tempdb.t3;
+drop database tempdb;
+
+connection default;
+disconnect stcon1;
+
+# Wait till all disconnects are completed
+--source include/wait_until_count_sessions.inc

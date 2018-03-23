@@ -1,0 +1,51 @@
+connect stcon1,localhost,root,,test;
+connect stcon2,localhost,root,,test;
+connection stcon1;
+drop table if exists t1,t2,t3;
+drop database if exists tempdb;
+create database if not exists tempdb;
+use test;
+create temporary table t1(t int);
+create temporary table t2(t int);
+create temporary table tempdb.t3(t int);
+insert into t1 values (1),(2),(3),(4);
+insert into tempdb.t3 values (5);
+select * from information_schema.global_temporary_tables;
+SESSION_ID	TABLE_SCHEMA	TABLE_NAME	ENGINE	NAME	TABLE_ROWS	AVG_ROW_LENGTH	DATA_LENGTH	INDEX_LENGTH	CREATE_TIME	UPDATE_TIME
+5	tempdb	t3	MyISAM	#sql3624_5_2	1	7	7	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+5	test	t1	MyISAM	#sql3624_5_0	4	7	28	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+5	test	t2	MyISAM	#sql3624_5_1	0	0	0	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+select * from information_schema.global_temporary_tables where table_schema="tempdb";
+SESSION_ID	TABLE_SCHEMA	TABLE_NAME	ENGINE	NAME	TABLE_ROWS	AVG_ROW_LENGTH	DATA_LENGTH	INDEX_LENGTH	CREATE_TIME	UPDATE_TIME
+5	tempdb	t3	MyISAM	#sql3624_5_2	1	7	7	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+select * from information_schema.global_temporary_tables where table_schema="test";
+SESSION_ID	TABLE_SCHEMA	TABLE_NAME	ENGINE	NAME	TABLE_ROWS	AVG_ROW_LENGTH	DATA_LENGTH	INDEX_LENGTH	CREATE_TIME	UPDATE_TIME
+5	test	t1	MyISAM	#sql3624_5_0	4	7	28	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+5	test	t2	MyISAM	#sql3624_5_1	0	0	0	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+select * from information_schema.global_temporary_tables where table_schema="temp";
+SESSION_ID	TABLE_SCHEMA	TABLE_NAME	ENGINE	NAME	TABLE_ROWS	AVG_ROW_LENGTH	DATA_LENGTH	INDEX_LENGTH	CREATE_TIME	UPDATE_TIME
+connection stcon2;
+drop table if exists tempdb.t2;
+create temporary table t1(t int);
+create temporary table tempdb.t2(t int);
+select * from information_schema.global_temporary_tables;
+SESSION_ID	TABLE_SCHEMA	TABLE_NAME	ENGINE	NAME	TABLE_ROWS	AVG_ROW_LENGTH	DATA_LENGTH	INDEX_LENGTH	CREATE_TIME	UPDATE_TIME
+5	tempdb	t3	MyISAM	#sql3624_5_2	1	7	7	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+5	test	t1	MyISAM	#sql3624_5_0	4	7	28	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+5	test	t2	MyISAM	#sql3624_5_1	0	0	0	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+6	tempdb	t2	MyISAM	#sql3624_6_1	0	0	0	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+6	test	t1	MyISAM	#sql3624_6_0	0	0	0	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+drop table tempdb.t2;
+drop table t1;
+disconnect stcon2;
+connection stcon1;
+select * from information_schema.global_temporary_tables;
+SESSION_ID	TABLE_SCHEMA	TABLE_NAME	ENGINE	NAME	TABLE_ROWS	AVG_ROW_LENGTH	DATA_LENGTH	INDEX_LENGTH	CREATE_TIME	UPDATE_TIME
+5	tempdb	t3	MyISAM	#sql3624_5_2	1	7	7	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+5	test	t1	MyISAM	#sql3624_5_0	4	7	28	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+5	test	t2	MyISAM	#sql3624_5_1	0	0	0	1024	2018-03-22 10:19:27	2018-03-22 10:19:27
+drop table t1,t2;
+drop table tempdb.t3;
+drop database tempdb;
+connection default;
+disconnect stcon1;
