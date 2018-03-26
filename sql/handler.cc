@@ -2629,7 +2629,7 @@ void **handler::ha_data(THD *thd) const
 
 THD *handler::ha_thd(void) const
 {
-  if(unlikely(cloned))
+  if (unlikely(cloned))
     return current_thd;
   DBUG_ASSERT(!table || !table->in_use || table->in_use == current_thd);
   return (table && table->in_use) ? table->in_use : current_thd;

@@ -19,6 +19,9 @@ use test;
 create temporary table t1(t int);
 create temporary table t2(t int);
 create temporary table tempdb.t3(t int);
+create temporary table t4(t int) ENGINE=InnoDB;
+show create table t1;
+show create table t4;
 insert into t1 values (1),(2),(3),(4);
 insert into tempdb.t3 values (5);
 
