@@ -1,0 +1,9 @@
+# By default engine = MyISAM
+let $engine = MyISAM;
+source include/mariadb_test_commands.inc;
+
+# InnoDB 
+--source include/have_innodb.inc
+
+let $engine = InnoDB;
+source include/mariadb_test_commands.inc;
