@@ -4647,8 +4647,8 @@ end:
 }
 
 /**
-  @brief          Fill I_S tables with global temporary tables 
-        
+  @brief          Fill I_S tables with global temporary tables
+
   @param[in]      thd                      thread handler
   @param[in]      tables                   I_S table 
   @param[in]      cond                     'WHERE' condition
@@ -4663,7 +4663,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
 {
   DBUG_ENTER("fill_global_temporary_tables");
   mysql_mutex_lock(&LOCK_thread_count);
-  
+
   CHARSET_INFO *cs = system_charset_info;
   THD* thd1;
   I_List_iterator<THD> it(threads);
@@ -4673,27 +4673,27 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
   uint db_access;
 #endif
 
-  while((thd1=it++))
+  while ((thd1=it++))
   {
-    
+
 #ifndef DBUG_OFF
     const char* tmp_proc_info=thd1->proc_info;
-    if(tmp_proc_info && !strncmp(tmp_proc_info, STRING_WITH_LEN("debug sync point: before_open_in_get_all_tables")))
+    if (tmp_proc_info && !strncmp(tmp_proc_info, STRING_WITH_LEN("debug sync point: before_open_in_get_all_tables")))
     {
       DEBUG_SYNC(thd1, "fill_global_temporary_tables_thd_item_at_tables_debug_sync");
     }
 #endif
-    
-    if(thd1->temporary_tables!=0)
+
+    if (thd1->temporary_tables!=0)
     {
       mysql_mutex_lock(&thd1->LOCK_temporary_tables);
       All_tmp_tables_list* tl = thd1->temporary_tables; 
       TMP_TABLE_SHARE* tmp = (*tl).front(); 
-      
-      while(tmp!=0)
+
+      while (tmp!=0)
       {
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
-        if(test_all_bits(sctx->master_access, DB_ACLS))
+        if (test_all_bits(sctx->master_access, DB_ACLS))
           db_access= DB_ACLS;
         else
           db_access= (acl_get(sctx->host, sctx->ip,
@@ -4705,7 +4705,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
           continue;
         }
 #endif
-        
+
         DEBUG_SYNC(thd1, "fill_global_temporary_tables_before_storing_rec");
         restore_record(tables->table,s->default_values);
         // session_id
@@ -4716,7 +4716,7 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
         tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, cs);
         // engine
         TABLE* current_table = tmp->all_tmp_tables.front();
-        
+
         handler* handle=current_table->file;
         // Assume that invoking handler::table_type() on a shared handler is safe
         const char* engine_type= (char*)(handle ? handle->table_type(): "UNKNOWN");
@@ -4727,11 +4727,11 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
         tables->table->field[4]->store(path,len,cs);
         // File stats
         handler* file = current_table->db_stat ? current_table->file : 0;
-        if(file)
+        if (file)
         {
           file = file->clone((*current_table).s->normalized_path.str,thd->mem_root);
         }
-        if(file)
+        if (file)
         {
           // table_rows
           file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
@@ -4739,24 +4739,20 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
           tables->table->field[5]->set_notnull();
           // avg_row_length
           tables->table->field[6]->store((longlong)file->stats.mean_rec_length,TRUE);
-             
           // data_length
           tables->table->field[7]->store((longlong)file->stats.data_file_length,TRUE);
-              
           // index_length
           tables->table->field[8]->store((longlong)file->stats.index_file_length,TRUE);
-          
           MYSQL_TIME time;
-              
           // create_time
-          if(file->stats.create_time)
+          if (file->stats.create_time)
           {
             thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.create_time);
             tables->table->field[9]->store_time(&time);
             tables->table->field[9]->set_notnull();
           }
           // update_time
-          if(file->stats.update_time)
+          if (file->stats.update_time)
           {
             thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.update_time);
             tables->table->field[10]->store_time(&time);
@@ -4764,14 +4760,12 @@ static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond
           }
           file->ha_close();
         }
-              
         schema_table_store_record(thd1,tables->table);
         tmp=*((All_tmp_table_shares*)tl)->next_ptr(tmp);
       } 
       mysql_mutex_unlock(&thd1->LOCK_temporary_tables);
     }
   }
-          
   mysql_mutex_unlock(&LOCK_thread_count);
   DBUG_RETURN(0);
 }
