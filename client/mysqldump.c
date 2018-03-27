@@ -39,7 +39,7 @@
 ** 10 Jun 2003: SET NAMES and --no-set-names by Alexander Barkov
 */
 
-#define DUMP_VERSION "10.17"
+#define DUMP_VERSION "10.18"
 
 #include <my_global.h>
 #include <my_sys.h>
@@ -83,6 +83,7 @@
 #define IGNORE_NONE 0x00 /* no ignore */
 #define IGNORE_DATA 0x01 /* don't dump data for this table */
 #define IGNORE_INSERT_DELAYED 0x02 /* table doesn't support INSERT DELAYED */
+#define IGNORE_SEQUENCE_TABLE 0x04 /* SEQUENCE tables must be dumped last */
 
 /* Chars needed to store LONGLONG, excluding trailing '\0'. */
 #define LONGLONG_LEN 20
@@ -154,7 +155,14 @@ static DYNAMIC_STRING dynamic_where;
 static MYSQL_RES *get_table_name_result= NULL;
 static MEM_ROOT glob_root;
 static MYSQL_RES *routine_res, *routine_list_res;
-
+static MEM_ROOT store_table_root;
+static struct store_tb
+{
+  char *db;
+  char *table;
+} store_tb;
+static struct store_tb stb_start= {0};
+static struct store_tb *stb_end= &store_tb;
 
 #include <sslopt-vars.h>
 FILE *md_result_file= 0;
@@ -579,7 +587,8 @@ static void write_header(FILE *sql_file, char *db_name);
 static void print_value(FILE *file, MYSQL_RES  *result, MYSQL_ROW row,
                         const char *prefix,const char *name,
                         int string_value);
-static int dump_selected_tables(char *db, char **table_names, int tables);
+static int dump_selected_tables(char *db, char **table_names, int tables,
+                                my_bool dump_seqt);
 static int dump_all_tables_in_db(char *db);
 static int init_dumping_views(char *);
 static int init_dumping_tables(char *);
@@ -1703,6 +1712,7 @@ static void free_resources()
   dynstr_free(&dynamic_where);
   dynstr_free(&insert_pat);
   dynstr_free(&select_field_names);
+  free_root(&store_table_root, 0);
   if (defaults_argv)
     free_defaults(defaults_argv);
   mysql_library_end();
@@ -2749,13 +2759,15 @@ static inline my_bool general_log_or_slow_log_tables(const char *db,
     db          - db name
     table_type  - table type, e.g. "MyISAM" or "InnoDB", but also "VIEW"
     ignore_flag - what we must particularly ignore - see IGNORE_ defines above
-
+    dump_seqt   - if table_type is "SEQUENCE", then:
+                  0: add sequence table in an array, don't dump it yet
+                  1: get sequence table structure for a dump
   RETURN
     number of fields in table, 0 if error
 */
 
 static uint get_table_structure(char *table, char *db, char *table_type,
-                                char *ignore_flag)
+                                char *ignore_flag, my_bool dump_seqt)
 {
   my_bool    init=0, delayed, write_data, complete_insert;
   my_ulonglong num_fields;
@@ -2778,10 +2790,31 @@ static uint get_table_structure(char *table, char *db, char *table_type,
   my_bool    is_log_table;
   MYSQL_RES  *result;
   MYSQL_ROW  row;
+  size_t     db_len;
+  size_t     table_len;
   DBUG_ENTER("get_table_structure");
   DBUG_PRINT("enter", ("db: %s  table: %s", db, table));
 
   *ignore_flag= check_if_ignore_table(table, table_type);
+  if(!dump_seqt && (*ignore_flag & IGNORE_SEQUENCE_TABLE))
+  {
+    db_len= strlen(db) + 1;
+    table_len= strlen(table) + 1;
+
+    if (!(stb_end->db= (char*) alloc_root(&store_table_root, db_len)))
+      die(EX_EOM, "alloc_root failure.");
+    strmake(stb_end->db, db, db_len);
+
+    if (!(stb_end->table= (char*) alloc_root(&store_table_root, table_len)))
+      die(EX_EOM, "alloc_root failure.");
+    strmake(stb_end->table, table, table_len);
+
+    /* stb_start is initialized with zeros */
+    if (!stb_start.db)
+      stb_start= *stb_end;
+
+    stb_end++;
+  }
 
   delayed= opt_delayed;
   if (delayed && (*ignore_flag & IGNORE_INSERT_DELAYED))
@@ -3697,13 +3730,14 @@ static char *alloc_query_str(size_t size)
   ARGS
    table - table name
    db    - db name
-
+   dump_seqt - flag whether to dump sequence type table
    RETURNS
     void
 */
 
 
-static void dump_table(char *table, char *db, const uchar *hash_key, size_t len)
+static void dump_table(char *table, char *db, const uchar *hash_key, size_t len,
+                       my_bool dump_seqt)
 {
   char ignore_flag;
   char buf[200], table_buff[NAME_LEN+3];
@@ -3724,7 +3758,8 @@ static void dump_table(char *table, char *db, const uchar *hash_key, size_t len)
     Make sure you get the create table info before the following check for
     --no-data flag below. Otherwise, the create table info won't be printed.
   */
-  num_fields= get_table_structure(table, db, table_type, &ignore_flag);
+  num_fields= get_table_structure(table, db, table_type, &ignore_flag,
+                                  dump_seqt);
 
   /*
     The "table" could be a view.  If so, we don't do anything here.
@@ -3779,6 +3814,8 @@ static void dump_table(char *table, char *db, const uchar *hash_key, size_t len)
   verbose_msg("-- Sending SELECT query...\n");
 
   init_dynamic_string_checked(&query_string, "", 1024, 1024);
+  if (!dump_seqt && (ignore_flag & IGNORE_SEQUENCE_TABLE))
+    goto end;
 
   if (path)
   {
@@ -4201,15 +4238,31 @@ err:
   dynstr_free(&query_string);
   maybe_exit(error);
   DBUG_VOID_RETURN;
+end:
+  dynstr_free(&query_string);
+  DBUG_VOID_RETURN;
+
 } /* dump_table */
 
 
 static char *getTableName(int reset)
 {
   MYSQL_ROW row;
+  char buff[FN_REFLEN+80];
 
   if (!get_table_name_result)
   {
+    /* We want sequence tables first for create statements */
+    /* Sequence tables data will be dumped last though */
+    my_snprintf(buff, sizeof(buff),
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema=DATABASE() "
+                "ORDER BY IF(table_type='SEQUENCE',0,1)");
+    if (mysql_query_with_error_report(mysql, &get_table_name_result, buff))
+    {
+      mysql_errno(mysql);
+      return(NULL);
+    }
     if (!(get_table_name_result= mysql_list_tables(mysql,NullS)))
       return(NULL);
   }
@@ -4751,7 +4804,7 @@ static int dump_all_tables_in_db(char *database)
     char *end= strmov(afterdot, table);
     if (include_table((uchar*) hash_key, end - hash_key))
     {
-      dump_table(table, database, (uchar*) hash_key, end - hash_key);
+      dump_table(table, database, (uchar*) hash_key, end - hash_key, 0);
       my_free(order_by);
       order_by= 0;
       if (opt_dump_triggers && mysql_get_server_version(mysql) >= 50009)
@@ -4836,21 +4889,21 @@ static int dump_all_tables_in_db(char *database)
     if (general_log_table_exists)
     {
       if (!get_table_structure((char *) "general_log",
-                               database, table_type, &ignore_flag) )
+                               database, table_type, &ignore_flag, 0) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'general_log' table\n");
     }
     if (slow_log_table_exists)
     {
       if (!get_table_structure((char *) "slow_log",
-                               database, table_type, &ignore_flag) )
+                               database, table_type, &ignore_flag, 0) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'slow_log' table\n");
     }
     if (transaction_registry_table_exists)
     {
       if (!get_table_structure((char *) "transaction_registry",
-                               database, table_type, &ignore_flag) )
+                               database, table_type, &ignore_flag, 0) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'transaction_registry' table\n");
     }
@@ -5046,7 +5099,8 @@ static int get_sys_var_lower_case_table_names()
 
 
 
-static int dump_selected_tables(char *db, char **table_names, int tables)
+static int dump_selected_tables(char *db, char **table_names, int tables,
+                                my_bool dump_seqt)
 {
   char table_buff[NAME_LEN*2+3];
   DYNAMIC_STRING lock_tables_query;
@@ -5149,7 +5203,7 @@ static int dump_selected_tables(char *db, char **table_names, int tables)
   for (pos= dump_tables; pos < end; pos++)
   {
     DBUG_PRINT("info",("Dumping table %s", *pos));
-    dump_table(*pos, db, NULL, 0);
+    dump_table(*pos, db, NULL, 0, dump_seqt);
     if (opt_dump_triggers &&
         mysql_get_server_version(mysql) >= 50009)
     {
@@ -5688,7 +5742,7 @@ char check_if_ignore_table(const char *table_name, char *table_type)
   /* Check memory for quote_for_like() */
   DBUG_ASSERT(2*sizeof(table_name) < sizeof(show_name_buff));
   my_snprintf(buff, sizeof(buff),
-              "SELECT engine FROM INFORMATION_SCHEMA.TABLES "
+              "SELECT engine, table_type FROM INFORMATION_SCHEMA.TABLES "
               "WHERE table_schema = DATABASE() AND table_name = %s",
               quote_for_equal(table_name, show_name_buff));
   if (mysql_query_with_error_report(mysql, &res, buff))
@@ -5728,7 +5782,10 @@ char check_if_ignore_table(const char *table_name, char *table_type)
           strcmp(table_type,"MEMORY"))
         result= IGNORE_INSERT_DELAYED;
     }
-
+    strmake(table_type, row[1], NAME_LEN-1);
+    if (!strcmp(table_type,"SEQUENCE"))
+      result|= IGNORE_SEQUENCE_TABLE;
+      /*
     /*
       If these two types, we do want to skip dumping the table
     */
@@ -6124,7 +6181,9 @@ int main(int argc, char **argv)
   int exit_code;
   int consistent_binlog_pos= 0;
   int have_mariadb_gtid= 0;
+  struct store_tb *pos;
   MY_INIT(argv[0]);
+  init_alloc_root(&store_table_root, "store_table_root", 8192, 0, MYF(0));
 
   sf_leaking_memory=1; /* don't report memory leaks on early exits */
   compatible_mode_normal_str[0]= 0;
@@ -6256,7 +6315,7 @@ int main(int argc, char **argv)
       /* Only one database and selected table(s) */
       if (!opt_alltspcs && !opt_notspcs)
         dump_tablespaces_for_tables(*argv, (argv + 1), (argc - 1));
-      dump_selected_tables(*argv, (argv + 1), (argc - 1));
+      dump_selected_tables(*argv, (argv + 1), (argc - 1), 0);
     }
     else
     {
@@ -6265,6 +6324,19 @@ int main(int argc, char **argv)
         dump_tablespaces_for_databases(argv);
       dump_databases(argv);
     }
+  }
+
+  /* If any SEQUENCE tables were found, now it's time to dump them */
+  pos= &stb_start;
+  /*
+    Begin dumping from the first element in the struct array.
+    We use pos-- (position) here, because after the first set
+    of data, pointed by stb_start, it was pointed to the second
+    position in the mem-allocated struct-array.
+  */
+  for (pos--; pos < stb_end; pos++)
+  {
+    dump_selected_tables((char*) pos->db, &pos->table, 1, 1);
   }
 
   /* add 'START SLAVE' to end of dump */
