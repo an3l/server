@@ -1,0 +1,29 @@
+--echo #
+--echo # Task MDEV14474: Create INFORMATION_SCHEMA.CHECK_CONSTRAINTS
+--echo #
+
+--source include/have_innodb.inc
+
+--enable_warnings
+set check_constraint_checks=1;
+
+use test;
+create table t0
+(
+ t int, 
+ f int check(f<0), # field constraint
+ check (t>32) # table constraint
+) ENGINE=myisam;
+
+SELECT * from information_schema.check_constraints;
+
+ALTER TABLE t0
+ADD CONSTRAINT CHK_t0_t CHECK(t<100);
+
+SELECT * from information_schema.check_constraints;
+
+ALTER TABLE t0
+DROP CONSTRAINT CHK_t0_t;
+
+SELECT * from information_schema.check_constraints;
+drop table t0;

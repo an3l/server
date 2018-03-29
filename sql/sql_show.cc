@@ -4646,6 +4646,129 @@ end:
   DBUG_RETURN(result);
 }
 
+/**
+  @brief          Fill I_S tables with global temporary tables
+
+  @param[in]      thd                      thread handler
+  @param[in]      tables                   I_S table 
+  @param[in]      cond                     'WHERE' condition
+  @param[in]      table_name               table name
+
+  @return         Operation status
+  @retval         0                  success
+  @retval         1                  error
+*/
+
+static int fill_global_temporary_tables(THD *thd, TABLE_LIST *tables, Item *cond)
+{
+  DBUG_ENTER("fill_global_temporary_tables");
+  mysql_mutex_lock(&LOCK_thread_count);
+
+  CHARSET_INFO *cs = system_charset_info;
+  THD* thd1;
+  I_List_iterator<THD> it(threads);
+
+#ifndef NO_EMBEDDED_ACCESS_CHECKS
+  Security_context* sctx=thd->security_ctx;
+  uint db_access;
+#endif
+
+  while ((thd1=it++))
+  {
+
+#ifndef DBUG_OFF
+    const char* tmp_proc_info=thd1->proc_info;
+    if (tmp_proc_info && !strncmp(tmp_proc_info, STRING_WITH_LEN("debug sync point: before_open_in_get_all_tables")))
+    {
+      DEBUG_SYNC(thd1, "fill_global_temporary_tables_thd_item_at_tables_debug_sync");
+    }
+#endif
+
+    if (thd1->temporary_tables!=0)
+    {
+      mysql_mutex_lock(&thd1->LOCK_temporary_tables);
+      All_tmp_tables_list* tl = thd1->temporary_tables; 
+      TMP_TABLE_SHARE* tmp = (*tl).front(); 
+
+      while (tmp!=0)
+      {
+#ifndef NO_EMBEDDED_ACCESS_CHECKS
+        if (test_all_bits(sctx->master_access, DB_ACLS))
+          db_access= DB_ACLS;
+        else
+          db_access= (acl_get(sctx->host, sctx->ip,
+                              sctx->priv_user, (*tmp).db.str, 0)
+                      | sctx->master_access);
+        if (!(db_access & DB_ACLS) && check_grant_db(thd1,(*tmp).db.str))
+        {
+          //no access for temp tables within this db for user
+          continue;
+        }
+#endif
+
+        DEBUG_SYNC(thd1, "fill_global_temporary_tables_before_storing_rec");
+        restore_record(tables->table,s->default_values);
+        // session_id
+        tables->table->field[0]->store((longlong) thd1->thread_id,TRUE);
+        // table_schema
+        tables->table->field[1]->store((*tmp).db.str, (*tmp).db.length, cs);
+        // table_name
+        tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, cs);
+        // engine
+        TABLE* current_table = tmp->all_tmp_tables.front();
+
+        handler* handle=current_table->file;
+        // Assume that invoking handler::table_type() on a shared handler is safe
+        const char* engine_type= (char*)(handle ? handle->table_type(): "UNKNOWN");
+        tables->table->field[3]->store(engine_type,strlen(engine_type),cs);
+        // name
+        const char *path = strstr((*tmp).path.str, "#sql");
+        int len = (*tmp).path.length-(path-(*tmp).path.str);
+        tables->table->field[4]->store(path,len,cs);
+        // File stats
+        handler* file = current_table->db_stat ? current_table->file : 0;
+        if (file)
+        {
+          file = file->clone((*current_table).s->normalized_path.str,thd->mem_root);
+        }
+        if (file)
+        {
+          // table_rows
+          file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
+          tables->table->field[5]->store((longlong)file->stats.records,TRUE);
+          tables->table->field[5]->set_notnull();
+          // avg_row_length
+          tables->table->field[6]->store((longlong)file->stats.mean_rec_length,TRUE);
+          // data_length
+          tables->table->field[7]->store((longlong)file->stats.data_file_length,TRUE);
+          // index_length
+          tables->table->field[8]->store((longlong)file->stats.index_file_length,TRUE);
+          MYSQL_TIME time;
+          // create_time
+          if (file->stats.create_time)
+          {
+            thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.create_time);
+            tables->table->field[9]->store_time(&time);
+            tables->table->field[9]->set_notnull();
+          }
+          // update_time
+          if (file->stats.update_time)
+          {
+            thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.update_time);
+            tables->table->field[10]->store_time(&time);
+            tables->table->field[10]->set_notnull();
+          }
+          file->ha_close();
+        }
+        schema_table_store_record(thd1,tables->table);
+        tmp=*((All_tmp_table_shares*)tl)->next_ptr(tmp);
+      } 
+      mysql_mutex_unlock(&thd1->LOCK_temporary_tables);
+    }
+  }
+  mysql_mutex_unlock(&LOCK_thread_count);
+  DBUG_RETURN(0);
+}
 
 /**
   @brief          Fill I_S table for SHOW TABLE NAMES commands
@@ -6883,6 +7006,68 @@ store_constraints(THD *thd, TABLE *table, const LEX_CSTRING *db_name,
   return schema_table_store_record(thd, table);
 }
 
+static int get_check_constraints_record(THD *thd, TABLE_LIST *tables,
+					TABLE *table, bool res,
+					const LEX_CSTRING *db_name,
+					const LEX_CSTRING *table_name)
+{
+  DBUG_ENTER("get_check_constraints_record");
+  if (res)
+  {
+    if (thd->is_error())
+      push_warning(thd, Sql_condition::WARN_LEVEL_WARN,
+                   thd->get_stmt_da()->sql_errno(),
+                   thd->get_stmt_da()->message());
+    thd->clear_error();
+    DBUG_RETURN(0);
+  }
+  else if (!tables->view)
+  {
+    TABLE_SHARE *share= tables->table->s;
+    CHARSET_INFO *cs= system_charset_info;
+    Field **ptr, *field;
+    for (ptr=tables->table->field; (field=*ptr); ptr++)
+    {
+
+      if (field->invisible > INVISIBLE_USER)
+        continue;
+
+      if (field->check_constraint)
+      {
+        StringBuffer<MAX_FIELD_WIDTH> str(&my_charset_utf8mb4_general_ci);
+
+        restore_record(table, s->default_values);
+        table->field[0]->store(STRING_WITH_LEN("def"),cs);
+        table->field[1]->store(db_name->str, db_name->length, cs);
+        table->field[2]->store(STRING_WITH_LEN("NULL"),cs);
+        table->field[3]->store(db_name->str, db_name->length, cs);
+        table->field[4]->store(table_name->str, table_name->length, cs);
+        field->check_constraint->print(&str);
+        table->field[5]->store(str.ptr(), strlen(str.ptr()), cs);
+        schema_table_store_record(thd, table);
+      }
+    }
+
+    if (share->table_check_constraints)
+    {
+      for (uint i=share->field_check_constraints;i<share->table_check_constraints;i++)
+      {
+        StringBuffer<MAX_FIELD_WIDTH> str(&my_charset_utf8mb4_general_ci);
+        Virtual_column_info *check= tables->table->check_constraints[i];
+        restore_record(table, s->default_values);
+        table->field[0]->store(STRING_WITH_LEN("def"),cs);
+        table->field[1]->store(db_name->str, db_name->length, cs);
+        table->field[2]->store(check->name.str, check->name.length, cs);
+        table->field[3]->store(db_name->str, db_name->length, cs);
+        table->field[4]->store(table_name->str, table_name->length, cs);
+        check->print(&str);
+        table->field[5]->store(str.ptr(), strlen(str.ptr()), cs);
+        schema_table_store_record(thd, table);
+      }
+    }
+  }
+  DBUG_RETURN(res);
+}
 
 static int get_schema_constraints_record(THD *thd, TABLE_LIST *tables,
 					 TABLE *table, bool res,
@@ -9725,7 +9910,41 @@ ST_FIELD_INFO spatial_ref_sys_fields_info[]=
 };
 #endif /*HAVE_SPATIAL*/
 
+ST_FIELD_INFO temporary_table_fields_info[]=
+{
+  {"SESSION_ID", 4, MYSQL_TYPE_LONGLONG, 0, 0, "Session", SKIP_OPEN_TABLE},
+  {"TABLE_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Db", SKIP_OPEN_TABLE},
+  {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Temp_tables_in_", SKIP_OPEN_TABLE},
+  {"ENGINE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Engine", OPEN_FRM_ONLY},
+  
+  {"NAME", FN_REFLEN, MYSQL_TYPE_STRING, 0, 0, "Name", SKIP_OPEN_TABLE},
+  {"TABLE_ROWS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
+   MY_I_S_UNSIGNED, "Rows", OPEN_FULL_TABLE},
+  {"AVG_ROW_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
+   MY_I_S_UNSIGNED, "Avg Row", OPEN_FULL_TABLE},
+  {"DATA_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
+   MY_I_S_UNSIGNED, "Data Length", OPEN_FULL_TABLE},
+  {"INDEX_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0, 
+   MY_I_S_UNSIGNED, "Index Size", OPEN_FULL_TABLE},
+  {"CREATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Create Time", OPEN_FULL_TABLE},
+  
+  {"UPDATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Update Time", OPEN_FULL_TABLE},
+  {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE} 
+};
 
+ST_FIELD_INFO check_constraints_fields_info[]=
+{
+  {"CONSTRAINT_CATALOG", FN_REFLEN, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FULL_TABLE},
+  {"CONSTRAINT_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0,
+   OPEN_FULL_TABLE},
+  {"CONSTRAINT_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0,
+   OPEN_FULL_TABLE},
+  {"TABLE_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FULL_TABLE},
+  {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FULL_TABLE},
+  {"CHECK_CLAUSE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0,
+   OPEN_FULL_TABLE},
+  {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE}
+};
 /*
   Description of ST_FIELD_INFO in table.h
 
@@ -9750,6 +9969,11 @@ ST_SCHEMA_TABLE schema_tables[]=
    OPTIMIZE_I_S_TABLE|OPEN_VIEW_FULL},
   {"COLUMN_PRIVILEGES", column_privileges_fields_info, 0,
    fill_schema_column_privileges, 0, 0, -1, -1, 0, 0},
+  /*{"CHECK_CONSTRAINTS", check_constraints_fields_info, 0,
+   fill_check_constraints, 0, 0, 0, 0, 0, 0},
+   */
+  {"CHECK_CONSTRAINTS", check_constraints_fields_info, 0,
+   get_all_tables, 0, get_check_constraints_record, 1, 2, 0, OPTIMIZE_I_S_TABLE|OPEN_TABLE_ONLY},
   {"ENABLED_ROLES", enabled_roles_fields_info, 0,
    fill_schema_enabled_roles, 0, 0, -1, -1, 0, 0},
   {"ENGINES", engines_fields_info, 0,
@@ -9767,6 +9991,8 @@ ST_SCHEMA_TABLE schema_tables[]=
    hton_fill_schema_table, 0, 0, -1, -1, 0, 0},
   {"GLOBAL_STATUS", variables_fields_info, 0,
    fill_status, make_old_format, 0, 0, -1, 0, 0},
+  {"GLOBAL_TEMPORARY_TABLES", temporary_table_fields_info,0, 
+   fill_global_temporary_tables,make_old_format , 0, 0, 0, 0, 0}, 
   {"GLOBAL_VARIABLES", variables_fields_info, 0,
    fill_variables, make_old_format, 0, 0, -1, 0, 0},
   {"KEY_CACHES", keycache_fields_info, 0,

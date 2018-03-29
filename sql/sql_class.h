@@ -2286,6 +2286,10 @@ public:
     Is locked when THD is deleted.
   */
   mysql_mutex_t LOCK_thd_data;
+  /**
+     Protects temporary_tables.
+  */
+  mysql_mutex_t LOCK_temporary_tables;
   /*
     Protects:
     - kill information
