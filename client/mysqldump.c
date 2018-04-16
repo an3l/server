@@ -1053,7 +1053,7 @@ static int get_options(int *argc, char ***argv)
             my_progname_short);
     return(EX_USAGE);
   }
-  if (strcmp(default_charset, charset_info->csname) &&
+  if (strcmp(default_charset, MYSQL_AUTODETECT_CHARSET_NAME) &&
       !(charset_info= get_charset_by_csname(default_charset,
                                             MY_CS_PRIMARY, MYF(MY_WME))))
     exit(1);
@@ -1518,6 +1518,33 @@ static int switch_character_set_results(MYSQL *mysql, const char *cs_name)
   char query_buffer[QUERY_LENGTH];
   size_t query_length;
 
+  if (!strcmp(cs_name,MYSQL_AUTODETECT_CHARSET_NAME))
+  {
+    cs_name = madb_get_os_character_set(); //elegant solution included [1,2,3]
+    /*
+     *[3] 
+#if defined(HAVE_NL_LANGINFO) && defined(HAVE_SETLOCALE)
+    char *ptr1, *ptr2;
+    if (setlocale(LC_CTYPE, ""))
+    {
+      cs_name= nl_langinfo(CODESET); // returns UTF-8 
+      // delete hyphen if found : <nl_C_codeset> error why ?
+      ptr1=cs_name;
+      ptr2=cs_name;
+      while(*ptr1!=0)
+      {
+        if(*ptr1!='-')
+          *ptr2++=*ptr1;
+        ptr1++;
+      }
+      *ptr2='\0';
+    }
+   #endif
+   */
+
+    // cs_name= my_os_charset_to_mysql_charset(cs_name); // [2] Something like this should be used...don't work
+   // cs_name=MYSQL_DEFAULT_CHARSET_NAME; // [1] same as MYSQL_UNIVERSAL_CLIENT - works, but not generic
+ }
   /* Server lacks facility.  This is not an error, by arbitrary decision . */
   if (!server_supports_switching_charsets)
     return FALSE;
