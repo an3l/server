@@ -11,6 +11,7 @@ create table t0
  t int, check (t>32) # table constraint
 ) ENGINE=myisam;
 
+--vertical_results
 SELECT * from information_schema.check_constraints;
 
 ALTER TABLE t0
@@ -50,6 +51,19 @@ ADD CONSTRAINT CHK_new_ CHECK(t>tt);
 
 SELECT * from information_schema.check_constraints;
 
+
+# Create table with same field and table check constraint name
+create table t3
+(
+a int,
+b int check (b>0), # field constraint named 'b'
+CONSTRAINT b check (b>10) # table constraint
+) ENGINE=InnoDB;
+
+--horizontal_results
+select * from information_schema.check_constraints;
+
 drop table t0;
 drop table t1;
 drop table t2;
+drop table t3;

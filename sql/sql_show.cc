@@ -6836,33 +6836,9 @@ static int get_check_constraints_record(THD *thd, TABLE_LIST *tables,
   }
   else if (!tables->view)
   {
-    TABLE_SHARE *share= tables->table->s;
-    Field **ptr, *field;
-    for (ptr= tables->table->field; (field= *ptr); ptr++)
+    if (tables->table->s->table_check_constraints)
     {
-
-      if (field->invisible > INVISIBLE_USER)
-        continue;
-
-      if (field->check_constraint)
-      {
-        StringBuffer<MAX_FIELD_WIDTH> str(system_charset_info);
-
-        restore_record(table, s->default_values);
-        table->field[0]->store(STRING_WITH_LEN("def"), system_charset_info);
-        table->field[1]->store(db_name->str, db_name->length, system_charset_info);
-        table->field[2]->store(STRING_WITH_LEN("NULL"), system_charset_info);
-        table->field[3]->store(db_name->str, db_name->length, system_charset_info);
-        table->field[4]->store(table_name->str, table_name->length, system_charset_info);
-        field->check_constraint->print(&str);
-        table->field[5]->store(str.ptr(), str.length(), system_charset_info);
-        schema_table_store_record(thd, table);
-      }
-    }
-
-    if (share->table_check_constraints)
-    {
-      for (uint i= share->field_check_constraints; i < share->table_check_constraints; i++)
+      for (uint i= 0; i < tables->table->s->table_check_constraints; i++)
       {
         StringBuffer<MAX_FIELD_WIDTH> str(system_charset_info);
         Virtual_column_info *check= tables->table->check_constraints[i];
@@ -6870,10 +6846,9 @@ static int get_check_constraints_record(THD *thd, TABLE_LIST *tables,
         table->field[0]->store(STRING_WITH_LEN("def"), system_charset_info);
         table->field[1]->store(db_name->str, db_name->length, system_charset_info);
         table->field[2]->store(check->name.str, check->name.length, system_charset_info);
-        table->field[3]->store(db_name->str, db_name->length, system_charset_info);
-        table->field[4]->store(table_name->str, table_name->length, system_charset_info);
+        table->field[3]->store(table_name->str, table_name->length, system_charset_info);
         check->print(&str);
-        table->field[5]->store(str.ptr(), str.length(), system_charset_info);
+        table->field[4]->store(str.ptr(), str.length(), system_charset_info);
         schema_table_store_record(thd, table);
       }
     }
@@ -9809,7 +9784,6 @@ ST_FIELD_INFO check_constraints_fields_info[]=
    OPEN_FULL_TABLE},
   {"CONSTRAINT_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0,
    OPEN_FULL_TABLE},
-  {"TABLE_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FULL_TABLE},
   {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0, OPEN_FULL_TABLE},
   {"CHECK_CLAUSE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, 0,
    OPEN_FULL_TABLE},
@@ -9830,6 +9804,8 @@ ST_SCHEMA_TABLE schema_tables[]=
    fill_schema_applicable_roles, 0, 0, -1, -1, 0, 0},
   {"CHARACTER_SETS", charsets_fields_info, 0,
    fill_schema_charsets, make_character_sets_old_format, 0, -1, -1, 0, 0},
+  {"CHECK_CONSTRAINTS", check_constraints_fields_info, 0,
+   get_all_tables, 0, get_check_constraints_record, 1, 2, 0, OPTIMIZE_I_S_TABLE|OPEN_TABLE_ONLY},
   {"COLLATIONS", collation_fields_info, 0,
    fill_schema_collation, make_old_format, 0, -1, -1, 0, 0},
   {"COLLATION_CHARACTER_SET_APPLICABILITY", coll_charset_app_fields_info,
@@ -9839,8 +9815,6 @@ ST_SCHEMA_TABLE schema_tables[]=
    OPTIMIZE_I_S_TABLE|OPEN_VIEW_FULL},
   {"COLUMN_PRIVILEGES", column_privileges_fields_info, 0,
    fill_schema_column_privileges, 0, 0, -1, -1, 0, 0},
-  {"CHECK_CONSTRAINTS", check_constraints_fields_info, 0,
-   get_all_tables, 0, get_check_constraints_record, 1, 2, 0, OPTIMIZE_I_S_TABLE|OPEN_TABLE_ONLY},
   {"ENABLED_ROLES", enabled_roles_fields_info, 0,
    fill_schema_enabled_roles, 0, 0, -1, -1, 0, 0},
   {"ENGINES", engines_fields_info, 0,
