@@ -2051,6 +2051,24 @@ bool mysql_rm_table(THD *thd,TABLE_LIST *tables, bool if_exists,
       {
         LEX_CSTRING db_name= table->db;
         LEX_CSTRING table_name= table->table_name;
+        TABLE_LIST *tab_same;
+        for (tab_same= table->next_local; tab_same; tab_same= tab_same->next_local)
+        {
+          /*  Try to find the tables with the same name.
+           *  In that case base table is the same a temporary table.
+           *  Temporary tables are checked first.
+          */
+          if (tab_same)
+          {
+            if (!strcmp(table->get_db_name(), tab_same->get_db_name()) &&
+                !strcmp(table->get_table_name(), tab_same->get_table_name()))
+            {
+              thd->mark_tmp_table_as_free_for_reuse(table->table);
+              table->table= NULL;
+            }
+          }
+        }
+
         if (table->open_type == OT_BASE_ONLY ||
             !thd->find_temporary_table(table))
           (void) delete_statistics_for_table(thd, &db_name, &table_name);

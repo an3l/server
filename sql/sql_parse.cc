@@ -779,7 +779,7 @@ void init_update_queries(void)
     Note that SQLCOM_RENAME_TABLE should not be in this list!
   */
   sql_command_flags[SQLCOM_CREATE_TABLE]|=    CF_PREOPEN_TMP_TABLES;
-  sql_command_flags[SQLCOM_DROP_TABLE]|=      CF_PREOPEN_TMP_TABLES;
+//  sql_command_flags[SQLCOM_DROP_TABLE]|=      CF_PREOPEN_TMP_TABLES;
   sql_command_flags[SQLCOM_DROP_SEQUENCE]|=   CF_PREOPEN_TMP_TABLES;
   sql_command_flags[SQLCOM_CREATE_INDEX]|=    CF_PREOPEN_TMP_TABLES;
   sql_command_flags[SQLCOM_ALTER_TABLE]|=     CF_PREOPEN_TMP_TABLES;
@@ -5005,6 +5005,10 @@ end_with_restore_list:
   case SQLCOM_DROP_TABLE:
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
+
+    if (thd->open_temporary_tables(all_tables))
+        goto error;
+
     if (!lex->tmp_table())
     {
       if (check_table_access(thd, DROP_ACL, all_tables, FALSE, UINT_MAX, FALSE))
@@ -5041,7 +5045,18 @@ end_with_restore_list:
         }
       }
     }
-    
+    /* Open temporary tables */
+    /*
+    for (TABLE_LIST *table= all_tables; table; table= table->next_global)
+    {
+      if(thd->find_temporary_table(table, THD::TMP_TABLE_IN_USE))
+      {
+        //table->table=  thd->find_temporary_table(table, THD::TMP_TABLE_ANY);
+        table->table= NULL; // needs because open_temporary_table(tl)
+        thd->open_temporary_tables(table);
+      }
+    }
+    */
     /* DDL and binlog write order are protected by metadata locks. */
     res= mysql_rm_table(thd, first_table, lex->if_exists(), lex->tmp_table(),
                         lex->table_type == TABLE_TYPE_SEQUENCE);
@@ -8330,6 +8345,7 @@ TABLE_LIST *st_select_lex::add_table_to_list(THD *thd,
   if (lock_type != TL_IGNORE && !ptr->sequence)
   {
     TABLE_LIST *first_table= table_list.first;
+    short same_name= 0;
     if (lex->sql_command == SQLCOM_CREATE_VIEW)
       first_table= first_table ? first_table->next_local : NULL;
     for (TABLE_LIST *tables= first_table ;
@@ -8340,9 +8356,25 @@ TABLE_LIST *st_select_lex::add_table_to_list(THD *thd,
                                   tables->alias.str) &&
                    !cmp(&ptr->db, &tables->db) && ! tables->sequence))
       {
-	my_error(ER_NONUNIQ_TABLE, MYF(0), alias_str.str); /* purecov: tested */
-	DBUG_RETURN(0);				/* purecov: tested */
+        if(lex->sql_command==SQLCOM_DROP_TABLE || lex->create_info.like())
+        {
+          /* In this case it is allowed to have same name 
+           * for base  and temp tables */
+          if (same_name>2)
+          {
+            my_error(ER_NONUNIQ_TABLE, MYF(0), alias_str.str); /* purecov: tested */
+            DBUG_RETURN(0);
+          }
+        }
+        else
+        {
+          my_error(ER_NONUNIQ_TABLE, MYF(0), alias_str.str); /* purecov: tested */
+          DBUG_RETURN(0);				/* purecov: tested */
+        }
+        same_name++;
+
       }
+      //}
     }
   }
   /* Store the table reference preceding the current one. */
