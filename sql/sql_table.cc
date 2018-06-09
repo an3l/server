@@ -2058,7 +2058,7 @@ bool mysql_rm_table(THD *thd,TABLE_LIST *tables, bool if_exists,
            *  In that case base table is the same a temporary table.
            *  Temporary tables are checked first.
           */
-          if (tab_same)
+          if (tab_same && tab_same->table)
           {
             if (!strcmp(table->get_db_name(), tab_same->get_db_name()) &&
                 !strcmp(table->get_table_name(), tab_same->get_table_name()))

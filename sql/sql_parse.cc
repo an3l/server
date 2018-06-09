@@ -5006,6 +5006,16 @@ end_with_restore_list:
   {
     DBUG_ASSERT(first_table == all_tables && first_table != 0);
 
+    for (TABLE_LIST *table= first_table; table; table= table->next_local)
+    {
+      if (check_access(thd, DROP_ACL, table->db.str,
+                       &table->grant.privilege,
+                       &table->grant.m_internal,
+                       0, 0) ||
+          check_grant(thd, DROP_ACL, table, FALSE, 1, FALSE))
+        goto error;
+    }
+
     if (thd->open_temporary_tables(all_tables))
         goto error;
 
