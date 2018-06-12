@@ -696,7 +696,7 @@ CREATE DATABASE mysqltest_db2;
 --echo # (EXECUTE_ACL is needed to call p0, and FILE_ACL is needed for SELECT
 --echo # OUTFILE/LOAD DATA INFILE).
 GRANT FILE ON *.* TO mysqltest_u1@localhost;
-GRANT CREATE TEMPORARY TABLES, EXECUTE ON mysqltest_db1.* TO mysqltest_u1@localhost;
+GRANT CREATE TEMPORARY TABLES, EXECUTE, DROP ON mysqltest_db1.* TO mysqltest_u1@localhost;
 
 --echo # mysqltest_u2@localhost has all privileges but CREATE_TMP_ACL.
 GRANT ALL PRIVILEGES ON mysqltest_db1.* TO mysqltest_u2@localhost;
@@ -710,13 +710,13 @@ GRANT EXECUTE ON mysqltest_db1.* TO mysqltest_u3@localhost;
 --echo # mysqltest_u4@localhost has only EXECUTE_ACL.
 --echo # We need this user to check that once created temporary tables
 --echo # are accessible by anyone.
-GRANT EXECUTE ON mysqltest_db1.* TO mysqltest_u4@localhost;
+GRANT EXECUTE, DROP ON mysqltest_db1.* TO mysqltest_u4@localhost;
 
 --echo # mysqltest_u5@localhost has CREATE_TMP_ACL and SELECT_ACL, UPDATE_ACL,
 --echo # DELETE_ACL on mysqltest_db1; and only CREATE_TMP_ACL on mysqltest_db2.
 --echo # By means of this user we check privileges required for merge tables.
-GRANT CREATE TEMPORARY TABLES ON mysqltest_db1.* TO mysqltest_u5@localhost;
-GRANT CREATE TEMPORARY TABLES ON mysqltest_db2.* TO mysqltest_u5@localhost;
+GRANT CREATE TEMPORARY TABLES, DROP ON mysqltest_db1.* TO mysqltest_u5@localhost;
+GRANT CREATE TEMPORARY TABLES, DROP ON mysqltest_db2.* TO mysqltest_u5@localhost;
 GRANT SELECT, UPDATE, DELETE ON mysqltest_db1.* TO mysqltest_u5@localhost;
 
 --echo # Create stored routine to test how privilege checking is done for its
