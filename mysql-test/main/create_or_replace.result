@@ -345,8 +345,6 @@ drop table t1;
 CREATE TEMPORARY TABLE t1 like t2;
 CREATE OR REPLACE TABLE t1 like t1;
 ERROR 42000: Not unique table/alias: 't1'
-CREATE OR REPLACE TABLE t1 like t1;
-ERROR 42000: Not unique table/alias: 't1'
 drop table t1;
 CREATE TEMPORARY TABLE t1 like t2;
 CREATE OR REPLACE TEMPORARY TABLE t3 like t1;
