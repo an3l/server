@@ -63,6 +63,7 @@
 #include "ha_partition.h"
 #endif
 #include "transaction.h"
+#include "sql_class.h"
 
 enum enum_i_s_events_fields
 {
@@ -2913,6 +2914,82 @@ void mysqld_list_processes(THD *thd,const char *user, bool verbose)
   DBUG_VOID_RETURN;
 }
 
+/*
+  Produce GLOBAL TEMPORARY TABLES data.
+
+  This function is APC-scheduled to be run in the context of the thread that
+  we're producing GLOBAL TEMPORARY TABLES for.
+*/
+
+void Global_temp_tables_request::call_in_target_thread()
+{
+  DBUG_ASSERT(current_thd == target_thd);
+  // set_current_thd(request_thd); // how to propagate data ?
+  // By creating a new class in request class ??
+  
+  TMP_TABLE_SHARE *tmp= tmp_table_list->front(); // (*tl).front();
+  while (tmp!= 0)
+  {
+    restore_record(tables->table, s->default_values);
+    // session_id
+    tables->table->field[0]->store((longlong) request_thread->thread_id, TRUE);
+    // table_schema
+    tables->table->field[1]->store((*tmp).db.str, (*tmp).db.length, cs);
+    // table_name
+    tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, cs);
+    /*
+    // engine
+    TABLE *current_table= tmp->all_tmp_tables.front();
+
+    handler *handle= current_table->file;
+    // Assume that invoking handler::table_type() on a shared handler is safe
+    const char *engine_type= (char*)(handle ? handle->table_type(): "UNKNOWN");
+    tables->table->field[3]->store(engine_type,strlen(engine_type), cs);
+    // name
+    const char *path= strstr((*tmp).path.str, "#sql");
+    int len= (*tmp).path.length-(path-(*tmp).path.str);
+    tables->table->field[4]->store(path, len, cs);
+    // File stats
+    handler *file= current_table->db_stat ? current_table->file : 0;
+    if (file)
+    {
+      file= file->clone((*current_table).s->normalized_path.str, thd->mem_root);
+    }
+    if (file)
+    {
+      // table_rows
+      file->info(HA_STATUS_VARIABLE | HA_STATUS_TIME | HA_STATUS_NO_LOCK);
+      tables->table->field[5]->store((longlong)file->stats.records, TRUE);
+      tables->table->field[5]->set_notnull();
+      // avg_row_length
+      tables->table->field[6]->store((longlong)file->stats.mean_rec_length, TRUE);
+      // data_length
+      tables->table->field[7]->store((longlong)file->stats.data_file_length, TRUE);
+      // index_length
+      tables->table->field[8]->store((longlong)file->stats.index_file_length, TRUE);
+      MYSQL_TIME time;
+      // create_time
+      if (file->stats.create_time)
+      {
+        thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.create_time);
+        tables->table->field[9]->store_time(&time);
+        tables->table->field[9]->set_notnull();
+      }
+      // update_time
+      if (file->stats.update_time)
+      {
+        thd1->variables.time_zone->gmt_sec_to_TIME(&time, (my_time_t)file->stats.update_time);
+        tables->table->field[10]->store_time(&time);
+        tables->table->field[10]->set_notnull();
+      }
+      file->ha_close();
+    }
+    */
+    schema_table_store_record(request_thd,tables->table);
+    tmp= *((All_tmp_table_shares*)tmp_table_list)->next_ptr(tmp);
+  }
+}
+ 
 
 /*
   Produce EXPLAIN data.
@@ -3054,6 +3131,40 @@ void select_result_text_buffer::save_to(String *res)
   res->append("#\n");
 }
 
+int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
+{
+  THD *tmp;
+  my_thread_id  thread_id;
+  DBUG_ENTER("fill_global_temporary_tables2");
+
+  bool timed_out, bres;
+  int timeout_sec= 30;
+  Global_temp_tables_request global_temp_req;
+
+  
+  THD *thd1;
+  I_List_iterator<THD> it(threads);
+  while ((thd1= it++))
+  {
+    if (thd1->temporary_tables!= 0)
+    {
+
+      global_temp_req.target_thd= tmp;
+      global_temp_req.request_thd= thd1;
+      global_temp_req.failed_to_produce= FALSE;
+      global_temp_req.tmp_table_list= thd1->temporary_tables;
+      global_temp_req.tables=tables;
+
+      /* Ok, we have a lock on target->LOCK_thd_data, can call: */ 
+      //HOW THIS ??? //
+      bres= tmp->apc_target.make_apc_call(thd1, &global_temp_req, timeout_sec,
+                                         &timed_out);
+    }
+  }
+
+  DBUG_RETURN(0);
+
+ }
 
 /*
   Store the SHOW EXPLAIN output in the temporary table.
@@ -9768,6 +9879,28 @@ ST_FIELD_INFO check_constraints_fields_info[]=
 
 */
 
+ST_FIELD_INFO temporary_table_fields_info[]=
+{
+  {"SESSION_ID", 4, MYSQL_TYPE_LONGLONG, 0, 0, "Session", SKIP_OPEN_TABLE},
+  {"TABLE_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Db", SKIP_OPEN_TABLE},
+  {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Temp_tables_in_", SKIP_OPEN_TABLE}
+  /*
+  {"ENGINE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Engine", OPEN_FRM_ONLY},
+  {"NAME", FN_REFLEN, MYSQL_TYPE_STRING, 0, 0, "Name", SKIP_OPEN_TABLE},
+  {"TABLE_ROWS", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
+   MY_I_S_UNSIGNED, "Rows", OPEN_FULL_TABLE},
+  {"AVG_ROW_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
+   MY_I_S_UNSIGNED, "Avg Row", OPEN_FULL_TABLE},
+  {"DATA_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
+   MY_I_S_UNSIGNED, "Data Length", OPEN_FULL_TABLE},
+  {"INDEX_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
+   MY_I_S_UNSIGNED, "Index Size", OPEN_FULL_TABLE},
+  {"CREATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Create Time", OPEN_FULL_TABLE},
+  {"UPDATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Update Time", OPEN_FULL_TABLE},
+  {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE}*/
+};
+
+
 ST_SCHEMA_TABLE schema_tables[]=
 {
   {"ALL_PLUGINS", plugin_fields_info, 0,
@@ -9804,6 +9937,8 @@ ST_SCHEMA_TABLE schema_tables[]=
    hton_fill_schema_table, 0, 0, -1, -1, 0, 0},
   {"GLOBAL_STATUS", variables_fields_info, 0,
    fill_status, make_old_format, 0, 0, -1, 0, 0},
+  {"GLOBAL_TEMPORARY_TABLES", temporary_table_fields_info, 0,
+   fill_global_temporary_tables2, make_old_format , 0, 0, 0, 0, 0},
   {"GLOBAL_VARIABLES", variables_fields_info, 0,
    fill_variables, make_old_format, 0, 0, -1, 0, 0},
   {"KEY_CACHES", keycache_fields_info, 0,

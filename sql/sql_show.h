@@ -21,6 +21,7 @@
 #include "handler.h"                            /* enum_schema_tables */
 #include "table.h"                              /* enum_schema_table_state */
 #include "my_apc.h"
+#include "sql_class.h"
 
 /* Forward declarations */
 class JOIN;
@@ -168,6 +169,28 @@ public:
   /* Overloaded virtual function */
   void call_in_target_thread();
 };
+
+/*
+  GLOBAL TEMP TABLES request object. 
+*/
+
+class Global_temp_tables_request : public Apc_target::Apc_call
+{
+  public:
+    THD *target_thd;  /* thd that we're running GLOBAL TEMP TABLES for */
+    THD *request_thd; /* thd that run GLOBAL TEMP TABLES command */
+
+    /* If true, there was some error when producing GLOBAL TEMP TABLES output. */
+    bool failed_to_produce;
+    
+    /* GLOBAL TEMP TABLES should be stored here ?*/
+    //All_tmp_tables_list *tmp_table_list; //cannot include
+    TABLE_LIST *tables;
+    
+    /* Overloaded virtual function */
+    void call_in_target_thread();
+};
+
 
 /**
   Condition pushdown used for INFORMATION_SCHEMA / SHOW queries.
