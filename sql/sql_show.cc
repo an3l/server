@@ -2915,6 +2915,26 @@ void mysqld_list_processes(THD *thd,const char *user, bool verbose)
 }
 
 /*
+  GLOBAL TEMP TABLES request object. 
+*/
+
+class Global_temp_tables_request : public Apc_target::Apc_call
+{
+  public:
+    THD *target_thd;  /* thd that we're running GLOBAL TEMP TABLES for */
+    THD *request_thd; /* thd that run GLOBAL TEMP TABLES command */
+     /* If true, there was some error when producing GLOBAL TEMP TABLES output. */
+    bool failed_to_produce;
+    
+    /* GLOBAL TEMP TABLES should be stored here ?*/
+    All_tmp_tables_list *tmp_table_list; //cannot include
+    TABLE_LIST *tables;
+    
+    /* Overloaded virtual function */
+    void call_in_target_thread();
+};
+
+/*
   Produce GLOBAL TEMPORARY TABLES data.
 
   This function is APC-scheduled to be run in the context of the thread that
@@ -2932,11 +2952,11 @@ void Global_temp_tables_request::call_in_target_thread()
   {
     restore_record(tables->table, s->default_values);
     // session_id
-    tables->table->field[0]->store((longlong) request_thread->thread_id, TRUE);
+    tables->table->field[0]->store((longlong) request_thd->thread_id, TRUE);
     // table_schema
-    tables->table->field[1]->store((*tmp).db.str, (*tmp).db.length, cs);
+    tables->table->field[1]->store((*tmp).db.str, (*tmp).db.length, system_charset_info);
     // table_name
-    tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, cs);
+    tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, system_charset_info);
     /*
     // engine
     TABLE *current_table= tmp->all_tmp_tables.front();
@@ -2985,11 +3005,84 @@ void Global_temp_tables_request::call_in_target_thread()
       file->ha_close();
     }
     */
-    schema_table_store_record(request_thd,tables->table);
-    tmp= *((All_tmp_table_shares*)tmp_table_list)->next_ptr(tmp);
+    if(!schema_table_store_record(request_thd,tables->table))
+    {
+      tmp= *((All_tmp_table_shares*)tmp_table_list)->next_ptr(tmp);
+      failed_to_produce=FALSE;
+    }
+    else
+    {
+      failed_to_produce=TRUE;
+      break;
+    }
   }
 }
+
+int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
+{
+
+  All_tmp_tables_list *tl= thd->temporary_tables;
+
+  TMP_TABLE_SHARE *tmp= (TMP_TABLE_SHARE*)tl->front();
+  //char dbn[]=tmp->db.str;
+
+  restore_record(tables->table, s->default_values);
+  // session_id
+  tables->table->field[0]->store((longlong) thd->thread_id, TRUE);
+  // table_schema
+  //tables->table->field[1]->store(tmp->db.str, tmp->db.length, system_charset_info);
+  // table_name
+  //tables->table->field[2]->store(tmp->table_name.str, tmp->table_name.length, system_charset_info);
+
+  schema_table_store_record(thd,tables->table);
+
+}
+
+int fill_global_temporary_tables2x(THD *thd, TABLE_LIST *tables, COND *cond)
+{
+
+  DBUG_ENTER("fill_global_temporary_tables2");
+  mysql_mutex_lock(&LOCK_thread_count);
+
+  bool timed_out, bres;
+  int timeout_sec= 5;
+  Global_temp_tables_request global_temp_req;
  
+  THD *tmp=NULL;
+
+  I_List_iterator<THD> it(threads);
+
+ //  while ((tmp= it++))
+ // {
+    //if (thd1->temporary_tables!= 0)
+    //{
+
+      global_temp_req.target_thd= thd;
+      global_temp_req.request_thd= thd;
+      global_temp_req.failed_to_produce= FALSE;
+      global_temp_req.tmp_table_list= thd->temporary_tables;
+      global_temp_req.tables=tables;
+
+      /* Ok, we have a lock on target->LOCK_thd_data, can call: */ 
+      //HOW THIS ??? //
+      bres= thd->apc_target.make_apc_call(thd, &global_temp_req, timeout_sec,
+                                         &timed_out);
+
+      if (bres || global_temp_req.failed_to_produce)
+      {
+        if (thd->killed)
+          thd->send_kill_message();
+        else if (timed_out)
+          my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
+        else
+          my_error(ER_TARGET_NOT_EXPLAINABLE, MYF(0));
+
+        bres= TRUE;
+      }
+    //}
+ // }
+  DBUG_RETURN(bres);
+ }
 
 /*
   Produce EXPLAIN data.
@@ -3131,40 +3224,6 @@ void select_result_text_buffer::save_to(String *res)
   res->append("#\n");
 }
 
-int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
-{
-  THD *tmp;
-  my_thread_id  thread_id;
-  DBUG_ENTER("fill_global_temporary_tables2");
-
-  bool timed_out, bres;
-  int timeout_sec= 30;
-  Global_temp_tables_request global_temp_req;
-
-  
-  THD *thd1;
-  I_List_iterator<THD> it(threads);
-  while ((thd1= it++))
-  {
-    if (thd1->temporary_tables!= 0)
-    {
-
-      global_temp_req.target_thd= tmp;
-      global_temp_req.request_thd= thd1;
-      global_temp_req.failed_to_produce= FALSE;
-      global_temp_req.tmp_table_list= thd1->temporary_tables;
-      global_temp_req.tables=tables;
-
-      /* Ok, we have a lock on target->LOCK_thd_data, can call: */ 
-      //HOW THIS ??? //
-      bres= tmp->apc_target.make_apc_call(thd1, &global_temp_req, timeout_sec,
-                                         &timed_out);
-    }
-  }
-
-  DBUG_RETURN(0);
-
- }
 
 /*
   Store the SHOW EXPLAIN output in the temporary table.
@@ -9883,7 +9942,7 @@ ST_FIELD_INFO temporary_table_fields_info[]=
 {
   {"SESSION_ID", 4, MYSQL_TYPE_LONGLONG, 0, 0, "Session", SKIP_OPEN_TABLE},
   {"TABLE_SCHEMA", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Db", SKIP_OPEN_TABLE},
-  {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Temp_tables_in_", SKIP_OPEN_TABLE}
+  {"TABLE_NAME", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Temp_tables_in_", SKIP_OPEN_TABLE},
   /*
   {"ENGINE", NAME_CHAR_LEN, MYSQL_TYPE_STRING, 0, 0, "Engine", OPEN_FRM_ONLY},
   {"NAME", FN_REFLEN, MYSQL_TYPE_STRING, 0, 0, "Name", SKIP_OPEN_TABLE},
@@ -9896,8 +9955,9 @@ ST_FIELD_INFO temporary_table_fields_info[]=
   {"INDEX_LENGTH", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG, 0,
    MY_I_S_UNSIGNED, "Index Size", OPEN_FULL_TABLE},
   {"CREATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Create Time", OPEN_FULL_TABLE},
-  {"UPDATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Update Time", OPEN_FULL_TABLE},
-  {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE}*/
+  {"UPDATE_TIME", 0, MYSQL_TYPE_DATETIME, 0, 1, "Update Time", OPEN_FULL_TABLE}
+  */
+  {0, 0, MYSQL_TYPE_STRING, 0, 0, 0, SKIP_OPEN_TABLE}
 };
 
 
