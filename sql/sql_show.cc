@@ -2946,17 +2946,20 @@ void Global_temp_tables_request::call_in_target_thread()
   DBUG_ASSERT(current_thd == target_thd);
   // set_current_thd(request_thd); // how to propagate data ?
   // By creating a new class in request class ??
-  
-  TMP_TABLE_SHARE *tmp= tmp_table_list->front(); // (*tl).front();
+   
+  TMP_TABLE_SHARE *tmp= NULL;
+  if(tmp_table_list) // Must go see dummy function 
+     tmp=tmp_table_list->front();
+
   while (tmp!= 0)
   {
     restore_record(tables->table, s->default_values);
     // session_id
     tables->table->field[0]->store((longlong) request_thd->thread_id, TRUE);
     // table_schema
-    tables->table->field[1]->store((*tmp).db.str, (*tmp).db.length, system_charset_info);
+    tables->table->field[1]->store(tmp->db.str, tmp->db.length, system_charset_info);
     // table_name
-    tables->table->field[2]->store((*tmp).table_name.str, (*tmp).table_name.length, system_charset_info);
+    tables->table->field[2]->store(tmp->table_name.str, tmp->table_name.length, system_charset_info);
     /*
     // engine
     TABLE *current_table= tmp->all_tmp_tables.front();
@@ -3018,70 +3021,76 @@ void Global_temp_tables_request::call_in_target_thread()
   }
 }
 
-int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
+/* This is dummy function for testing functionality with no APC
+ * It is working for only 1 thread - change number x to 2 in order to work
+ */
+/*
+int fill_global_temporary_tablesx(THD *thd, TABLE_LIST *tables, COND *cond)
 {
 
   All_tmp_tables_list *tl= thd->temporary_tables;
-
-  TMP_TABLE_SHARE *tmp= (TMP_TABLE_SHARE*)tl->front();
+  if(tl)
+  {
+    TMP_TABLE_SHARE *tmp= tl->front();
+  
   //char dbn[]=tmp->db.str;
 
   restore_record(tables->table, s->default_values);
   // session_id
   tables->table->field[0]->store((longlong) thd->thread_id, TRUE);
   // table_schema
-  //tables->table->field[1]->store(tmp->db.str, tmp->db.length, system_charset_info);
+  tables->table->field[1]->store(tmp->db.str, tmp->db.length, system_charset_info);
   // table_name
-  //tables->table->field[2]->store(tmp->table_name.str, tmp->table_name.length, system_charset_info);
-
+  tables->table->field[2]->store(tmp->table_name.str, tmp->table_name.length, system_charset_info);
+  }
   schema_table_store_record(thd,tables->table);
 
 }
+*/
 
-int fill_global_temporary_tables2x(THD *thd, TABLE_LIST *tables, COND *cond)
+int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
 {
 
-  DBUG_ENTER("fill_global_temporary_tables2");
-  mysql_mutex_lock(&LOCK_thread_count);
+    DBUG_ENTER("fill_global_temporary_tables2");
+    DBUG_ASSERT(cond==NULL);
+    
+    // See example of fill_show_explain function in this file for getting
+    // the LOCK_thd_data ... Line bellow is generating an error
+    //thread_id= thd->lex->value_list.head()->val_int(); // here we got SIGSEGV
+   // mysql_mutex_lock(&LOCK_thread_count);
+  //  mysql_mutex_lock(&LOCK_thd_kill); // doesn't work
+   
+    bool timed_out, bres;
+    int timeout_sec= 5;
+    Global_temp_tables_request global_temp_req;
 
-  bool timed_out, bres;
-  int timeout_sec= 5;
-  Global_temp_tables_request global_temp_req;
- 
-  THD *tmp=NULL;
+    THD *tmp= NULL; // Not used, testing same thread as target and requestor
 
-  I_List_iterator<THD> it(threads);
+    global_temp_req.target_thd= thd;
+    global_temp_req.request_thd= thd;
+    global_temp_req.failed_to_produce= FALSE;
+    global_temp_req.tmp_table_list= thd->temporary_tables;
+    global_temp_req.tables=tables;
 
- //  while ((tmp= it++))
- // {
-    //if (thd1->temporary_tables!= 0)
-    //{
+    // In function `fill_show explain` is written this:
+    /* Ok, we have a lock on target->LOCK_thd_data, can call: */ 
+    // mysql_mutex_lock(&thd->LOCK_thd_data); // simulating locking thd data, still is not working
+        mysql_mutex_lock(&thd->LOCK_thd_kill);
+    bres= thd->apc_target.make_apc_call(thd, &global_temp_req, timeout_sec,
+                                       &timed_out);
+/*  Unlock is done in make_apc When trying to unlock -> safe_mutex: Trying to unlock mutex LOCK_thd_kill that wasn't locked at sql/sql_show.cc*/
+    if (bres || global_temp_req.failed_to_produce)
+    {
+      if (thd->killed)
+        thd->send_kill_message();
+      else if (timed_out)
+        my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
+      else
+        my_error(ER_TARGET_NOT_EXPLAINABLE, MYF(0));
 
-      global_temp_req.target_thd= thd;
-      global_temp_req.request_thd= thd;
-      global_temp_req.failed_to_produce= FALSE;
-      global_temp_req.tmp_table_list= thd->temporary_tables;
-      global_temp_req.tables=tables;
-
-      /* Ok, we have a lock on target->LOCK_thd_data, can call: */ 
-      //HOW THIS ??? //
-      bres= thd->apc_target.make_apc_call(thd, &global_temp_req, timeout_sec,
-                                         &timed_out);
-
-      if (bres || global_temp_req.failed_to_produce)
-      {
-        if (thd->killed)
-          thd->send_kill_message();
-        else if (timed_out)
-          my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
-        else
-          my_error(ER_TARGET_NOT_EXPLAINABLE, MYF(0));
-
-        bres= TRUE;
-      }
-    //}
- // }
-  DBUG_RETURN(bres);
+      bres= TRUE;
+    }
+    DBUG_RETURN(bres);
  }
 
 /*
