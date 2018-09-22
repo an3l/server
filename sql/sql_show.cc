@@ -3064,9 +3064,9 @@ int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
     int timeout_sec= 5;
     Global_temp_tables_request global_temp_req;
 
-    THD *tmp= NULL; // Not used, testing same thread as target and requestor
+    THD *tmp= new THD(next_thread_id()); // Not used, testing same thread as target and requestor
 
-    global_temp_req.target_thd= thd;
+    global_temp_req.target_thd= tmp;
     global_temp_req.request_thd= thd;
     global_temp_req.failed_to_produce= FALSE;
     global_temp_req.tmp_table_list= thd->temporary_tables;
@@ -3075,10 +3075,14 @@ int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
     // In function `fill_show explain` is written this:
     /* Ok, we have a lock on target->LOCK_thd_data, can call: */ 
     // mysql_mutex_lock(&thd->LOCK_thd_data); // simulating locking thd data, still is not working
-        mysql_mutex_lock(&thd->LOCK_thd_kill);
-    bres= thd->apc_target.make_apc_call(thd, &global_temp_req, timeout_sec,
+    mysql_mutex_lock(&thd->LOCK_thd_kill);
+    mysql_mutex_lock(&tmp->LOCK_thd_kill);
+    bres= tmp->apc_target.make_apc_call(thd, &global_temp_req, timeout_sec,
                                        &timed_out);
+    //mysql_mutex_unlock(&tmp->LOCK_thd_kill);
+
 /*  Unlock is done in make_apc When trying to unlock -> safe_mutex: Trying to unlock mutex LOCK_thd_kill that wasn't locked at sql/sql_show.cc*/
+    /*
     if (bres || global_temp_req.failed_to_produce)
     {
       if (thd->killed)
@@ -3090,6 +3094,7 @@ int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
 
       bres= TRUE;
     }
+    */
     DBUG_RETURN(bres);
  }
 
