@@ -64,6 +64,9 @@
 #endif
 #include "transaction.h"
 #include "sql_class.h"
+// #include <../libmariadb/unittest/mytap/tap.h>
+// #include <../unittest/mytap/tap.h>
+#include <stdio.h>
 
 enum enum_i_s_events_fields
 {
@@ -3065,6 +3068,13 @@ int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
     Global_temp_tables_request global_temp_req;
 
     THD *tmp= new THD(next_thread_id()); // Not used, testing same thread as target and requestor
+ 
+    mysql_mutex_t target_mutex;
+    mysql_mutex_init(0, &target_mutex, MY_MUTEX_INIT_FAST);
+    tmp->apc_target.init(&target_mutex);
+    mysql_mutex_lock(&target_mutex);
+    tmp->apc_target.enable();
+    //diag("Started apc!");
 
     global_temp_req.target_thd= tmp;
     global_temp_req.request_thd= thd;
@@ -3072,29 +3082,36 @@ int fill_global_temporary_tables2(THD *thd, TABLE_LIST *tables, COND *cond)
     global_temp_req.tmp_table_list= thd->temporary_tables;
     global_temp_req.tables=tables;
 
-    // In function `fill_show explain` is written this:
-    /* Ok, we have a lock on target->LOCK_thd_data, can call: */ 
     // mysql_mutex_lock(&thd->LOCK_thd_data); // simulating locking thd data, still is not working
     mysql_mutex_lock(&thd->LOCK_thd_kill);
     mysql_mutex_lock(&tmp->LOCK_thd_kill);
     bres= tmp->apc_target.make_apc_call(thd, &global_temp_req, timeout_sec,
                                        &timed_out);
     //mysql_mutex_unlock(&tmp->LOCK_thd_kill);
+    mysql_mutex_unlock(&thd->LOCK_thd_kill);
 
 /*  Unlock is done in make_apc When trying to unlock -> safe_mutex: Trying to unlock mutex LOCK_thd_kill that wasn't locked at sql/sql_show.cc*/
-    /*
+    
     if (bres || global_temp_req.failed_to_produce)
     {
       if (thd->killed)
         thd->send_kill_message();
       else if (timed_out)
-        my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
+        printf("Timed out\n");
+        // diag("Timed out");
+        // my_error("Timed out", MYF(0));
       else
-        my_error(ER_TARGET_NOT_EXPLAINABLE, MYF(0));
+        printf("Something else happend !\n");
+        //diag("Something else");
+        // my_error("Something else", MYF(0));
 
       bres= TRUE;
     }
-    */
+    // mysql_mutex_unlock(&target_mutex); // already unlocked
+    //tmp->apc_target.disable();
+    //tmp->apc_target.destroy();
+    mysql_mutex_destroy(&target_mutex);
+
     DBUG_RETURN(bres);
  }
 
