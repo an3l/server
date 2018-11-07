@@ -3957,7 +3957,19 @@ end:
     if (handle_as_role)
     {
       if (old_row_exists)
+      {
         acl_update_role(combo->user.str, rights);
+        if (user_table.max_statement_time())
+        {
+          if (lex->mqh.specified_limits & USER_RESOURCES::MAX_STATEMENT_TIME)
+            user_table.max_statement_time()->store(lex->mqh.max_statement_time);
+        }
+        mqh_used= (mqh_used || lex->mqh.questions || lex->mqh.updates ||
+                   lex->mqh.conn_per_hour || lex->mqh.user_conn ||
+                   lex->mqh.max_statement_time != 0.0);
+
+
+      }
       else
         acl_insert_role(combo->user.str, rights);
     }
@@ -11662,12 +11674,6 @@ LEX_USER *get_current_user(THD *thd, LEX_USER *user, bool lock)
       return 0;
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
-    if (has_auth(user, thd->lex))
-    {
-      dup->host= host_not_specified;
-      return dup;
-    }
-
     if (is_invalid_role_name(user->user.str))
       return 0;
 
