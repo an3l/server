@@ -497,10 +497,10 @@ enum enum_field_types { MYSQL_TYPE_DECIMAL, MYSQL_TYPE_TINY,
                         MYSQL_TYPE_TIMESTAMP2,
                         MYSQL_TYPE_DATETIME2,
                         MYSQL_TYPE_TIME2,
+                        MYSQL_TYPE_MYSQL_JSON= 139,
                         /* Compressed types are only used internally for RBR. */
                         MYSQL_TYPE_BLOB_COMPRESSED= 140,
                         MYSQL_TYPE_VARCHAR_COMPRESSED= 141,
-
                         MYSQL_TYPE_NEWDECIMAL=246,
 			MYSQL_TYPE_ENUM=247,
 			MYSQL_TYPE_SET=248,
@@ -511,7 +511,6 @@ enum enum_field_types { MYSQL_TYPE_DECIMAL, MYSQL_TYPE_TINY,
 			MYSQL_TYPE_VAR_STRING=253,
 			MYSQL_TYPE_STRING=254,
 			MYSQL_TYPE_GEOMETRY=255
-
 };
 
 /* For backward compatibility */

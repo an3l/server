@@ -4770,6 +4770,19 @@ public:
   void (*do_copy2)(Copy_field *);		// Used to handle null values
 };
 
+/*
+  A class for handling the mysql json data to fields
+*/
+class Field_mysql_json :public Field_blob
+{
+  public:
+    Field_mysql_json(uchar *ptr_arg, uchar *null_ptr_arg,
+                        uchar null_bit_arg, enum utype unireg_check_arg,
+                        const LEX_CSTRING *field_name_arg, TABLE_SHARE *share,
+                        uint blob_pack_length, const DTCollation &collation):
+    Field_blob(ptr_arg, null_ptr_arg, null_bit_arg, unireg_check_arg,
+               field_name_arg, share, blob_pack_length, collation) {}
+};
 
 uint pack_length_to_packflag(uint type);
 enum_field_types get_blob_type_from_length(ulong length);
@@ -4786,6 +4799,7 @@ bool check_expression(Virtual_column_info *vcol, LEX_CSTRING *name,
 #define FIELDFLAG_DECIMAL		1U
 #define FIELDFLAG_BINARY		1U	// Shares same flag
 #define FIELDFLAG_NUMBER		2U
+#define FIELDFLAG_JSON  		2U // Shares the same flag
 #define FIELDFLAG_ZEROFILL		4U
 #define FIELDFLAG_PACK			120U	// Bits used for packing
 #define FIELDFLAG_INTERVAL		256U    // mangled with decimals!
@@ -4822,6 +4836,7 @@ bool check_expression(Virtual_column_info *vcol, LEX_CSTRING *name,
 #define f_bit_as_char(x)        ((x) & FIELDFLAG_TREAT_BIT_AS_CHAR)
 #define f_is_hex_escape(x)      ((x) & FIELDFLAG_HEX_ESCAPE)
 #define f_visibility(x)         (static_cast<field_visibility_t> ((x) & INVISIBLE_MAX_BITS))
+#define f_is_json(x)		(((x) & (FIELDFLAG_JSON | FIELDFLAG_NUMBER | FIELDFLAG_BITFIELD)) == FIELDFLAG_JSON)
 
 inline
 ulonglong TABLE::vers_end_id() const

@@ -10697,6 +10697,10 @@ Field *make_field(TABLE_SHARE *share,
                    pack_length, geom_type, srid);
     }
 #endif
+    if (f_is_json(pack_flag)) 
+      return new Field_mysql_json(ptr, null_pos, null_bit,
+                            unireg_check, field_name, share,
+                            pack_length, field_charset);
     if (f_is_blob(pack_flag))
     {
       if (unireg_check == Field::TMYSQL_COMPRESSED)
@@ -10874,7 +10878,6 @@ Field *make_field(TABLE_SHARE *share,
             new (mem_root)
             Field_bit(ptr, field_length, null_pos, null_bit, bit_ptr,
                       bit_offset, unireg_check, field_name));
-
   default:					// Impossible (Wrong version)
     break;
   }
