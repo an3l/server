@@ -1,0 +1,25 @@
+--echo #
+--echo #  Cannot read .frm file from mysql table containg the json data
+--echo # (Incorrect information in file: .frm)
+--echo #
+--echo $datadir
+
+# 1)  At line 8: Path '/test/mysql_json.frm;' is not a subdirectory of MYSQLTEST_VARDIR or MYSQL_TMP_DIR
+#--copy_file std_data/mysql_json.frm $datadir/test/mysql_json.frm;
+#--copy_file std_data/mysql_json.MYD $datadir/test/mysql_json.MYD;
+
+# 2) Can't create/write to file '/home/anel/workspace/server/mysql-test/var/tmp/test/mysql_json.frm' 
+# (Errcode: 2 "No such file or directory")# mysqltest: At line 12: command "copy_file" failed with error: 1  my_errno: 2  errno: 2
+--copy_file $MYSQLTEST_VARDIR/std_data/mysql_json.frm  $MYSQL_TMP_DIR/test/mysql_json.frm
+--copy_file $MYSQLTEST_VARDIR/std_data/mysql_json.MYD  $MYSQL_TMP_DIR/mysql_json.MYD
+
+show databases;
+use test;
+show tables;
+#show create table test.t;
+
+# Note
+# Path '/test/mysql_json.frm;' is not a subdirectory of MYSQLTEST_VARDIR '/home/anel/workspace/server/mysql-test/var'
+# (here is folder /std_data with my data in it!)
+# or MYSQL_TMP_DIR '/home/anel/workspace/server/mysql-test/var/tmp'
+#--copy_file $MYSQLTEST_VARDIR/std_data/t_set.frm $MYSQL_TMP_DIR/data57/test/t_set.frm
