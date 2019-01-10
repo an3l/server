@@ -4799,13 +4799,13 @@ bool check_expression(Virtual_column_info *vcol, LEX_CSTRING *name,
 #define FIELDFLAG_DECIMAL		1U
 #define FIELDFLAG_BINARY		1U	// Shares same flag
 #define FIELDFLAG_NUMBER		2U
-#define FIELDFLAG_JSON  		2U // Shares the same flag
 #define FIELDFLAG_ZEROFILL		4U
 #define FIELDFLAG_PACK			120U	// Bits used for packing
 #define FIELDFLAG_INTERVAL		256U    // mangled with decimals!
 #define FIELDFLAG_BITFIELD		512U	// mangled with decimals!
 #define FIELDFLAG_BLOB			1024U	// mangled with decimals!
 #define FIELDFLAG_GEOM			2048U   // mangled with decimals!
+#define FIELDFLAG_JSON  		4096U // Shares the same flag
 
 #define FIELDFLAG_TREAT_BIT_AS_CHAR     4096U   /* use Field_bit_as_char */
 #define FIELDFLAG_LONG_DECIMAL          8192U
