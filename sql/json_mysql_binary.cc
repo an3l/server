@@ -181,8 +181,7 @@ static Value parse_scalar(uint8 type, const char *data, size_t len)
       if (len < 8)
         return err();                         /* purecov: inspected */
       double d;
-      //double *d= (double *)malloc(sizeof(double));
-      //float8get(&d, data);
+      float8get(d, data);
       return Value(d);
     }
   case JSONB_TYPE_STRING:

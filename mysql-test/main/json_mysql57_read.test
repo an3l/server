@@ -21,6 +21,7 @@ show tables;
 show create table test.json;
 select * from test.json;
 
+drop table json;
 # Note
 # Path '/test/mysql_json.frm;' is not a subdirectory of MYSQLTEST_VARDIR '/home/anel/workspace/server/mysql-test/var'
 # (here is folder /std_data with my data in it!)
