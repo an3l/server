@@ -1,7 +1,7 @@
 #ifndef FIELD_INCLUDED
 #define FIELD_INCLUDED
 /* Copyright (c) 2000, 2015, Oracle and/or its affiliates.
-   Copyright (c) 2008, 2017, MariaDB Corporation.
+   Copyright (c) 2008, 2019, MariaDB Corporation.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -4777,11 +4777,24 @@ class Field_mysql_json :public Field_blob
 {
   public:
     Field_mysql_json(uchar *ptr_arg, uchar *null_ptr_arg,
-                        uchar null_bit_arg, enum utype unireg_check_arg,
-                        const LEX_CSTRING *field_name_arg, TABLE_SHARE *share,
-                        uint blob_pack_length, const DTCollation &collation):
-    Field_blob(ptr_arg, null_ptr_arg, null_bit_arg, unireg_check_arg,
-               field_name_arg, share, blob_pack_length, collation) {}
+                     uchar null_bit_arg, enum utype unireg_check_arg,
+                     const LEX_CSTRING *field_name_arg, TABLE_SHARE *share,
+                     uint blob_pack_length, const DTCollation &collation)
+    : Field_blob(ptr_arg, null_ptr_arg, null_bit_arg, unireg_check_arg,
+                 field_name_arg, share, blob_pack_length, collation) 
+    {}
+
+    Field_mysql_json(uint32 len_arg, bool maybe_null_arg, const LEX_CSTRING *field_name_arg)
+    : Field_blob(len_arg, maybe_null_arg, field_name_arg, &my_charset_bin)
+    {}
+
+  /**
+    Retrieve the JSON value stored in this field as text
+
+    @param[in,out] buf1 string buffer for converting JSON value to string
+    @param[in,out] buf2 unused
+  */
+  String *val_str(String *, String *);
 };
 
 uint pack_length_to_packflag(uint type);
