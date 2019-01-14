@@ -16,6 +16,7 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 */
 #include "json_mysql_binary.h"
+#include <algorithm>            // std::min
 
 #define JSONB_TYPE_SMALL_OBJECT   0x0
 #define JSONB_TYPE_LARGE_OBJECT   0x1
@@ -41,7 +42,7 @@ namespace json_mysql_binary
 
 // Constructor for literals and errors.
 Value::Value(mysql_value_enum_type t)
-  : m_type(t), m_field_type(), m_data(), m_element_count(), m_length(),
+  : m_type(t), m_data(), m_element_count(), m_length(),
     m_int_value(), m_double_value(), m_large()
 {
   DBUG_ASSERT(t == LITERAL_NULL || t == LITERAL_TRUE || t == LITERAL_FALSE ||
@@ -51,7 +52,7 @@ Value::Value(mysql_value_enum_type t)
 
 // Constructor for int and uint.
 Value::Value(mysql_value_enum_type t, int64 val)
-  : m_type(t), m_field_type(), m_data(), m_element_count(), m_length(),
+  : m_type(t), m_data(), m_element_count(), m_length(),
     m_int_value(val), m_double_value(), m_large()
 {
   DBUG_ASSERT(t == INT || t == UINT);
@@ -60,14 +61,14 @@ Value::Value(mysql_value_enum_type t, int64 val)
 
 // Constructor for double.
 Value::Value(double d)
-  : m_type(DOUBLE), m_field_type(), m_data(), m_element_count(), m_length(),
+  : m_type(DOUBLE), m_data(), m_element_count(), m_length(),
     m_int_value(), m_double_value(d), m_large()
 {}
 
 
 // Constructor for string.
 Value::Value(const char *data, size_t len)
-  : m_type(STRING), m_field_type(), m_data(data), m_element_count(),
+  : m_type(STRING), m_data(data), m_element_count(),
     m_length(len), m_int_value(), m_double_value(), m_large()
 {}
 
@@ -75,7 +76,7 @@ Value::Value(const char *data, size_t len)
 // Constructor for arrays and objects.
 Value::Value(mysql_value_enum_type t, const char *data, size_t bytes,
              size_t element_count, bool large)
-  : m_type(t), m_field_type(), m_data(data), m_element_count(element_count),
+  : m_type(t), m_data(data), m_element_count(element_count),
     m_length(bytes), m_int_value(), m_double_value(), m_large(large)
 {
   DBUG_ASSERT(t == ARRAY || t == OBJECT);
@@ -91,6 +92,48 @@ static Value err() { return Value(Value::ERROR); } // assert in explicit constru
   @param len    the maximum number of bytes to read from data
   @return  an object that represents the scalar value
 */
+
+/**
+  Read a variable length written by append_variable_length().
+
+  @param[in] data  the buffer to read from
+  @param[in] data_length  the maximum number of bytes to read from data
+  @param[out] length  the length that was read
+  @param[out] num  the number of bytes needed to represent the length
+  @return  false on success, true on error
+*/
+static bool read_variable_length(const char *data, size_t data_length,
+                                 size_t *length, size_t *num)
+{
+  /*
+    It takes five bytes to represent UINT_MAX32, which is the largest
+    supported length, so don't look any further.
+  */
+  const size_t max_bytes= std::min(data_length, static_cast<size_t>(5));
+
+  size_t len= 0;
+  for (size_t i= 0; i < max_bytes; i++)
+  {
+    // Get the next 7 bits of the length.
+    len|= (data[i] & 0x7f) << (7 * i);
+    if ((data[i] & 0x80) == 0)
+    {
+      // The length shouldn't exceed 32 bits.
+      if (len > UINT_MAX32)
+        return true;                          /* purecov: inspected */
+
+      // This was the last byte. Return successfully.
+      *num= i + 1;
+      *length= len;
+      return false;
+    }
+  }
+
+  // No more available bytes. Return true to signal error.
+  return true;                                /* purecov: inspected */
+}
+
+
 static Value parse_scalar(uint8 type, const char *data, size_t len)
 {
   switch (type)
@@ -138,7 +181,8 @@ static Value parse_scalar(uint8 type, const char *data, size_t len)
       if (len < 8)
         return err();                         /* purecov: inspected */
       double d;
-      float8get(&d, data);
+      //double *d= (double *)malloc(sizeof(double));
+      //float8get(&d, data);
       return Value(d);
     }
   case JSONB_TYPE_STRING:
@@ -192,7 +236,7 @@ static Value parse_scalar(uint8 type, const char *data, size_t len)
   @return  an object that allows access to the array or object
 */
 //static Value parse_array_or_object(Value::enum_type t, const char *data,
-                                   size_t len, bool large)
+//                                   size_t len, bool large)
 //{
 //}
 
@@ -218,7 +262,6 @@ Value parse_binary(const char *data, size_t len)
       return parse_scalar(type, data, len);
 
   }
-  return s;
 }
 
-}
+}//end of namespace json_mysql_binary

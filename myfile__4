@@ -1,0 +1,30 @@
+[1/19] Generating mysqlserver_depends.c
+[2/19] Building C object libmysqld/CMakeFiles/mysqlserver.dir/mysqlserver_depends.c.o
+[3/19] cd /home/anel/workspace/server && /usr/bin/cmake -P /home/anel/workspace/server/cmake/info_src.cmake
+[4/19] cd /home/anel/workspace/server && /usr/bin/cmake -P /home/anel/workspace/server/cmake/info_bin.cmake
+[5/19] cd /home/anel/workspace/server && /usr/bin/cmake -DCOMPILER=/usr/bin/cc -DSOURCE_DIR=/home/anel/workspace/server -DBINARY_DIR=/home/anel/workspace/server "-DABI_HEADERS=/home/anel/workspace/server/include/mysql/plugin_audit.h;/home/anel/workspace/server/include/mysql/plugin_ftparser.h;/home/anel/workspace/server/include/mysql.h;/home/anel/workspace/server/include/mysql/psi/psi_abi_v1.h;/home/anel/workspace/server/include/mysql/psi/psi_abi_v2.h;/home/anel/workspace/server/include/mysql/client_plugin.h;/home/anel/workspace/server/include/mysql/plugin_auth.h;/home/anel/workspace/server/include/mysql/plugin_password_validation.h;/home/anel/workspace/server/include/mysql/plugin_encryption.h" -P /home/anel/workspace/server/cmake/do_abi_check.cmake
+[6/19] Building CXX object sql/CMakeFiles/sql.dir/json_mysql_binary.cc.o
+FAILED: sql/CMakeFiles/sql.dir/json_mysql_binary.cc.o 
+/usr/bin/c++  -DHAVE_CONFIG_H -DHAVE_EVENT_SCHEDULER -DHAVE_POOL_OF_THREADS -DMYSQL_SERVER -D_FILE_OFFSET_BITS=64 -Iinclude -Isql -Iextra/yassl/include -Iextra/yassl/taocrypt/include -Iwsrep -pie -fPIC -Wl,-z,relro,-z,now -fstack-protector --param=ssp-buffer-size=4 -fPIC -fno-rtti -g -DENABLED_DEBUG_SYNC -ggdb3 -DSAFE_MUTEX -Wall -Wextra -Wformat-security -Wno-format-truncation -Wno-init-self -Wno-nonnull-compare -Wno-unused-parameter -Woverloaded-virtual -Wnon-virtual-dtor -Wvla -Wwrite-strings   -DHAVE_YASSL -DYASSL_PREFIX -DHAVE_OPENSSL -DMULTI_THREADED -MD -MT sql/CMakeFiles/sql.dir/json_mysql_binary.cc.o -MF sql/CMakeFiles/sql.dir/json_mysql_binary.cc.o.d -o sql/CMakeFiles/sql.dir/json_mysql_binary.cc.o -c sql/json_mysql_binary.cc
+In file included from include/my_byteorder.h:51:0,
+                 from include/my_global.h:1054,
+                 from sql/json_mysql_binary.h:105,
+                 from sql/json_mysql_binary.cc:18:
+sql/json_mysql_binary.cc: In function ‘json_mysql_binary::Value json_mysql_binary::parse_scalar(uint8, const char*, size_t)’:
+include/little_endian.h:23:38: error: lvalue required as unary ‘&’ operand
+ #define float8get(V,M)   doubleget((V),(M))
+                                      ^
+include/little_endian.h:51:33: note: in definition of macro ‘doubleget’
+ #define doubleget(V,M)  memcpy(&V, (M), sizeof(double))
+                                 ^
+sql/json_mysql_binary.cc:184:7: note: in expansion of macro ‘float8get’
+       float8get(&d, data);
+       ^~~~~~~~~
+sql/json_mysql_binary.cc: In function ‘json_mysql_binary::Value json_mysql_binary::parse_binary(const char*, size_t)’:
+sql/json_mysql_binary.cc:264:10: error: ‘s’ was not declared in this scope
+   return s;
+          ^
+[7/19] Building CXX object libmysqld/examples/CMakeFiles/mysql_embedded.dir/__/__/client/mysql.cc.o
+[8/19] Linking C static library libmysqld/libmariadbd.a
+/usr/bin/ar: creating /home/anel/workspace/server/libmysqld/libmariadbd.a
+ninja: build stopped: subcommand failed.

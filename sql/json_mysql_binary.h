@@ -1,3 +1,5 @@
+#ifndef JSON_MYSQL_BINARY_INCLUDED
+#define JSON_MYSQL_BINARY_INCLUDED
 /*
    Copyright (c) 2000, 2017, Oracle and/or its affiliates.
    Copyright (c) 2008, 2019, MariaDB
@@ -102,8 +104,9 @@
   @endverbatim
 
 */
-
+#include "my_global.h"
 #include "sql_string.h"                         /* String */
+
 
 namespace json_mysql_binary
 {
@@ -129,7 +132,6 @@ class Value
 
     mysql_value_enum_type type() const { return m_type; }
 
-    static Value err() { return Value(ERROR); }
     /* Constructor for values that represent literals or errors. */
     explicit Value(mysql_value_enum_type t);
     /* Constructor for values that represent ints or uints. */
@@ -207,7 +209,7 @@ class Value
     byte offsets instead of 2 byte offsets.
     */
     const bool m_large;
-};
+}; // end of Value class
 
 /*
   Parse a JSON binary document.
@@ -219,3 +221,4 @@ class Value
 Value parse_binary(const char *data, size_t len);
 
 }
+#endif  /* JSON_BINARY_INCLUDED */

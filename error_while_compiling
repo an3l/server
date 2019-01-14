@@ -1,0 +1,34 @@
+[1/10] cd /home/anel/workspace/server && /usr/bin/cmake -P /home/anel/workspace/server/cmake/info_bin.cmake
+[2/10] cd /home/anel/workspace/server && /usr/bin/cmake -P /home/anel/workspace/server/cmake/info_src.cmake
+[3/10] cd /home/anel/workspace/server && /usr/bin/cmake -DCOMPILER=/usr/bin/cc -DSOURCE_DIR=/home/anel/workspace/server -DBINARY_DIR=/home/anel/workspace/server "-DABI_HEADERS=/home/anel/workspace/server/include/mysql/plugin_audit.h;/home/anel/workspace/server/include/mysql/plugin_ftparser.h;/home/anel/workspace/server/include/mysql.h;/home/anel/workspace/server/include/mysql/psi/psi_abi_v1.h;/home/anel/workspace/server/include/mysql/psi/psi_abi_v2.h;/home/anel/workspace/server/include/mysql/client_plugin.h;/home/anel/workspace/server/include/mysql/plugin_auth.h;/home/anel/workspace/server/include/mysql/plugin_password_validation.h;/home/anel/workspace/server/include/mysql/plugin_encryption.h" -P /home/anel/workspace/server/cmake/do_abi_check.cmake
+[4/10] Linking CXX executable libmysqld/examples/mysql_client_test_embedded
+FAILED: libmysqld/examples/mysql_client_test_embedded 
+: && /usr/bin/c++  -pie -fPIC -Wl,-z,relro,-z,now -fstack-protector --param=ssp-buffer-size=4 -fPIC -fno-rtti -g -DENABLED_DEBUG_SYNC -ggdb3 -DSAFE_MUTEX -Wall -Wextra -Wformat-security -Wno-format-truncation -Wno-init-self -Wno-nonnull-compare -Wno-unused-parameter -Woverloaded-virtual -Wnon-virtual-dtor -Wvla -Wwrite-strings  -Wl,--export-dynamic libmysqld/examples/CMakeFiles/mysql_client_test_embedded.dir/__/__/tests/mysql_client_test.c.o  -o libmysqld/examples/mysql_client_test_embedded  -lpthread libmysqld/libmariadbd.a -lpthread -lz -lm -ldl -lpcre -lcrypt -llz4 -llzma -lbz2 -lnuma && :
+libmysqld/libmariadbd.a(field.cc.o): In function `Field_mysql_json::val_str(String*, String*)':
+/home/anel/workspace/server/sql/field.cc:11182: undefined reference to `json_mysql_binary::parse_binary(char const*, unsigned long)'
+collect2: error: ld returned 1 exit status
+[5/10] Linking CXX executable unittest/embedded/test-connect-t
+FAILED: unittest/embedded/test-connect-t 
+: && /usr/bin/c++  -pie -fPIC -Wl,-z,relro,-z,now -fstack-protector --param=ssp-buffer-size=4 -fPIC -fno-rtti -g -DENABLED_DEBUG_SYNC -ggdb3 -DSAFE_MUTEX -Wall -Wextra -Wformat-security -Wno-format-truncation -Wno-init-self -Wno-nonnull-compare -Wno-unused-parameter -Woverloaded-virtual -Wnon-virtual-dtor -Wvla -Wwrite-strings  -Wl,--export-dynamic unittest/embedded/CMakeFiles/test-connect-t.dir/test-connect.cc.o  -o unittest/embedded/test-connect-t  -lpthread libmysqld/libmariadbd.a -lpthread -lz -lm -ldl -lpcre -lcrypt -llz4 -llzma -lbz2 -lnuma && :
+libmysqld/libmariadbd.a(field.cc.o): In function `Field_mysql_json::val_str(String*, String*)':
+/home/anel/workspace/server/sql/field.cc:11182: undefined reference to `json_mysql_binary::parse_binary(char const*, unsigned long)'
+collect2: error: ld returned 1 exit status
+[6/10] Linking CXX shared library libmysqld/libmariadbd.so.19
+FAILED: libmysqld/libmariadbd.so.19 
+: && /usr/bin/c++ -fPIC -pie -fPIC -Wl,-z,relro,-z,now -fstack-protector --param=ssp-buffer-size=4 -fPIC -fno-rtti -g -DENABLED_DEBUG_SYNC -ggdb3 -DSAFE_MUTEX -Wall -Wextra -Wformat-security -Wno-format-truncation -Wno-init-self -Wno-nonnull-compare -Wno-unused-parameter -Woverloaded-virtual -Wnon-virtual-dtor -Wvla -Wwrite-strings  -Wl,--no-undefined -shared -Wl,-soname,libmariadbd.so.19 -o libmysqld/libmariadbd.so.19 libmysqld/CMakeFiles/libmysqld.dir/libmysqld_exports_file.cc.o  -lpthread libmysqld/libmariadbd.a -lpthread -lz -lm -ldl -lpcre -lcrypt -llz4 -llzma -lbz2 -lnuma && :
+libmysqld/libmariadbd.a(field.cc.o): In function `Field_mysql_json::val_str(String*, String*)':
+/home/anel/workspace/server/sql/field.cc:11182: undefined reference to `json_mysql_binary::parse_binary(char const*, unsigned long)'
+collect2: error: ld returned 1 exit status
+[7/10] Linking CXX executable libmysqld/examples/mysql_embedded
+FAILED: libmysqld/examples/mysql_embedded 
+: && /usr/bin/c++  -pie -fPIC -Wl,-z,relro,-z,now -fstack-protector --param=ssp-buffer-size=4 -fPIC -fno-rtti -g -DENABLED_DEBUG_SYNC -ggdb3 -DSAFE_MUTEX -Wall -Wextra -Wformat-security -Wno-format-truncation -Wno-init-self -Wno-nonnull-compare -Wno-unused-parameter -Woverloaded-virtual -Wnon-virtual-dtor -Wvla -Wwrite-strings  -Wl,--export-dynamic libmysqld/examples/CMakeFiles/mysql_embedded.dir/__/__/client/completion_hash.cc.o libmysqld/examples/CMakeFiles/mysql_embedded.dir/__/__/client/mysql.cc.o libmysqld/examples/CMakeFiles/mysql_embedded.dir/__/__/client/readline.cc.o  -o libmysqld/examples/mysql_embedded  -lpthread libmysqld/libmariadbd.a extra/readline/libreadline.a -lz -lm -ldl -lpcre -lcrypt -llz4 -llzma -lbz2 -lnuma -lpthread -lcurses && :
+libmysqld/libmariadbd.a(field.cc.o): In function `Field_mysql_json::val_str(String*, String*)':
+/home/anel/workspace/server/sql/field.cc:11182: undefined reference to `json_mysql_binary::parse_binary(char const*, unsigned long)'
+collect2: error: ld returned 1 exit status
+[8/10] Linking CXX executable libmysqld/examples/mysqltest_embedded
+FAILED: libmysqld/examples/mysqltest_embedded 
+: && /usr/bin/c++  -pie -fPIC -Wl,-z,relro,-z,now -fstack-protector --param=ssp-buffer-size=4 -fPIC -fno-rtti -g -DENABLED_DEBUG_SYNC -ggdb3 -DSAFE_MUTEX -Wall -Wextra -Wformat-security -Wno-format-truncation -Wno-init-self -Wno-nonnull-compare -Wno-unused-parameter -Woverloaded-virtual -Wnon-virtual-dtor -Wvla -Wwrite-strings  -Wl,--export-dynamic libmysqld/examples/CMakeFiles/mysqltest_embedded.dir/__/__/client/mysqltest.cc.o  -o libmysqld/examples/mysqltest_embedded  -lpthread libmysqld/libmariadbd.a -lpcre -lpcreposix -lpthread -lz -lm -ldl -lpcre -lcrypt -llz4 -llzma -lbz2 -lnuma && :
+libmysqld/libmariadbd.a(field.cc.o): In function `Field_mysql_json::val_str(String*, String*)':
+/home/anel/workspace/server/sql/field.cc:11182: undefined reference to `json_mysql_binary::parse_binary(char const*, unsigned long)'
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
