@@ -4,6 +4,24 @@
 --echo #
 let $datadir=`select @@datadir`;
 --echo $datadir
+# this doesn't work $file= '/home/anel/workspace/server/dog.jpg'; 
+# let $file= '$MYSQLTEST_VARDIR/tmp/bug53088.txt';
+# --remove_file $MYSQLTEST_VARDIR/tmp/bug31663.txt
+
+let $file= '$MYSQLTEST_VARDIR/std_data/dog.jpg'; 
+let $length= 50;
+
+create table tblob (photo blob,fint int);
+describe tblob;
+
+--eval INSERT INTO tblob(photo) VALUE (LOAD_FILE($file))
+--eval INSERT INTO tblob VALUES (REPEAT('.', $length), 335)
+
+# insert into tblob values (LOAD_FILE($file), 245); # doesnt work
+select photo from tblob;
+select * from tblob;
+
+drop table tblob;
 
 # 1)  At line 8: Path '/test/mysql_json.frm;' is not a subdirectory of MYSQLTEST_VARDIR or MYSQL_TMP_DIR
 --copy_file std_data/json.frm $datadir/test/json.frm
@@ -19,9 +37,11 @@ show databases;
 use test;
 show tables;
 show create table test.json;
+describe test.json;
 select * from test.json;
 
 drop table json;
+
 # Note
 # Path '/test/mysql_json.frm;' is not a subdirectory of MYSQLTEST_VARDIR '/home/anel/workspace/server/mysql-test/var'
 # (here is folder /std_data with my data in it!)

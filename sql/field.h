@@ -4788,6 +4788,18 @@ class Field_mysql_json :public Field_blob
     : Field_blob(len_arg, maybe_null_arg, field_name_arg, &my_charset_bin)
     {}
 
+   // int store(const char *to, size_t length, CHARSET_INFO *charset);
+  /*
+    In mysql - > used for insert not needed now:
+    type_conversion_status store(const char *to, size_t length,
+                                const CHARSET_INFO *charset);
+    type_conversion_status store(double nr);
+    type_conversion_status store(longlong nr, bool unsigned_val);
+    type_conversion_status store_decimal(const my_decimal *);
+    type_conversion_status store_json(Json_wrapper *json);
+    type_conversion_status store_time(MYSQL_TIME *ltime, uint8 dec_arg);
+    type_conversion_status store(Field_json *field); 
+  */
   /**
     Retrieve the JSON value stored in this field as text
 

@@ -36,6 +36,29 @@
 #define JSONB_NULL_LITERAL        '\x00'
 #define JSONB_TRUE_LITERAL        '\x01'
 #define JSONB_FALSE_LITERAL       '\x02'
+/*
+  The size of offset or size fields in the small and the large storage
+  format for JSON objects and JSON arrays.
+*/
+#define SMALL_OFFSET_SIZE         2
+#define LARGE_OFFSET_SIZE         4
+
+/*
+  The size of key entries for objects when using the small storage
+  format or the large storage format. In the small format it is 4
+  bytes (2 bytes for key length and 2 bytes for key offset). In the
+  large format it is 6 (2 bytes for length, 4 bytes for offset).
+*/
+#define KEY_ENTRY_SIZE_SMALL      (2 + SMALL_OFFSET_SIZE)
+#define KEY_ENTRY_SIZE_LARGE      (2 + LARGE_OFFSET_SIZE)
+/*
+  The size of value entries for objects or arrays. When using the
+  small storage format, the entry size is 3 (1 byte for type, 2 bytes
+  for offset). When using the large storage format, it is 5 (1 byte
+  for type, 4 bytes for offset).
+*/
+#define VALUE_ENTRY_SIZE_SMALL    (1 + SMALL_OFFSET_SIZE)
+#define VALUE_ENTRY_SIZE_LARGE    (1 + LARGE_OFFSET_SIZE)
 
 namespace json_mysql_binary
 {
@@ -133,7 +156,14 @@ static bool read_variable_length(const char *data, size_t data_length,
   return true;                                /* purecov: inspected */
 }
 
+/**
+  Parse a JSON scalar value.
 
+  @param type   the binary type of the scalar
+  @param data   pointer to the start of the binary representation of the scalar
+  @param len    the maximum number of bytes to read from data
+  @return  an object that represents the scalar value
+*/
 static Value parse_scalar(uint8 type, const char *data, size_t len)
 {
   switch (type)
@@ -224,6 +254,19 @@ static Value parse_scalar(uint8 type, const char *data, size_t len)
   }
 }
 /**
+  Read an offset or size field from a buffer. The offset could be either
+  a two byte unsigned integer or a four byte unsigned integer.
+
+  @param data  the buffer to read from
+  @param large tells if the large or small storage format is used; true
+               means read four bytes, false means read two bytes
+*/
+static size_t read_offset_or_size(const char *data, bool large)
+{
+  return large ? uint4korr(data) : uint2korr(data);
+}
+
+/**
   Parse a JSON array or object.
 
   @param t      type (either ARRAY or OBJECT)
@@ -234,33 +277,83 @@ static Value parse_scalar(uint8 type, const char *data, size_t len)
                 storage format
   @return  an object that allows access to the array or object
 */
-//static Value parse_array_or_object(Value::enum_type t, const char *data,
-//                                   size_t len, bool large)
-//{
-//}
+static Value parse_array_or_object(Value::mysql_value_enum_type t, const char *data,
+                                   size_t len, bool large)
+{
+  DBUG_ASSERT(t == Value::ARRAY || t == Value::OBJECT);
+
+  /*
+    Make sure the document is long enough to contain the two length fields
+    (both number of elements or members, and number of bytes).
+  */
+  const size_t offset_size= large ? LARGE_OFFSET_SIZE : SMALL_OFFSET_SIZE;
+  if (len < 2 * offset_size)
+    return err();
+  const size_t element_count= read_offset_or_size(data, large);
+  const size_t bytes= read_offset_or_size(data + offset_size, large);
+
+  // The value can't have more bytes than what's available in the data buffer.
+  if (bytes > len)
+    return err();
+
+  /*
+    Calculate the size of the header. It consists of:
+    - two length fields
+    - if it is a JSON object, key entries with pointers to where the keys
+      are stored
+    - value entries with pointers to where the actual values are stored
+  */
+  size_t header_size= 2 * offset_size;
+  if (t == Value::OBJECT)
+    header_size+= element_count *
+      (large ? KEY_ENTRY_SIZE_LARGE : KEY_ENTRY_SIZE_SMALL);
+  header_size+= element_count *
+    (large ? VALUE_ENTRY_SIZE_LARGE : VALUE_ENTRY_SIZE_SMALL);
+
+  // The header should not be larger than the full size of the value.
+  if (header_size > bytes)
+    return err();                             /* purecov: inspected */
+
+  return Value(t, data, bytes, element_count, large);
+}
+
+/**
+  Parse a JSON value within a larger JSON document.
+
+  @param type   the binary type of the value to parse
+  @param data   pointer to the start of the binary representation of the value
+  @param len    the maximum number of bytes to read from data
+  @return  an object that allows access to the value
+*/
+static Value parse_value(uint8 type, const char *data, size_t len)
+{
+
+  // Parse further => type = data[0] , data+1 , len=len-1
+  switch (type)
+  {
+    case JSONB_TYPE_SMALL_OBJECT:
+      //return parse_scalar(type, data, len);
+      return parse_array_or_object(Value::OBJECT, data, len, false);
+    case JSONB_TYPE_LARGE_OBJECT:
+      return parse_scalar(type, data, len);
+      return parse_array_or_object(Value::OBJECT, data, len, false);
+    case JSONB_TYPE_SMALL_ARRAY:
+      return parse_array_or_object(Value::OBJECT, data, len, false);
+    case JSONB_TYPE_LARGE_ARRAY:
+      return parse_array_or_object(Value::OBJECT, data, len, false);
+    default:
+      return parse_scalar(type, data, len);
+
+  }
+}
 
 Value parse_binary(const char *data, size_t len)
 {
   if (len<1)
     return err(); // error
   uint8 type= data[0];
-  // Parse further => type = data[0] , data+1 , len=len-1
-  switch (type)
-  {
-    case JSONB_TYPE_SMALL_OBJECT:
-      return parse_scalar(type, data, len);
-      //return parse_array_or_object(Value::OBJECT, data, len, false);
-    case JSONB_TYPE_LARGE_OBJECT:
-      return parse_scalar(type, data, len);
-      //return parse_array_or_object(Value::OBJECT, data, len, false);
-    case JSONB_TYPE_SMALL_ARRAY:
-      //return parse_array_or_object(Value::OBJECT, data, len, false);
-    case JSONB_TYPE_LARGE_ARRAY:
-      //return parse_array_or_object(Value::OBJECT, data, len, false);
-    default:
-      return parse_scalar(type, data, len);
-
-  }
+  return parse_value(type, data+1, len-1);
 }
+
 
 }//end of namespace json_mysql_binary

@@ -11176,10 +11176,14 @@ uint32 Field_blob::max_display_length() const
 String *Field_mysql_json::val_str(String *buf1, String *buf2 __attribute__((unused)))
 {
   ASSERT_COLUMN_MARKED_FOR_READ;
+  DBUG_ASSERT(!is_null());
+
+  String tmp;
+  String *s= Field_blob::val_str(&tmp, &tmp);
   //buf1->set("",0,charset());	// A bit safer than buf1->length(0);
   //if (is_null() || json_mysql_binary::parse_binary(buf1->ptr(), buf1->len()) )
   //  buf1->set("",0,charset()); 
-  json_mysql_binary::parse_binary(buf1->ptr(), buf1->length());
+  json_mysql_binary::Value v= json_mysql_binary::parse_binary(s->ptr(), s->length());
   return buf1;
 }
 
