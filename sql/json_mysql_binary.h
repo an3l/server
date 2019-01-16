@@ -178,6 +178,7 @@ class Value
       }
       return *this;
     }
+  bool to_string(String *buffer);
 
   private:
     /* The type of the value. */

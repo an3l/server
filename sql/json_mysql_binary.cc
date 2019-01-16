@@ -60,6 +60,9 @@
 #define VALUE_ENTRY_SIZE_SMALL    (1 + SMALL_OFFSET_SIZE)
 #define VALUE_ENTRY_SIZE_LARGE    (1 + LARGE_OFFSET_SIZE)
 
+/// The maximum number of nesting levels allowed in a JSON document.
+#define JSON_DOCUMENT_MAX_DEPTH 100
+
 namespace json_mysql_binary
 {
 
@@ -107,6 +110,25 @@ Value::Value(mysql_value_enum_type t, const char *data, size_t bytes,
 
 static Value err() { return Value(Value::ERROR); } // assert in explicit constructor to error
 
+/**
+  Check if the depth of a JSON document exceeds the maximum supported
+  depth (JSON_DOCUMENT_MAX_DEPTH). Raise an error if the maximum depth
+  has been exceeded.
+
+  @param[in] depth  the current depth of the document
+  @return true if the maximum depth is exceeded, false otherwise
+*/
+/*
+static bool check_json_depth(size_t depth)
+{
+  if (depth > JSON_DOCUMENT_MAX_DEPTH)
+  {
+    my_error(ER_JSON_DOCUMENT_TOO_DEEP, MYF(0));
+    return true;
+  }
+  return false;
+}
+*/
 /**
   Parse a JSON scalar value.
 
@@ -336,11 +358,11 @@ static Value parse_value(uint8 type, const char *data, size_t len)
       return parse_array_or_object(Value::OBJECT, data, len, false);
     case JSONB_TYPE_LARGE_OBJECT:
       return parse_scalar(type, data, len);
-      return parse_array_or_object(Value::OBJECT, data, len, false);
+      return parse_array_or_object(Value::OBJECT, data, len, true);
     case JSONB_TYPE_SMALL_ARRAY:
-      return parse_array_or_object(Value::OBJECT, data, len, false);
+      return parse_array_or_object(Value::ARRAY, data, len, false);
     case JSONB_TYPE_LARGE_ARRAY:
-      return parse_array_or_object(Value::OBJECT, data, len, false);
+      return parse_array_or_object(Value::ARRAY, data, len, true);
     default:
       return parse_scalar(type, data, len);
 
@@ -355,5 +377,27 @@ Value parse_binary(const char *data, size_t len)
   return parse_value(type, data+1, len-1);
 }
 
+
+  bool Value::to_string(String *buffer)
+  {
+    switch (this->type())
+    {
+      case Value::OBJECT:
+      {
+        if (buffer->append('{'))
+        return true;                           /* purecov: inspected */
+        
+        if (buffer->append('}'))
+        return true;                           /* purecov: inspected */
+
+        break;
+      }
+      default:
+        DBUG_ABORT();
+        my_error(ME_FATALERROR, MYF(0), "JSON wrapper: unexpected type");
+        return true;
+    }
+    return true;
+  }
 
 }//end of namespace json_mysql_binary

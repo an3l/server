@@ -11184,6 +11184,8 @@ String *Field_mysql_json::val_str(String *buf1, String *buf2 __attribute__((unus
   //if (is_null() || json_mysql_binary::parse_binary(buf1->ptr(), buf1->len()) )
   //  buf1->set("",0,charset()); 
   json_mysql_binary::Value v= json_mysql_binary::parse_binary(s->ptr(), s->length());
+ 
+  v.to_string(buf1);
   return buf1;
 }
 
