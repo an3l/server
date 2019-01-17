@@ -11179,13 +11179,14 @@ String *Field_mysql_json::val_str(String *buf1, String *buf2 __attribute__((unus
   DBUG_ASSERT(!is_null());
 
   String tmp;
-  String *s= Field_blob::val_str(&tmp, &tmp);
+  String *buf3;
+  buf1= Field_blob::val_str(buf3, buf1);
   //buf1->set("",0,charset());	// A bit safer than buf1->length(0);
   //if (is_null() || json_mysql_binary::parse_binary(buf1->ptr(), buf1->len()) )
   //  buf1->set("",0,charset()); 
-  json_mysql_binary::Value v= json_mysql_binary::parse_binary(s->ptr(), s->length());
+ json_mysql_binary::Value v= json_mysql_binary::parse_binary(buf1->ptr(), buf1->length());
  
-  v.to_string(buf1);
+  //v.to_string(buf1);
   return buf1;
 }
 

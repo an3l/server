@@ -4787,7 +4787,8 @@ class Field_mysql_json :public Field_blob
     Field_mysql_json(uint32 len_arg, bool maybe_null_arg, const LEX_CSTRING *field_name_arg)
     : Field_blob(len_arg, maybe_null_arg, field_name_arg, &my_charset_bin)
     {}
-
+    
+    String *val_str(String *, String *);
    // int store(const char *to, size_t length, CHARSET_INFO *charset);
   /*
     In mysql - > used for insert not needed now:
@@ -4806,7 +4807,6 @@ class Field_mysql_json :public Field_blob
     @param[in,out] buf1 string buffer for converting JSON value to string
     @param[in,out] buf2 unused
   */
-  String *val_str(String *, String *);
 };
 
 uint pack_length_to_packflag(uint type);

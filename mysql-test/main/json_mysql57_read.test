@@ -12,14 +12,14 @@ let $file= '$MYSQLTEST_VARDIR/std_data/dog.jpg';
 let $length= 50;
 
 create table tblob (photo blob,fint int);
-describe tblob;
+#describe tblob;
 
 --eval INSERT INTO tblob(photo) VALUE (LOAD_FILE($file))
 --eval INSERT INTO tblob VALUES (REPEAT('.', $length), 335)
 
 # insert into tblob values (LOAD_FILE($file), 245); # doesnt work
-select photo from tblob;
-select * from tblob;
+#select photo from tblob;
+#select * from tblob;
 
 drop table tblob;
 
