@@ -1,0 +1,15 @@
+--echo #
+--echo #  Cannot read .frm file from mysql table containg the json data
+--echo # (Incorrect information in file: .frm)
+--echo #
+let $datadir=`select @@datadir`;
+
+--copy_file std_data/json.frm $datadir/test/json.frm
+--copy_file std_data/json.MYD $datadir/test/json.MYD
+--copy_file std_data/json.MYI $datadir/test/json.MYI
+
+use test;
+show tables;
+show create table test.json;
+select * from test.json;
+drop table json;
