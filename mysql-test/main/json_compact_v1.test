@@ -2,39 +2,26 @@
 --echo # MDEV 18284
 --echo #
 
-CREATE TABLE json_test(a JSON, b JSON);
-INSERT INTO json_test VALUES ("[1, 2,  3]", '{"a":"  foo "}');
+CREATE TABLE json_test(a JSON, b JSON, c JSON);
+INSERT INTO json_test VALUES ("[1, 2,  3]", '{"bobj":"  foo "}', "[5 ,6 ,7 ]");
 
 DESC json_test;
 
 SELECT * FROM json_test;
 
-# JSON_OBJECT (key, value)
-# JSON_COMPACT(json_doc) // removes unnecessary spaces
+# Test JSON_COMPACT(a)
+SELECT a,JSON_COMPACT(a) FROM json_test;
 
---echo # JSON_COMPACT works with arrays
-#SELECT a,JSON_COMPACT(a) FROM json_test;
+# Test JSON_OBJECT()
+SELECT JSON_OBJECT ("A", JSON_COMPACT(a)), JSON_OBJECT("B", JSON_COMPACT(b)), JSON_OBJECT("C", JSON_COMPACT(c)) FROM (SELECT * FROM json_test) AS derived_table;
 
---echo # JSON_COMPACT doesn't work with objects
-#SELECT b,JSON_COMPACT(b) FROM json_test;
+# Test JSON_COMPACT(<derived_table.field>)
+SELECT JSON_OBJECT ("A", JSON_COMPACT(derived_table.a)) FROM (SELECT * FROM json_test) AS derived_table;
 
---echo # Altough JSON_COMPACT(a) works in SELECT doesn't work -JSON_OBJECT?
-SELECT JSON_OBJECT ("a", JSON_COMPACT(a)) FROM (SELECT * FROM json_test) AS derived_table;
+# Test JSON_OBJECT on more arguments with a values as JSON_COMPACT() only
+SELECT JSON_OBJECT ("A", JSON_COMPACT(a), "B", JSON_COMPACT(b)) FROM (SELECT * FROM json_test) AS derived_table;
 
---echo # Use JSON_COMPACT on a field from alias - array -> doesn't work
-#SELECT JSON_OBJECT ("a", JSON_COMPACT(derived_table.a)) FROM (SELECT * FROM json_test) AS derived_table;
-
---echo # JSON_COMPACT(b) doesn't work in JSON_OBJECT either
-#SELECT JSON_OBJECT ("b", JSON_COMPACT(b)) FROM (SELECT * FROM json_test) AS derived_table;
-
---echo # Use JSON_COMPACT on a field from alias - object-> doesn't work
-#SELECT JSON_OBJECT ("b", JSON_COMPACT(derived_table.b)) FROM (SELECT * FROM json_test) AS derived_table;
-
---echo # Use JSON_COMPACT as a values -> works
-#SELECT JSON_OBJECT ("a", JSON_COMPACT(a), "b", JSON_COMPACT(b)) FROM (SELECT * FROM json_test) AS derived_table;
-
---echo # Use JSON_COMPACT on one field and no JSON_COMPACT on second field -> doesn't work
-
-SELECT JSON_OBJECT ("a", JSON_COMPACT(a), "b", b) FROM (SELECT * FROM json_test) AS derived_table;
+# Test JSON_OBJECT with JSON_COMPACT and other values
+SELECT JSON_OBJECT ("A", JSON_COMPACT(a), "B", b, "c", c) FROM (SELECT * FROM json_test) AS derived_table;
 
 DROP TABLE json_test;
