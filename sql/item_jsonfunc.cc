@@ -3228,11 +3228,10 @@ String *Item_func_json_format::val_json(String *str)
   /* In case when args[0] is of type Item_direct_ref JSON_COMPACT doesnt work inside JSON_OBJECT
      Item_func_json_format::val_str is not invoked
   */
-  if(this->fmt==COMPACT)
+  if(this->fmt==COMPACT && js!=NULL)
   {
     js=(static_cast <Item_func_json_format*> (args[0]))->val_str(js);
     json_engine_t je;
-    String *strtmp;
     int tab_size= 4;
     json_scan_start(&je, js->charset(), (const uchar *) js->ptr(),
                   (const uchar *) js->ptr()+js->length());
