@@ -3,10 +3,10 @@
 --echo #            with values from subqueries
 --echo #
 
- CREATE TABLE json_test(a JSON, b JSON, c JSON, d JSON);
+CREATE TABLE json_test(a JSON, b JSON, c JSON, d JSON);
 INSERT INTO json_test VALUES ("[1, 2,  3]", '{"bobj":"  foo "}', "[5 ,6 ,7 ]", '"MDEV_18284-string"');
 
- DESC json_test;
+DESC json_test;
 
  SELECT * FROM json_test;
 --echo
