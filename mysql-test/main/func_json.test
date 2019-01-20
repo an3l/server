@@ -509,5 +509,48 @@ SELECT
 --disable_metadata
 
 --echo #
+--echo # MDEV-18284 JSON casting using JSON_COMPACT doesn't always work
+--echo #            with values from subqueries
+--echo #
+
+CREATE TABLE json_test(a JSON, b JSON, c JSON);
+INSERT INTO json_test VALUES ("[1, 2,  3]", '{"bobj":"  foo "}', "[5 ,6 ,7 ]");
+
+DESC json_test;
+
+SELECT * FROM json_test;
+--echo
+# Test JSON_COMPACT(a)
+SELECT a, JSON_COMPACT(a), JSON_COMPACT(b), JSON_COMPACT(c) FROM json_test;
+--echo
+# Test JSON_OBJECT()
+SELECT JSON_OBJECT ("A", JSON_COMPACT(a)), JSON_OBJECT("B", JSON_COMPACT(b)),
+       JSON_OBJECT("C", JSON_COMPACT(c)) FROM
+       (SELECT * FROM json_test) AS derived_table;
+--echo
+# Test JSON_COMPACT(<derived_table.field>)
+SELECT JSON_OBJECT ("A", JSON_COMPACT(derived_table.a)) FROM
+       (SELECT * FROM json_test) AS derived_table;
+--echo
+# Test JSON_OBJECT on more arguments with a values as JSON_COMPACT() only
+SELECT JSON_OBJECT ("A", JSON_COMPACT(a), "B", JSON_COMPACT(b), "C", JSON_COMPACT(c))
+       FROM (SELECT * FROM json_test) AS derived_table;
+--echo
+# Test JSON_OBJECT with JSON_COMPACT and other values
+SELECT JSON_OBJECT ("A", JSON_COMPACT(a), "B", b, "c", c, "c_comp", JSON_COMPACT(c))
+       FROM (SELECT * FROM json_test) AS derived_table;
+--echo
+# Using the variables
+set names utf8;
+SET @j = '[ 1 , 2 ]';
+SELECT JSON_OBJECT("a",JSON_COMPACT(@j));
+--echo
+SELECT JSON_OBJECT("a",JSON_COMPACT(@j), "b", @j);
+--echo
+DROP TABLE json_test;
+
+--echo #
 --echo # End of 10.3 tests
 --echo #
+
+
