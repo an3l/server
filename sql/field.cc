@@ -1,6 +1,6 @@
 /*
    Copyright (c) 2000, 2017, Oracle and/or its affiliates.
-   Copyright (c) 2008, 2017, MariaDB
+   Copyright (c) 2008, 2019, MariaDB
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -10697,6 +10697,10 @@ Field *make_field(TABLE_SHARE *share,
                    pack_length, geom_type, srid);
     }
 #endif
+    if (f_is_json(pack_flag)) 
+      return new Field_mysql_json(ptr, null_pos, null_bit,
+                            unireg_check, field_name, share,
+                            pack_length, field_charset);
     if (f_is_blob(pack_flag))
     {
       if (unireg_check == Field::TMYSQL_COMPRESSED)
@@ -11164,7 +11168,6 @@ uint32 Field_blob::max_display_length() const
     return 0;
   }
 }
-
 
 /*****************************************************************************
  Warning handling
