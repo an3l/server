@@ -1,0 +1,26 @@
+--echo #
+--echo # MDEV-18323: Convert MySQL JSON type to MariaDB TEXT in mysql_upgrade
+--echo # Test 1 (clean):
+--echo # Cannot read .frm file from mysql table containg the json data
+--echo # (Incorrect information in file: .frm)
+--echo #
+
+let $datadir=`select @@datadir`;
+
+drop table if exists mysql_json;
+
+# Make sure you have placed `json.[frm/myd/myi]` files in `source/mysql-test/std_data/`
+--copy_file std_data/json.frm $datadir/test/mysql_json.frm
+--copy_file std_data/json.MYI $datadir/test/mysql_json.MYI
+--copy_file std_data/json.MYD $datadir/test/mysql_json.MYD
+
+
+--error ER_NOT_FORM_FILE
+select * from test.mysql_json;
+
+drop table mysql_json;
+
+# Additional paths:
+#--echo $datadir # source/mysql-test/var/mysqld.1/data/
+#--echo $MYSQLTEST_VARDIR # source/mysql-test/var
+#--echo $MYSQL_TMP_DIR # source/mysql-test/var/tmp
