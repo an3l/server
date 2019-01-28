@@ -1445,7 +1445,11 @@ static int append_json_value(String *str, Item *item, String *tmp_val)
     return str->append(t_f, t_f_len);
   }
   {
-    String *sv= item->val_json(tmp_val);
+    String *sv;
+    if (item->type()==Item::FUNC_ITEM)
+      sv= item->val_str(tmp_val);
+    else
+      sv= item->val_json(tmp_val);
     if (item->null_value)
       goto append_null;
     if (item->is_json_type() || item->type()==Item::FUNC_ITEM || item->type()==Item::REF_ITEM)
