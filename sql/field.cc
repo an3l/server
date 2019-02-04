@@ -42,6 +42,7 @@
 #include "filesort.h"                    // change_double_for_sort
 #include "log_event.h"                   // class Table_map_log_event
 #include <m_ctype.h>
+#include "json_mysql_binary.h"
 
 // Maximum allowed exponent value for converting string to decimal
 #define MAX_EXPONENT 1024
@@ -11170,6 +11171,20 @@ uint32 Field_blob::max_display_length() const
   }
 }
 
+/*****************************************************************************
+ Mysql table 5.7 with json data handling
+*****************************************************************************/
+
+ String *Field_mysql_json::val_str(String *buf1_tmp, String *buf2 __attribute__((unused)))
+{
+  ASSERT_COLUMN_MARKED_FOR_READ;
+  String *buf1= Field_blob::val_str(buf1_tmp, buf2);
+  //buf1->set("",0,charset());	// A bit safer than buf1->length(0);
+  //if (is_null() || json_mysql_binary::parse_binary(buf1->ptr(), buf1->len()) )
+  //  buf1->set("",0,charset()); 
+  json_mysql_binary::parse_binary(buf1->ptr(), buf1->length());
+  return buf1;
+}
 
 /*****************************************************************************
  Warning handling
