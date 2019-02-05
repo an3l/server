@@ -48,6 +48,7 @@ class Item_equal;
 class Virtual_tmp_table;
 class Qualified_column_ident;
 class Table_ident;
+class Json_wrapper;
 
 enum enum_check_fields
 {
@@ -4794,6 +4795,7 @@ class Field_mysql_json :public Field_blob
     @param[in,out] buf2 unused
   */
   String *val_str(String *, String *);
+  bool val_json(Json_wrapper *);
 };
 
 uint pack_length_to_packflag(uint type);

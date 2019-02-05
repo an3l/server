@@ -56,7 +56,7 @@ extern uchar days_in_month[];
 #endif
 
 /* Flags to str_to_datetime */
-
+typedef uint my_time_flags_t;
 /*
   TIME_FUZZY_DATES is used for the result will only be used for comparison
   purposes. Conversion is as relaxed as possible.
