@@ -38,7 +38,7 @@ namespace json_mysql_binary
 {
 
 // Constructor for literals and errors.
-Value::Value(mysql_value_enum_type t)
+Value::Value(enum_type t)
   : m_type(t), m_data(), m_element_count(), m_length(),
     m_int_value(), m_double_value(), m_large()
 {
@@ -48,7 +48,7 @@ Value::Value(mysql_value_enum_type t)
 
 
 // Constructor for int and uint.
-Value::Value(mysql_value_enum_type t, int64 val)
+Value::Value(enum_type t, int64 val)
   : m_type(t), m_data(), m_element_count(), m_length(),
     m_int_value(val), m_double_value(), m_large()
 {
@@ -71,7 +71,7 @@ Value::Value(const char *data, size_t len)
 
 
 // Constructor for arrays and objects.
-Value::Value(mysql_value_enum_type t, const char *data, size_t bytes,
+Value::Value(enum_type t, const char *data, size_t bytes,
              size_t element_count, bool large)
   : m_type(t), m_data(data), m_element_count(element_count),
     m_length(bytes), m_int_value(), m_double_value(), m_large(large)

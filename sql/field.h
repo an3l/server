@@ -48,6 +48,7 @@ class Item_equal;
 class Virtual_tmp_table;
 class Qualified_column_ident;
 class Table_ident;
+class Json_wrapper;
 
 enum enum_check_fields
 {
@@ -4788,6 +4789,15 @@ class Field_mysql_json :public Field_blob
       : Field_blob(len_arg, maybe_null_arg, field_name_arg, &my_charset_bin)
     {}
 
+  /**
+    Retrieve the field's value as a JSON wrapper. It
+    there is an error, wr is not modified and we return
+    false, else true.
+
+    @param[out]    wr   the JSON value
+    @return true if a value is retrieved (or NULL), false if error
+  */
+  bool val_json(Json_wrapper *);
    /**
     Retrieve the JSON value stored in this field as text
      @param[in,out] buf1 string buffer for converting JSON value to string

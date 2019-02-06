@@ -98,7 +98,7 @@
 class Value
 {
   public:
-    enum mysql_value_enum_type
+    enum enum_type
     {
       OBJECT, ARRAY, STRING, INT, UINT, DOUBLE,
       LITERAL_NULL, LITERAL_TRUE, LITERAL_FALSE,
@@ -107,13 +107,13 @@ class Value
               error was detected. */
     };
 
-    mysql_value_enum_type type() const { return m_type; }
+    enum_type type() const { return m_type; }
 
     static Value err() { return Value(ERROR); }
     /* Constructor for values that represent literals or errors. */
-    explicit Value(mysql_value_enum_type t);
+    explicit Value(enum_type t);
     /* Constructor for values that represent ints or uints. */
-    explicit Value(mysql_value_enum_type t, int64 val);
+    explicit Value(enum_type t, int64 val);
     /* Constructor for values that represent doubles. */
     explicit Value(double val);
     /** Constructor for values that represent strings. */
@@ -127,38 +127,45 @@ class Value
       @param large true if the value should be stored in the large
       storage format with 4 byte offsets instead of 2 byte offsets
     */
-    Value(mysql_value_enum_type t, const char *data, size_t bytes, size_t element_count,
+    Value(enum_type t, const char *data, size_t bytes, size_t element_count,
           bool large);
-
-     /* Empty constructor. Produces a value that represents an error condition. */
-    Value()
-      : m_type(ERROR), m_data(NULL),
-        m_element_count(-1), m_length(-1), m_int_value(-1),
-        m_double_value(0.0), m_large(false)
-    {}
-
-     /* Copy constructor. */
+    /** Constructor for values that represent opaque data. */
+    //Value(enum_field_types ft, const char *data, size_t len);
+    
+    /** Copy constructor. */
     Value(const Value &old)
-      : m_type(old.m_type), m_data(old.m_data),
+        : m_type(old.m_type), m_data(old.m_data),
         m_element_count(old.m_element_count), m_length(old.m_length),
         m_int_value(old.m_int_value), m_double_value(old.m_double_value),
         m_large(old.m_large)
     {}
 
-     /* Assignment operator. */
+    /** Empty constructor. Produces a value that represents an error condition. */
+    Value()
+        : m_type(ERROR), m_data(NULL), 
+        m_element_count(-1), m_length(-1), m_int_value(-1),
+        m_double_value(0.0), m_large(false)
+    {}
+// MYSQL_TYPE_NULL
+    /** Assignment operator. */
     Value &operator=(const Value &from)
     {
-      if (this != &from)
-      {
+        if (this != &from)
+        {
         // Copy the entire from value into this.
-        new (this) Value(from); 
-      }
-      return *this;
+        new (this) Value(from);
+        }
+        return *this;
     }
 
    private:
     /* The type of the value. */
-    const mysql_value_enum_type m_type;
+    const enum_type m_type;
+    /**
+    The MySQL field type of the value, in case the type of the value is
+    OPAQUE. Otherwise, it is unused.
+    */
+    //const enum_field_types m_field_type ;
     /*
     Pointer to the start of the binary representation of the value. Only
     used by STRING, OBJECT and ARRAY.
