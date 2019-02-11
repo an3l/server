@@ -85,6 +85,7 @@
 #include "my_global.h"
 #include "sql_string.h"                         /* String */
 #include "mysql_com.h"
+#include "mysqld_error.h"
 
 class Json_dom;
 
