@@ -965,6 +965,103 @@ static Value err()
 }
 
 /**
+  Parse a JSON scalar value.
+
+  @param type   the binary type of the scalar
+  @param data   pointer to the start of the binary representation of the scalar
+  @param len    the maximum number of bytes to read from data
+  @return  an object that represents the scalar value
+*/
+static Value parse_scalar(uint8 type, const char *data, size_t len)
+{
+  switch (type)
+  {
+  case JSONB_TYPE_LITERAL:
+    if (len < 1)
+      return err();                           /* purecov: inspected */
+    switch (static_cast<uint8>(*data))
+    {
+    case JSONB_NULL_LITERAL:
+      return Value(Value::LITERAL_NULL);
+    case JSONB_TRUE_LITERAL:
+      return Value(Value::LITERAL_TRUE);
+    case JSONB_FALSE_LITERAL:
+      return Value(Value::LITERAL_FALSE);
+    default:
+      return err();                           /* purecov: inspected */
+    }
+  case JSONB_TYPE_INT16:
+    if (len < 2)
+      return err();                           /* purecov: inspected */
+    return Value(Value::INT, sint2korr(data));
+  case JSONB_TYPE_INT32:
+    if (len < 4)
+      return err();                           /* purecov: inspected */
+    return Value(Value::INT, sint4korr(data));
+  case JSONB_TYPE_INT64:
+    if (len < 8)
+      return err();                           /* purecov: inspected */
+    return Value(Value::INT, sint8korr(data));
+  case JSONB_TYPE_UINT16:
+    if (len < 2)
+      return err();                           /* purecov: inspected */
+    return Value(Value::UINT, uint2korr(data));
+  case JSONB_TYPE_UINT32:
+    if (len < 4)
+      return err();                           /* purecov: inspected */
+    return Value(Value::UINT, uint4korr(data));
+  case JSONB_TYPE_UINT64:
+    if (len < 8)
+      return err();                           /* purecov: inspected */
+    return Value(Value::UINT, uint8korr(data));
+  case JSONB_TYPE_DOUBLE:
+    {
+      if (len < 8)
+        return err();                         /* purecov: inspected */
+      double d;
+      float8get(&d, data);
+      return Value(d);
+    }
+  case JSONB_TYPE_STRING:
+    {
+      size_t str_len;
+      size_t n;
+      if (read_variable_length(data, len, &str_len, &n))
+        return err();                         /* purecov: inspected */
+      if (len < n + str_len)
+        return err();                         /* purecov: inspected */
+      return Value(data + n, str_len);
+    }
+  case JSONB_TYPE_OPAQUE:
+    {
+      /*
+        There should always be at least one byte, which tells the field
+        type of the opaque value.
+      */
+      if (len < 1)
+        return err();                         /* purecov: inspected */
+
+      // The type is encoded as a uint8 that maps to an enum_field_types.
+      uint8 type_byte= static_cast<uint8>(*data);
+      enum_field_types field_type= static_cast<enum_field_types>(type_byte);
+
+      // Then there's the length of the value.
+      size_t val_len;
+      size_t n;
+      if (read_variable_length(data + 1, len - 1, &val_len, &n))
+        return err();                         /* purecov: inspected */
+      if (len < 1 + n + val_len)
+        return err();                         /* purecov: inspected */
+      return Value(field_type, data + 1 + n, val_len);
+    }
+  default:
+    // Not a valid scalar type.
+    return err();
+  }
+}
+
+
+/**
   Read an offset or size field from a buffer. The offset could be either
   a two byte unsigned integer or a four byte unsigned integer.
 
@@ -1028,7 +1125,6 @@ static Value parse_array_or_object(Value::enum_type t, const char *data,
 
   return Value(t, data, bytes, element_count, large);
 }
-
 
 /**
   Parse a JSON value within a larger JSON document.
