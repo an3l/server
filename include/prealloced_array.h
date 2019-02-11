@@ -188,7 +188,7 @@ public:
     if (n <= m_capacity)
       return false;
 
-    void *mem= my_malloc(m_psi_key, n * element_size(), MYF(MY_WME));
+    void *mem= my_malloc(m_psi_key, n * element_size());
     if (!mem)
       return true;
     Element_type *new_array= static_cast<Element_type*>(mem);

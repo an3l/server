@@ -169,7 +169,7 @@ void *Json_dom::operator new(size_t size, const std::nothrow_t&) throw()
     Call my_malloc() with the MY_WME flag to make sure that it will
     write an error message if the memory could not be allocated.
   */
-  return my_malloc(key_memory_JSON, size, MYF(MY_WME));
+  return my_malloc(key_memory_JSON, size);
 }
 
 
