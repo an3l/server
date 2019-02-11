@@ -22,7 +22,6 @@
  */
 
 #include "json_path.h"
-
 #include "json_dom.h"
 #include "mysqld.h"                             // key_memory_JSON
 #include "rapidjson/rapidjson.h"                // rapidjson::UTF8<char>::Decode

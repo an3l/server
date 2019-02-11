@@ -75,7 +75,7 @@ inline const T pointer_cast(const void *p)
 template<typename Target, typename Source>
 inline Target down_cast(Source arg)
 {
-  DBUG_ASSERT(NULL != dynamic_cast<Target>(arg));
+//  DBUG_ASSERT(NULL != dynamic_cast<Target>(arg));
   return static_cast<Target>(arg);
 }
 

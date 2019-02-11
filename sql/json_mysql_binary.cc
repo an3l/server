@@ -13,6 +13,7 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 */
 #include "json_mysql_binary.h"
+#include "mysqld.h"             // key_memory_JSON
 #include <algorithm>            // std::min
 
 #define JSONB_TYPE_SMALL_OBJECT   0x0
