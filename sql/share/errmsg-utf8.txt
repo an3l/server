@@ -7921,3 +7921,9 @@ ER_KEY_DOESNT_SUPPORT
         eng "%s index %`s does not support this operation"
 ER_ALTER_OPERATION_TABLE_OPTIONS_NEED_REBUILD
 	eng "Changing table options requires the table to be rebuilt"
+ER_JSON_DOCUMENT_TOO_DEEP
+        eng "The JSON document exceeds the maximum depth"
+ER_INVALID_JSON_BINARY_DATA
+        eng "The JSON binary value contains invalid data"
+ER_JSON_VALUE_TOO_BIG
+        eng "The JSON value is too big to be stored in a JSON column"

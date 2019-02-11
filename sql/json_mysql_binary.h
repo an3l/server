@@ -84,9 +84,24 @@
  */
 #include "my_global.h"
 #include "sql_string.h"                         /* String */
+#include "mysql_com.h"
+
+class Json_dom;
 
  namespace json_mysql_binary
 {
+  /**
+  Serialize the JSON document represented by dom to binary format in
+  the destination string, replacing any content already in the
+  destination string.
+
+  @param[in]     dom   the input DOM tree
+  @param[in,out] dest  the destination string
+  @retval false on success
+  @retval true if an error occurred
+*/
+bool serialize(const Json_dom *dom, String *dest);
+
 /*
   Class used for reading JSON values that are stored in the binary
   format. Values are parsed lazily, so that only the parts of the
@@ -98,26 +113,42 @@
 class Value
 {
   public:
-    enum enum_type
-    {
+   static Value parse(const char *data, size_t len);
+   enum enum_type
+   {
       OBJECT, ARRAY, STRING, INT, UINT, DOUBLE,
       LITERAL_NULL, LITERAL_TRUE, LITERAL_FALSE,
       OPAQUE,
       ERROR /* Not really a type. Used to signal that an
               error was detected. */
-    };
+   };
+   /**
+       Does this value, and all of its members, represent a valid JSON
+      value?
+   */
+   bool is_valid() const;
+   enum_type type() const { return m_type; }
+   const char *get_data() const;
+   size_t get_data_length() const;
+   int64 get_int64() const;
+   uint64 get_uint64() const;
+   double get_double() const;
+   size_t element_count() const;
+   Value element(size_t pos) const;
+   Value key(size_t pos) const;
+   enum_field_types field_type() const;
+   Value lookup(const char *key, size_t len) const;
+   bool raw_binary(String *buf) const;
 
-    enum_type type() const { return m_type; }
-
-    static Value err() { return Value(ERROR); }
+   static Value err() { return Value(ERROR); }
     /* Constructor for values that represent literals or errors. */
-    explicit Value(enum_type t);
+   explicit Value(enum_type t);
     /* Constructor for values that represent ints or uints. */
-    explicit Value(enum_type t, int64 val);
+   explicit Value(enum_type t, int64 val);
     /* Constructor for values that represent doubles. */
-    explicit Value(double val);
+   explicit Value(double val);
     /** Constructor for values that represent strings. */
-    Value(const char *data, size_t len);
+   Value(const char *data, size_t len);
     /*
       Constructor for values that represent arrays or objects.
       @param t type
@@ -127,37 +158,37 @@ class Value
       @param large true if the value should be stored in the large
       storage format with 4 byte offsets instead of 2 byte offsets
     */
-    Value(enum_type t, const char *data, size_t bytes, size_t element_count,
+   Value(enum_type t, const char *data, size_t bytes, size_t element_count,
           bool large);
     /** Constructor for values that represent opaque data. */
-    //Value(enum_field_types ft, const char *data, size_t len);
+   Value(enum_field_types ft, const char *data, size_t len);
     
     /** Copy constructor. */
     Value(const Value &old)
-        : m_type(old.m_type), m_data(old.m_data),
+      : m_type(old.m_type), m_data(old.m_data),
         m_element_count(old.m_element_count), m_length(old.m_length),
         m_int_value(old.m_int_value), m_double_value(old.m_double_value),
         m_large(old.m_large)
-    {}
+   {}
 
     /** Empty constructor. Produces a value that represents an error condition. */
-    Value()
-        : m_type(ERROR), m_data(NULL), 
+   Value()
+      : m_type(ERROR), m_data(NULL), 
         m_element_count(-1), m_length(-1), m_int_value(-1),
         m_double_value(0.0), m_large(false)
-    {}
+   {}
 // MYSQL_TYPE_NULL
     /** Assignment operator. */
-    Value &operator=(const Value &from)
-    {
-        if (this != &from)
-        {
-        // Copy the entire from value into this.
-        new (this) Value(from);
-        }
-        return *this;
-    }
-
+   Value &operator=(const Value &from)
+   {
+     if (this != &from)
+     {
+       // Copy the entire from value into this.
+       new (this) Value(from);
+     }
+     return *this;
+   }
+   
    private:
     /* The type of the value. */
     const enum_type m_type;
@@ -165,7 +196,7 @@ class Value
     The MySQL field type of the value, in case the type of the value is
     OPAQUE. Otherwise, it is unused.
     */
-    //const enum_field_types m_field_type ;
+    const enum_field_types m_field_type ;
     /*
     Pointer to the start of the binary representation of the value. Only
     used by STRING, OBJECT and ARRAY.
