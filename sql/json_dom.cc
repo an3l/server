@@ -2145,7 +2145,7 @@ static bool wrapper_to_string(const Json_wrapper &wr, String *buffer,
     }
   case Json_dom::J_OPAQUE:
     {
-      if (wr.get_data_length() > base64_encode_max_arg_length())
+      if (wr.get_data_length() > my_base64_encode_max_arg_length()) //base64_encode_max_arg_length
       {
         /* purecov: begin inspected */
         buffer->append("\"<data too long to decode - unexpected error>\"");
@@ -2156,7 +2156,7 @@ static bool wrapper_to_string(const Json_wrapper &wr, String *buffer,
       }
 
       const size_t needed=
-        static_cast<size_t>(base64_needed_encoded_length(wr.get_data_length()));
+        static_cast<size_t>(my_base64_needed_encoded_length(wr.get_data_length()));
 
       if (single_quote(buffer, json_quoted) ||
           buffer->append("base64:type") ||
@@ -2167,7 +2167,7 @@ static bool wrapper_to_string(const Json_wrapper &wr, String *buffer,
       // "base64:typeXX:<binary data>"
       size_t pos= buffer->length();
       if (buffer->reserve(needed) ||
-          base64_encode(wr.get_data(), wr.get_data_length(),
+          my_base64_encode(wr.get_data(), wr.get_data_length(),
                         const_cast<char*>(buffer->ptr() + pos)))
         return true;                           /* purecov: inspected */
       buffer->length(pos + needed - 1); // drop zero terminator space
@@ -2200,7 +2200,8 @@ static bool wrapper_to_string(const Json_wrapper &wr, String *buffer,
 
   if (buffer->length() > current_thd->variables.max_allowed_packet)
   {
-    push_warning_printf(current_thd, Sql_condition::SL_WARNING,
+    //SL_WARNING instead of WARN_LEVEL_WARN
+    push_warning_printf(current_thd, Sql_condition::WARN_LEVEL_WARN, 
 			ER_WARN_ALLOWED_PACKET_OVERFLOWED,
 			ER_THD(current_thd, ER_WARN_ALLOWED_PACKET_OVERFLOWED),
 			func_name, current_thd->variables.max_allowed_packet);
@@ -3283,15 +3284,15 @@ static void push_json_coercion_warning(const char *target_type,
   /*
     One argument is no longer used (the empty string), but kept to avoid
     changing error message format.
-  */
+  */ // SL_WARNING
   push_warning_printf(current_thd,
-                      Sql_condition::SL_WARNING,
+                      Sql_condition::WARN_LEVEL_WARN,
                       error_code,
                       ER_THD(current_thd, error_code),
                       target_type,
                       "",
                       msgnam,
-                      current_thd->get_stmt_da()->current_row_for_condition());
+                      current_thd->get_stmt_da()->current_row_for_warning()); // current_row_for_condition()
 }
 
 
@@ -3925,8 +3926,8 @@ void Json_wrapper::make_sort_key(uchar *to, size_t to_length) const
         raised for each object/array that is found during the sort,
         but Filesort_error_handler will make sure that only one
         warning is seen on the top level for every sort.
-      */
-      push_warning_printf(current_thd, Sql_condition::SL_WARNING,
+      */ // SL_WARNING
+      push_warning_printf(current_thd, Sql_condition::WARN_LEVEL_WARN,
                           ER_NOT_SUPPORTED_YET,
                           ER_THD(current_thd, ER_NOT_SUPPORTED_YET),
                           "sorting of non-scalar JSON values");

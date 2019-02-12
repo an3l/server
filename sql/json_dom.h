@@ -28,7 +28,7 @@
 #include "sql_alloc.h"          // Sql_alloc
 #include "sql_error.h"          // Sql_condition
 #include "prealloced_array.h"   // Prealloced_array
-
+#include "compat56.h"
 #include <map>
 #include <string>
 
@@ -1580,5 +1580,156 @@ public:
   @return true if the string is valid JSON text, false otherwise
 */
 bool is_valid_json_syntax(const char *text, size_t length);
+
+/**
+  Convert MYSQL_TIME value to its packed numeric representation,
+  using field type.
+  @param ltime  The value to convert.
+  @param type   MySQL field type.
+  @retval       Packed numeric representation.
+
+longlong TIME_to_longlong_packed(const MYSQL_TIME *ltime,
+                                 enum enum_field_types type)
+{
+  switch (type)
+  {
+  case MYSQL_TYPE_TIME:
+    return TIME_to_longlong_time_packed(ltime);
+  case MYSQL_TYPE_DATETIME:
+  case MYSQL_TYPE_TIMESTAMP:
+    return TIME_to_longlong_datetime_packed(ltime);
+  case MYSQL_TYPE_DATE:
+    return TIME_to_longlong_date_packed(ltime);
+  default:
+    return TIME_to_longlong_packed(ltime);
+  }
+}
+*/
+/**
+  Convert packed numeric datetime representation to MYSQL_TIME.
+  @param OUT  ltime The datetime variable to convert to.
+  @param      tmp   The packed numeric datetime value.
+
+void TIME_from_longlong_datetime_packed(MYSQL_TIME *ltime, longlong tmp)
+{
+  longlong ymd, hms;
+  longlong ymdhms, ym;
+  if ((ltime->neg= (tmp < 0)))
+    tmp= -tmp;
+
+  ltime->second_part= MY_PACKED_TIME_GET_FRAC_PART(tmp);
+  ymdhms= MY_PACKED_TIME_GET_INT_PART(tmp);
+
+  ymd= ymdhms >> 17;
+  ym= ymd >> 5;
+  hms= ymdhms % (1 << 17);
+
+  ltime->day= ymd % (1 << 5);
+  ltime->month= ym % 13;
+  ltime->year= (uint)(ym / 13);
+
+  ltime->second= hms % (1 << 6);
+  ltime->minute= (hms >> 6) % (1 << 6);
+  ltime->hour= (uint)(hms >> 12);
+  
+  ltime->time_type= MYSQL_TIMESTAMP_DATETIME;
+}
+*/
+
+/*
+Convert packed numeric date representation to MYSQL_TIME.
+  @param OUT  ltime The date variable to convert to.
+  @param      tmp   The packed numeric date value.
+
+void TIME_from_longlong_date_packed(MYSQL_TIME *ltime, longlong tmp)
+{
+  TIME_from_longlong_datetime_packed(ltime, tmp);
+  ltime->time_type= MYSQL_TIMESTAMP_DATE;
+}
+*/
+
+/**
+  Convert packed numeric temporal representation to time, date or datetime,
+  using field type.
+  @param[out] ltime        The variable to write to.
+  @param      type         MySQL field type.
+  @param      packed_value Numeric datetype representation.
+*/
+void TIME_from_longlong_packed(MYSQL_TIME *ltime,
+                               enum enum_field_types type,
+                               longlong packed_value)
+{
+  switch (type)
+  {
+  case MYSQL_TYPE_TIME:
+    TIME_from_longlong_time_packed(ltime, packed_value);
+    break;
+  case MYSQL_TYPE_DATE:
+    //TIME_from_longlong_date_packed(ltime, packed_value); //not defined in sql/compat56.h
+    break;
+  case MYSQL_TYPE_DATETIME:
+  case MYSQL_TYPE_TIMESTAMP:
+    TIME_from_longlong_datetime_packed(ltime, packed_value);
+    break;
+  default:
+    DBUG_ASSERT(0);
+    set_zero_time(ltime, MYSQL_TIMESTAMP_ERROR);
+    break;
+  }
+}
+
+
+/*
+Copies an integer value to a format comparable with memcmp(). The
+   format is characterized by the following:
+
+   - The sign bit goes first and is unset for negative values.
+   - The representation is big endian.
+
+   The function template can be instantiated to copy from little or
+   big endian values.
+
+   @tparam Is_big_endian True if the source integer is big endian.
+
+   @param to          Where to write the integer.
+   @param to_length   Size in bytes of the destination buffer.
+   @param from        Where to read the integer.
+   @param from_length Size in bytes of the source integer
+   @param is_unsigned True if the source integer is an unsigned value.
+*/
+template<bool Is_big_endian>
+void copy_integer(uchar *to, size_t to_length,
+                  const uchar* from, size_t from_length,
+                  bool is_unsigned)
+{
+  if (Is_big_endian)
+  {
+    if (is_unsigned)
+      to[0]= from[0];
+    else
+      to[0]= (char)(from[0] ^ 128); // Reverse the sign bit.
+    memcpy(to + 1, from + 1, to_length - 1);
+  }
+  else
+  {
+    const int sign_byte= from[from_length - 1];
+    if (is_unsigned)
+      to[0]= sign_byte;
+    else
+      to[0]= static_cast<char>(sign_byte ^ 128); // Reverse the sign bit.
+    for (size_t i= 1, j= from_length - 2; i < to_length; ++i, --j)
+      to[i]= from[j];
+  }
+}
+
+
+static inline longlong my_strtoll(const char *nptr, char **endptr, int base)
+{
+#if defined _WIN32
+  return _strtoi64(nptr, endptr, base);
+#else
+  return strtoll(nptr, endptr, base);
+#endif
+}
 
 #endif /* JSON_DOM_INCLUDED */

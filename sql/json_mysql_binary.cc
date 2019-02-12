@@ -14,6 +14,7 @@
 */
 #include "json_mysql_binary.h"
 #include "json_dom.h"
+#include "sql_class.h"
 #include "mysqld.h"             // key_memory_JSON
 #include "template_utils.h"     // down_cast
 #include <algorithm>            // std::min
@@ -706,9 +707,10 @@ serialize_json_value(const Json_dom *dom, size_t type_pos, String *dest,
     {
       // Store the double in a platform-independent eight-byte format.
       const Json_double *d= down_cast<const Json_double*>(dom);
+      double dvalue= d->value();
       if (dest->reserve(8))
         return FAILURE;                       /* purecov: inspected */
-      float8store(const_cast<char *>(dest->ptr()) + dest->length(), d->value());
+      float8store(const_cast<char *>(dest->ptr()) + dest->length(), dvalue);
       dest->length(dest->length() + 8);
       (*dest)[type_pos]= JSONB_TYPE_DOUBLE;
       result= OK;
@@ -1019,7 +1021,7 @@ static Value parse_scalar(uint8 type, const char *data, size_t len)
       if (len < 8)
         return err();                         /* purecov: inspected */
       double d;
-      float8get(&d, data);
+      float8get(d, data);
       return Value(d);
     }
   case JSONB_TYPE_STRING:
