@@ -135,6 +135,7 @@ ulonglong TIME_to_ulonglong_time(const MYSQL_TIME *);
 ulonglong TIME_to_ulonglong(const MYSQL_TIME *);
 double TIME_to_double(const MYSQL_TIME *my_time);
 
+#define MY_PACKED_TIME_MAKE_INT(i)         ((((longlong) (i)) << 24))
 longlong TIME_to_longlong_date_packed(const MYSQL_TIME *);
 longlong TIME_to_longlong_packed(const MYSQL_TIME *);
 

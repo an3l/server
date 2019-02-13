@@ -1655,7 +1655,7 @@ void TIME_from_longlong_date_packed(MYSQL_TIME *ltime, longlong tmp)
   @param      type         MySQL field type.
   @param      packed_value Numeric datetype representation.
 */
-void TIME_from_longlong_packed(MYSQL_TIME *ltime,
+inline void TIME_from_longlong_packed(MYSQL_TIME *ltime,
                                enum enum_field_types type,
                                longlong packed_value)
 {
