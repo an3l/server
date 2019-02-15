@@ -11193,14 +11193,14 @@ bool Field_mysql_json::val_json (Json_wrapper *wr)
     literal is used to represent the empty value in this case.
     Bug#21437989.
   */
-  /*
+ 
   if (s->length() == 0)
   {
     Json_wrapper w(new (std::nothrow) Json_null());
     wr->steal(&w);
     return false;
   }
-  */
+
   json_mysql_binary::Value v(json_mysql_binary::parse_binary(s->ptr(), s->length()));
   if (v.type() == json_mysql_binary::Value::ERROR)
   {
@@ -11211,7 +11211,7 @@ bool Field_mysql_json::val_json (Json_wrapper *wr)
   }
 
   Json_wrapper w(v);
- // wr->steal(&w);
+  wr->steal(&w);
   return false;
 }
 
@@ -11220,11 +11220,10 @@ bool Field_mysql_json::val_json (Json_wrapper *wr)
   ASSERT_COLUMN_MARKED_FOR_READ;
   String *buf1= Field_blob::val_str(buf1_tmp, buf2);
   //buf1->set("",0,charset());	// A bit safer than buf1->length(0);
-  //if (is_null() || json_mysql_binary::parse_binary(buf1->ptr(), buf1->len()) )
-  //  buf1->set("",0,charset()); 
-  //json_mysql_binary::parse_binary(buf1->ptr(), buf1->length());
+  buf1->length(0);
+
   Json_wrapper wr;
-  if(val_json(&wr))
+  if (is_null() || val_json(&wr) || wr.to_string(buf1, true, field_name.str))
     buf1->length(0);
   return buf1;
 }
