@@ -4108,7 +4108,28 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
 
     // Check if a duplicate index is defined.
     check_duplicate_key(thd, key, key_info, &alter_info->key_list);
-
+    /*
+    // Check is there any duplicated field check constraints
+    List_iterator<Create_field> it_check1(alter_info->create_list);
+    while (const Create_field *table_check_field= it_check1++)
+    {
+      if(table_check_field->check_constraint)
+      {
+        const Virtual_column_info *c= table_check_field->check_constraint;
+        // Validate key with field check constraint
+        if (my_strcasecmp(system_charset_info,
+                          key->name.str, c->name.str) == 0)
+        {
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
+                              ER_DUP_CONSTRAINT_NAME, ER_THD(thd, ER_DUP_CONSTRAINT_NAME),
+                              key->name.str);
+          //my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "CHECK", key->name.str);
+          //DBUG_RETURN(TRUE);
+        }
+      }
+    }
+    */
+    
     key_info++;
   }
 
@@ -4189,7 +4210,7 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
                                     &alter_info->check_constraint_list,
                                     &nr);
       {
-        /* Check that there's no repeating CHECK constraint names. */
+        /* Check that there's no repeating table CHECK constraint names. */
         List_iterator_fast<Virtual_column_info>
           dup_it(alter_info->check_constraint_list);
         const Virtual_column_info *dup_check;
@@ -4204,7 +4225,7 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
           }
         }
       }
-      /* Check that there's no repeating foreign key constraint names. */
+      /* Check that there's no repeating key constraint names. */
       List_iterator_fast<Key> key_it(alter_info->key_list);
       while (const Key *key= key_it++)
       {
@@ -4214,6 +4235,22 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
         {
           my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "CHECK", check->name.str);
           DBUG_RETURN(TRUE);
+        }
+      }
+      /* Check that there's no repeating field check constraint names. */
+      List_iterator<Create_field> it_check(alter_info->create_list);
+      while (const Create_field *table_check_field= it_check++)
+      {
+        if(table_check_field->check_constraint)
+        {
+          const Virtual_column_info *c= table_check_field->check_constraint;
+          // Validate table check constraints with field check constraint
+          if (my_strcasecmp(system_charset_info,
+                            check->name.str, c->name.str) == 0)
+          {
+            my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "CHECK", key->name.str);
+            DBUG_RETURN(TRUE);
+          }
         }
       }
 
