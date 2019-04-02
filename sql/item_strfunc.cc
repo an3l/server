@@ -4444,9 +4444,9 @@ bool Item_func_dyncol_create::prepare_arguments(THD *thd, bool force_names_arg)
       case MYSQL_TYPE_GEOMETRY:
         type= DYN_COL_STRING;
         break;
+      case MYSQL_TYPE_MYSQL_JSON:
       case MYSQL_TYPE_VARCHAR_COMPRESSED:
       case MYSQL_TYPE_BLOB_COMPRESSED:
-      case MYSQL_TYPE_MYSQL_JSON:
         DBUG_ASSERT(0);
       }
     }

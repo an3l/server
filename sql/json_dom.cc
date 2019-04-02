@@ -2142,7 +2142,7 @@ static bool wrapper_to_string(const Json_wrapper &wr, String *buffer,
     }
   case Json_dom::J_OPAQUE:
     {
-      if (wr.get_data_length() > my_base64_encode_max_arg_length())
+      if (wr.get_data_length() > (uint) my_base64_encode_max_arg_length())
       {
         /* purecov: begin inspected */
         buffer->append("\"<data too long to decode - unexpected error>\"");
