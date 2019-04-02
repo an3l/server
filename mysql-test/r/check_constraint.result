@@ -336,17 +336,7 @@ constraint_name	check_clause
 #
 CREATE TABLE tfk (c1 INT, c2 INT check (c2>0), CONSTRAINT c2
 FOREIGN KEY (c1) REFERENCES tpk (id)) ENGINE=MyISAM;
-SHOW CREATE TABLE tfk;
-Table	Create Table
-tfk	CREATE TABLE `tfk` (
-  `c1` int(11) DEFAULT NULL,
-  `c2` int(11) DEFAULT NULL CHECK (`c2` > 0),
-  KEY `c2` (`c1`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-SELECT constraint_name, check_clause FROM information_schema.check_constraints;
-constraint_name	check_clause
-c2	`c2` > 0
-DROP TABLE tfk;
+ERROR HY000: Duplicate CHECK constraint name 'c2'
 DROP TABLE tpk;
 CREATE TABLE tpk
 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,name VARCHAR(100) NOT NULL)
@@ -463,16 +453,5 @@ constraint_name	check_clause
 #
 CREATE TABLE tfk (c1 INT, c2 INT check (c2>0), CONSTRAINT c2
 FOREIGN KEY (c1) REFERENCES tpk (id)) ENGINE=InnoDB;
-SHOW CREATE TABLE tfk;
-Table	Create Table
-tfk	CREATE TABLE `tfk` (
-  `c1` int(11) DEFAULT NULL,
-  `c2` int(11) DEFAULT NULL CHECK (`c2` > 0),
-  KEY `c2` (`c1`),
-  CONSTRAINT `c2` FOREIGN KEY (`c1`) REFERENCES `tpk` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1
-SELECT constraint_name, check_clause FROM information_schema.check_constraints;
-constraint_name	check_clause
-c2	`c2` > 0
-DROP TABLE tfk;
+ERROR HY000: Duplicate CHECK constraint name 'c2'
 DROP TABLE tpk;

@@ -87,11 +87,8 @@ SELECT constraint_name, check_clause FROM information_schema.check_constraints;
 --echo #
 --echo # Field check constraints name same as name of field `c2` and as foreign key
 --echo #
-# Should we handle this case ? Currently we are doing everything regarding the table check constraint
+--error ER_DUP_CONSTRAINT_NAME
 eval CREATE TABLE tfk (c1 INT, c2 INT check (c2>0), CONSTRAINT c2
                        FOREIGN KEY (c1) REFERENCES tpk (id)) ENGINE=$engine;
-SHOW CREATE TABLE tfk;
-SELECT constraint_name, check_clause FROM information_schema.check_constraints;
 
-DROP TABLE tfk;
 DROP TABLE tpk;
