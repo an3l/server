@@ -69,6 +69,14 @@ eval CREATE TABLE tfk (c1 INT, c2 INT, CONSTRAINT CONSTRAINT_1 FOREIGN KEY (c1) 
                        ENGINE=$engine;
 
 --echo #
+--echo # Field check constraints name same as table constraint name
+--echo #
+eval CREATE TABLE tfk (c1 INT, c2 INT check (c2>0), CONSTRAINT c2
+                       CHECK (c1>0)) ENGINE=$engine;
+
+SHOW CREATE TABLE tfk;
+DROP TABLE tfk;
+--echo #
 --echo # Field check constraints name same as name of field `c2` and as foreign key
 --echo #
 # Should we handle this case ?
