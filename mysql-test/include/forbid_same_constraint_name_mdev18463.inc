@@ -69,9 +69,25 @@ eval CREATE TABLE tfk (c1 INT, c2 INT, CONSTRAINT CONSTRAINT_1 FOREIGN KEY (c1) 
                        ENGINE=$engine;
 
 --echo #
+--echo # Table check constraints name same as name of field `c2` and as foreign key
+--echo #
+--error ER_DUP_CONSTRAINT_NAME
+eval CREATE TABLE tfk (c1 INT, c2 INT check (c2>0), CONSTRAINT c2
+                       FOREIGN KEY (c1) REFERENCES tpk (id), CONSTRAINT c2 CHECK (c1>0)) ENGINE=$engine;
+SELECT constraint_name, check_clause FROM information_schema.check_constraints;
+
+--echo #
+--echo # Table check constraints name same as name of field `c2` (field check constraint)
+--echo # This will have impact on MDEV-16630
+--echo #
+--error ER_DUP_CONSTRAINT_NAME
+eval CREATE TABLE tfk (c1 INT, c2 INT check (c2>0), CONSTRAINT c2 CHECK (c1>0)) ENGINE=$engine;
+SELECT constraint_name, check_clause FROM information_schema.check_constraints;
+
+--echo #
 --echo # Field check constraints name same as name of field `c2` and as foreign key
 --echo #
-# Should we handle this case ?
+# Should we handle this case ? Currently we are doing everything regarding the table check constraint
 eval CREATE TABLE tfk (c1 INT, c2 INT check (c2>0), CONSTRAINT c2
                        FOREIGN KEY (c1) REFERENCES tpk (id)) ENGINE=$engine;
 SHOW CREATE TABLE tfk;
