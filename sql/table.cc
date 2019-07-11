@@ -588,7 +588,7 @@ static bool has_disabled_path_chars(const char *str)
   NOTES
     This function is called when the table definition is not cached in
     table_def_cache
-    The data is returned in 'share', which is alloced by
+    The data is returned in 'share', which is allocated by
     alloc_table_share().. The code assumes that share is initialized.
 
   RETURN VALUES
