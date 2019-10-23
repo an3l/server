@@ -3196,7 +3196,7 @@ com_go(String *buffer,char *line __attribute__((unused)))
 
   if (buffer->is_empty())
   {
-    if (status.batch)				// Ignore empty quries
+    if (status.batch)				// Ignore empty queries.
       return 0;
     return put_info("No query specified\n",INFO_ERROR);
 
@@ -3261,7 +3261,7 @@ com_go(String *buffer,char *line __attribute__((unused)))
     else
       time_buff[0]= '\0';
 
-    /* Every branch must truncate  buff . */
+    /* Every branch must truncate buff. */
     if (result)
     {
       if (!mysql_num_rows(result) && ! quick && !column_types_flag)
