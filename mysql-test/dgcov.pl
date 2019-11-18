@@ -68,8 +68,11 @@ if ($opt_purge)
   system($cmd)==0 or die "system($cmd): $? $!";
   exit 0;
 }
-
+my $gcov_vers= `gcov -v`;
+$gcov_vers=~ s/\D//g;
+$gcov_vers= substr($gcov_vers, 0, 1);
 find(\&gcov_one_file, $root);
+undef $gcov_vers;
 find(\&write_coverage, $root) if $opt_generate;
 exit 0 if $opt_only_gcov;
 
@@ -162,7 +165,16 @@ sub gcov_one_file {
   }
 
   # now, read the generated file
-  open FH, '<', "$_.gcov" or die "open(<$_.gcov): $!";
+  if($gcov_vers<7)
+  {
+    open FH, '<', "$_.gcov" or die "open(<$_.gcov): $!";
+  }
+  else
+  {
+    my $f=substr $_, 0, -5;
+    open FH, '<', "$f.gcov" or die "open(<$f.gcov): $!";
+    undef $f;
+  }
   my $fname;
   while (<FH>) {
     chomp;
