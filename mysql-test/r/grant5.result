@@ -33,3 +33,32 @@ grant update on mysqltest1.* to u1@localhost;
 update mysqltest1.t1 set id=1 where id=2;
 drop user u1@localhost;
 drop database mysqltest1;
+CREATE ROLE test_role;
+CREATE USER test_user;
+GRANT test_role TO test_user;
+SET DEFAULT ROLE test_role FOR test_user;
+SHOW GRANTS FOR test_user;
+Grants for test_user@%
+GRANT test_role TO 'test_user'@'%'
+GRANT USAGE ON *.* TO 'test_user'@'%'
+SET DEFAULT ROLE test_role FOR 'test_user'@'%'
+SET DEFAULT ROLE NONE for test_user;
+SHOW GRANTS FOR test_user;
+Grants for test_user@%
+GRANT test_role TO 'test_user'@'%'
+GRANT USAGE ON *.* TO 'test_user'@'%'
+SET DEFAULT ROLE test_role;
+SHOW GRANTS;
+Grants for root@localhost
+GRANT test_role TO 'root'@'localhost' WITH ADMIN OPTION
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION
+GRANT PROXY ON ''@'%' TO 'root'@'localhost' WITH GRANT OPTION
+SET DEFAULT ROLE test_role FOR 'root'@'localhost'
+SET DEFAULT ROLE NONE;
+SHOW GRANTS;
+Grants for root@localhost
+GRANT test_role TO 'root'@'localhost' WITH ADMIN OPTION
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION
+GRANT PROXY ON ''@'%' TO 'root'@'localhost' WITH GRANT OPTION
+DROP USER test_user;
+DROP ROLE test_role;
