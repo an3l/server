@@ -60,3 +60,94 @@ change_user 'root';
 drop role test_role;
 drop role not_granted_role;
 drop user test_user@localhost;
+
+--echo #
+--echo # MDEV-22312: Bad error message for SET DEFAULT ROLE when user account
+--echo #             is not granted the role
+--echo #
+
+CREATE USER a;
+CREATE USER b;
+CREATE ROLE r1;
+CREATE ROLE r2;
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE r1 FOR a;
+
+GRANT r1 TO b;
+GRANT r2 TO b;
+SELECT * FROM information_schema.applicable_roles;
+SELECT CURRENT_ROLE;
+
+SET DEFAULT ROLE r1 FOR b;
+# User a has not been granted a role r1
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE r1 FOR a;
+SELECT CURRENT_ROLE;
+SELECT * FROM information_schema.applicable_roles;
+
+--echo # change user b
+change_user b;
+SELECT CURRENT_ROLE;
+SET ROLE r2;
+SELECT CURRENT_ROLE;
+--error 1044
+SET DEFAULT ROLE r1 FOR a;
+SET ROLE r2;
+SELECT CURRENT_ROLE;
+SET DEFAULT ROLE r2;
+
+--echo # change user root
+change_user root;
+GRANT SELECT ON mysql.* TO b;
+
+--echo # change user b
+change_user b;
+SHOW GRANTS FOR b;
+--echo # Select_priv is granted
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE r1 FOR a;
+# Handling CURRENT_ROLE
+SELECT CURRENT_ROLE;
+SET DEFAULT ROLE NONE;
+SELECT CURRENT_ROLE;
+SET DEFAULT ROLE current_role FOR current_user;
+# Handling of non-existing role
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE invalid_role;
+# Handling of non-existing role for user
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE invalid_role FOR a;
+# Special case of handling the none role with select_priv
+-- error 1044
+SET DEFAULT ROLE none FOR a;
+
+--echo # change user root
+change_user root;
+# UPDATE PRIV are enough
+GRANT UPDATE ON mysql.* TO b;
+
+--echo # change user b
+change_user b;
+SHOW GRANTS FOR b;
+# There is select and update priv granted it should fail with new type of error
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE r1 FOR a;
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE invalid_role;
+
+--echo # change user root
+change_user root;
+# After granting the privilege for a, user b can set default role
+GRANT r1 TO a;
+
+--echo # change user b
+SET DEFAULT ROLE r1 FOR a;
+
+--echo # change user a
+change_user a;
+SELECT CURRENT_ROLE;
+
+change_user root;
+SELECT user, host, default_role FROM mysql.user where user='a' or user='b';
+DROP ROLE r1, r2;
+DROP USER a, b;
