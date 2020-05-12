@@ -1,0 +1,67 @@
+
+source include/not_embedded.inc;
+
+--echo #
+--echo # MDEV-22312: Bad error message for SET DEFAULT ROLE when user account
+--echo #             is not granted the role
+--echo #
+# Create a user with no privileges
+CREATE USER a;
+CREATE USER b;
+CREATE ROLE r1;
+CREATE ROLE r2;
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE r1 FOR a;
+
+GRANT r1 TO b;
+SELECT * FROM information_schema.applicable_roles;
+SELECT CURRENT_ROLE;
+SELECT * FROM mysql.roles_mapping;
+
+GRANT r2 TO b;
+SELECT * FROM information_schema.applicable_roles;
+SELECT CURRENT_ROLE;
+SELECT * FROM mysql.roles_mapping;
+
+SET DEFAULT ROLE r1 FOR b;
+# User a has not been granted a role r1
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE r1 FOR a;
+SELECT CURRENT_ROLE;
+SELECT * FROM information_schema.applicable_roles;
+
+--echo # change user b
+change_user b;
+SELECT CURRENT_ROLE;
+--error 1044
+SET DEFAULT ROLE r1 FOR a;
+SET ROLE r2;
+SELECT CURRENT_ROLE;
+SET DEFAULT ROLE r2;
+
+--echo # change user root
+change_user root;
+# SELECT PRIV may not be enough because of `check_alter_table()`
+GRANT SELECT ON mysql.* TO b;
+SHOW GRANTS FOR b;
+
+--echo # change user b
+change_user b;
+--error 1044
+SET DEFAULT ROLE r1 FOR a;
+
+--echo # change user root
+change_user root;
+# UPDATE PRIV are enough
+GRANT UPDATE ON mysql.* TO b;
+SHOW GRANTS FOR b;
+
+--echo # change user b
+change_user b;
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE r1 FOR a;
+
+--echo # change user root
+change_user root;
+DROP ROLE r1,r2;
+DROP USER a,b;

@@ -1,0 +1,83 @@
+#
+# MDEV-22312: Bad error message for SET DEFAULT ROLE when user account
+#             is not granted the role
+#
+CREATE USER a;
+CREATE USER b;
+CREATE ROLE r1;
+CREATE ROLE r2;
+SET DEFAULT ROLE r1 FOR a;
+ERROR OP000: User `a@%` has not been granted a role `r1`
+GRANT r1 TO b;
+SELECT * FROM information_schema.applicable_roles;
+GRANTEE	ROLE_NAME	IS_GRANTABLE	IS_DEFAULT
+root@localhost	r1	YES	NO
+root@localhost	r2	YES	NO
+SELECT CURRENT_ROLE;
+CURRENT_ROLE
+NULL
+SELECT * FROM mysql.roles_mapping;
+Host	User	Role	Admin_option
+localhost	root	r1	Y
+localhost	root	r2	Y
+%	b	r1	N
+GRANT r2 TO b;
+SELECT * FROM information_schema.applicable_roles;
+GRANTEE	ROLE_NAME	IS_GRANTABLE	IS_DEFAULT
+root@localhost	r1	YES	NO
+root@localhost	r2	YES	NO
+SELECT CURRENT_ROLE;
+CURRENT_ROLE
+NULL
+SELECT * FROM mysql.roles_mapping;
+Host	User	Role	Admin_option
+localhost	root	r1	Y
+localhost	root	r2	Y
+%	b	r1	N
+%	b	r2	N
+SET DEFAULT ROLE r1 FOR b;
+SET DEFAULT ROLE r1 FOR a;
+ERROR OP000: User `a@%` has not been granted a role `r1`
+SELECT CURRENT_ROLE;
+CURRENT_ROLE
+NULL
+SELECT * FROM information_schema.applicable_roles;
+GRANTEE	ROLE_NAME	IS_GRANTABLE	IS_DEFAULT
+root@localhost	r1	YES	NO
+root@localhost	r2	YES	NO
+# change user b
+SELECT CURRENT_ROLE;
+CURRENT_ROLE
+r1
+SET DEFAULT ROLE r1 FOR a;
+ERROR 42000: Access denied for user 'b'@'%' to database 'mysql'
+SET ROLE r2;
+SELECT CURRENT_ROLE;
+CURRENT_ROLE
+r2
+SET DEFAULT ROLE r2;
+# change user root
+GRANT SELECT ON mysql.* TO b;
+SHOW GRANTS FOR b;
+Grants for b@%
+GRANT r1 TO 'b'@'%'
+GRANT r2 TO 'b'@'%'
+GRANT USAGE ON *.* TO 'b'@'%'
+GRANT SELECT ON `mysql`.* TO 'b'@'%'
+# change user b
+SET DEFAULT ROLE r1 FOR a;
+ERROR 42000: Access denied for user 'b'@'%' to database 'mysql'
+# change user root
+GRANT UPDATE ON mysql.* TO b;
+SHOW GRANTS FOR b;
+Grants for b@%
+GRANT r1 TO 'b'@'%'
+GRANT r2 TO 'b'@'%'
+GRANT USAGE ON *.* TO 'b'@'%'
+GRANT SELECT, UPDATE ON `mysql`.* TO 'b'@'%'
+# change user b
+SET DEFAULT ROLE r1 FOR a;
+ERROR OP000: User `a@%` has not been granted a role `r1`
+# change user root
+DROP ROLE r1,r2;
+DROP USER a,b;

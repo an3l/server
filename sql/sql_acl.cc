@@ -201,6 +201,8 @@ LEX_STRING current_user= { C_STRING_WITH_LEN("*current_user") };
 LEX_STRING current_role= { C_STRING_WITH_LEN("*current_role") };
 LEX_STRING current_user_and_current_role= { C_STRING_WITH_LEN("*current_user_and_current_role") };
 
+class ACL_USER_BASE;
+static int check_role_is_granted_callback(ACL_USER_BASE *, void *);
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
 static plugin_ref old_password_plugin;
@@ -2034,6 +2036,64 @@ bool acl_getroot(Security_context *sctx, char *user, char *host,
   DBUG_RETURN(res);
 }
 
+/**
+  @brief Helper function to handle the error when using check_user_can_set_role()
+  @param type { ER_INVALID_CURRENT_USER - user doesn't exist,
+             -1: ER_INVALID_ROLE - role doesn't exist
+              1: ER_INVALID_ROLE - role exist's but we don't know the does the
+                                   current user has access to see the role in
+                                   which case different type of error is generated
+             }
+  @param curr_user   A current user
+  @param curr_host   A current host
+  @param user        A user for which we are setting the role
+  @param host        A host of a user
+  @param rolename    The name of the role
+  @param read_access A read access of mysql.* aquired
+*/
+
+static void handle_error_set_role(int type, const char *curr_user,
+                                  const char* curr_host, const char *user,
+                                  const char *host, const char *rolename,
+                                  bool read_access)
+{
+  switch(type)
+  {
+    case ER_INVALID_CURRENT_USER:
+      my_error(ER_INVALID_CURRENT_USER, MYF(0), rolename);
+      break;
+    case -1:
+      /* Role doesn't exist at all */
+      my_error(ER_INVALID_ROLE, MYF(0), rolename);
+      break;
+    case 1:
+      StringBuffer<1024> c_usr;
+      LEX_CSTRING role_lex;
+      role_lex.str= rolename;
+      role_lex.length= strlen(rolename);
+
+      mysql_mutex_lock(&acl_cache->lock);
+      ACL_USER *cur_user= find_user_exact(curr_host, curr_user);
+      if (read_access || traverse_role_graph_down(cur_user, &role_lex,
+                                   check_role_is_granted_callback, NULL) == -1)
+      {
+        /* Role is not granted but current user can see the role */
+        c_usr.append(user, strlen(user));
+        c_usr.append('@');
+        c_usr.append(host, strlen(host));
+        my_printf_error(ER_INVALID_ROLE, "User %`s has not been granted a role %`s",
+                        MYF(0), c_usr.c_ptr(), rolename);
+      }
+      else
+      {
+        /* Role is not granted and current user cannot see the role */
+        my_error(ER_INVALID_ROLE, MYF(0), rolename); 
+      }
+      mysql_mutex_unlock(&acl_cache->lock);
+      break;
+  }
+}
+
 static int check_user_can_set_role(const char *user, const char *host,
                       const char *ip, const char *rolename, ulonglong *access)
 {
@@ -2053,8 +2113,7 @@ static int check_user_can_set_role(const char *user, const char *host,
     acl_user= find_user_wild(host, user, ip);
     if (acl_user == NULL)
     {
-      my_error(ER_INVALID_CURRENT_USER, MYF(0), rolename);
-      result= -1;
+      result= ER_INVALID_CURRENT_USER;
     }
     else if (access)
       *access= acl_user->access;
@@ -2065,8 +2124,8 @@ static int check_user_can_set_role(const char *user, const char *host,
   role= find_acl_role(rolename);
 
   /* According to SQL standard, the same error message must be presented */
-  if (role == NULL) {
-    my_error(ER_INVALID_ROLE, MYF(0), rolename);
+  if (role == NULL)
+  {
     result= -1;
     goto end;
   }
@@ -2088,7 +2147,6 @@ static int check_user_can_set_role(const char *user, const char *host,
   /* According to SQL standard, the same error message must be presented */
   if (!is_granted)
   {
-    my_error(ER_INVALID_ROLE, MYF(0), rolename);
     result= 1;
     goto end;
   }
@@ -2917,8 +2975,15 @@ int acl_set_default_role(THD *thd, const char *host, const char *user,
       rolename= thd->security_ctx->priv_role;
   }
 
-  if (check_user_can_set_role(user, host, host, rolename, NULL))
+  bool check_result= 0;
+  if( (check_result= check_user_can_set_role(user, host, host, rolename, NULL)) )
+  {
+    bool read_access= check_access(thd, SELECT_ACL, "mysql", NULL, NULL, 1, 0);
+    handle_error_set_role(check_result, thd->security_ctx->priv_user,
+                          thd->security_ctx->priv_host, user, host,
+                          rolename, read_access);
     DBUG_RETURN(result);
+  }
 
   if (!strcasecmp(rolename, "NONE"))
     clear_role= TRUE;
@@ -3370,7 +3435,7 @@ static bool test_if_create_new_users(THD *thd)
     if (!(db_access & INSERT_ACL))
     {
       if (check_grant(thd, INSERT_ACL, &tl, FALSE, UINT_MAX, TRUE))
-	create_new_users=0;
+        create_new_users=0;
     }
   }
   return create_new_users;
@@ -10329,7 +10394,7 @@ acl_check_proxy_grant_access(THD *thd, const char *host, const char *user,
     Security context in THD contains two pairs of (user,host):
     1. (user,host) pair referring to inbound connection.
     2. (priv_user,priv_host) pair obtained from mysql.user table after doing
-        authnetication of incoming connection.
+        authentication of incoming connection.
     Privileges should be checked wrt (priv_user, priv_host) tuple, because
     (user,host) pair obtained from inbound connection may have different
     values than what is actually stored in mysql.user table and while granting
