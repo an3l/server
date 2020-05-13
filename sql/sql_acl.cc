@@ -2037,6 +2037,40 @@ bool acl_getroot(Security_context *sctx, char *user, char *host,
 }
 
 /**
+  @brief Helper function to check access of mysql.user table
+
+  @param thd         A current thread
+  @param access      A desired access
+  
+  @return Status of access @param access for mysql.user
+    @retval 0 - a user doesn't have access
+    @retval 1 - a user has access
+*/
+
+static bool check_access_of_mysql_user_table(THD *thd, ulong access)
+{
+  Security_context *sctx= thd->security_ctx;
+
+  TABLE_LIST tl;
+  ulong db_access;
+  tl.init_one_table(C_STRING_WITH_LEN("mysql"),
+                    C_STRING_WITH_LEN("user"), "user", TL_READ);
+  bool read_access= 1;
+
+  db_access=acl_get(sctx->host, sctx->ip,
+        sctx->priv_user, tl.db, 0);
+  if (sctx->priv_role[0])
+    db_access|= acl_get("", "", sctx->priv_role, tl.db, 0);
+  if (!(db_access & access))
+  {
+    if (check_grant(thd, access, &tl, FALSE, UINT_MAX, TRUE))
+      read_access=0;
+  }
+  
+  return read_access;
+}
+
+/**
   @brief Helper function to handle the error when using check_user_can_set_role()
   @param type { ER_INVALID_CURRENT_USER - user doesn't exist,
              -1: ER_INVALID_ROLE - role doesn't exist
@@ -2944,8 +2978,16 @@ WSREP_ERROR_LABEL:
   DBUG_RETURN(result);
 }
 
-int acl_check_set_default_role(THD *thd, const char *host, const char *user)
+int acl_check_set_default_role(THD *thd, const char *host, const char *user,
+                               const char *role)
 {
+  /* If the user has a read access on mysql.user table, it can see the roles,
+     granted or not and different kind of error may be allowed 
+  */
+  if (!check_access(thd, SELECT_ACL, "mysql", NULL, NULL, 1, 0))
+  {
+    acl_set_default_role(thd, host, user, role);
+  }
   return check_alter_user(thd, host, user);
 }
 
@@ -2978,7 +3020,11 @@ int acl_set_default_role(THD *thd, const char *host, const char *user,
   bool check_result= 0;
   if( (check_result= check_user_can_set_role(user, host, host, rolename, NULL)) )
   {
-    bool read_access= check_access(thd, SELECT_ACL, "mysql", NULL, NULL, 1, 0);
+    /* Check if the current_user has SELECT_ACL to mysql.user table */
+    /* Note for reviewer: both version will work */
+    //ulong read_access= acl_get(thd->security_ctx->priv_host, thd->security_ctx->ip,
+    //                           thd->security_ctx->priv_user, "mysql", 0);
+    bool read_access= check_access_of_mysql_user_table(thd, SELECT_ACL);
     handle_error_set_role(check_result, thd->security_ctx->priv_user,
                           thd->security_ctx->priv_host, user, host,
                           rolename, read_access);
@@ -10811,7 +10857,7 @@ int fill_schema_user_privileges(THD *thd, TABLE_LIST *tables, COND *cond)
       ulong j,test_access= want_access & ~GRANT_ACL;
       for (priv_id=0, j = SELECT_ACL;j <= GLOBAL_ACLS; priv_id++,j <<= 1)
       {
-	if (test_access & j)
+        if (test_access & j)
         {
           if (update_schema_privilege(thd, table, buff, 0, 0, 0, 0,
                                       command_array[priv_id],

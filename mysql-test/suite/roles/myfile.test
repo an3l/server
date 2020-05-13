@@ -37,6 +37,8 @@ SELECT CURRENT_ROLE;
 SET DEFAULT ROLE r1 FOR a;
 SET ROLE r2;
 SELECT CURRENT_ROLE;
+--echo # NOT GOOD, SHOULDN'T FAIL WITH 1044 !!!!
+--error 1044
 SET DEFAULT ROLE r2;
 
 --echo # change user root
@@ -47,7 +49,9 @@ SHOW GRANTS FOR b;
 
 --echo # change user b
 change_user b;
---error 1044
+SHOW GRANTS FOR b;
+--echo # THIS IS GOOD (not 1044) !!!
+--error ER_INVALID_ROLE
 SET DEFAULT ROLE r1 FOR a;
 
 --echo # change user root

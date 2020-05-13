@@ -1,0 +1,26 @@
+CREATE USER a;
+CREATE USER b;
+CREATE ROLE r1;
+CREATE ROLE r2;
+GRANT r1 TO b;
+GRANT r2 TO b;
+GRANT SELECT ON mysql.* TO b;
+SHOW GRANTS FOR b;
+Grants for b@%
+GRANT r1 TO 'b'@'%'
+GRANT r2 TO 'b'@'%'
+GRANT USAGE ON *.* TO 'b'@'%'
+GRANT SELECT ON `mysql`.* TO 'b'@'%'
+# change user b
+SHOW GRANTS FOR b;
+Grants for b@%
+GRANT r1 TO 'b'@'%'
+GRANT r2 TO 'b'@'%'
+GRANT USAGE ON *.* TO 'b'@'%'
+GRANT SELECT ON `mysql`.* TO 'b'@'%'
+SET DEFAULT ROLE r1 FOR a;
+ERROR OP000: User `a@%` has not been granted a role `r1`
+DROP USER a;
+DROP USER b;
+DROP ROLE r1;
+DROP ROLE r2;

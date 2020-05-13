@@ -55,7 +55,9 @@ SET ROLE r2;
 SELECT CURRENT_ROLE;
 CURRENT_ROLE
 r2
+# NOT GOOD, SHOULDN'T FAIL WITH 1044 !!!!
 SET DEFAULT ROLE r2;
+ERROR 42000: Access denied for user 'b'@'%' to database 'mysql'
 # change user root
 GRANT SELECT ON mysql.* TO b;
 SHOW GRANTS FOR b;
@@ -65,8 +67,15 @@ GRANT r2 TO 'b'@'%'
 GRANT USAGE ON *.* TO 'b'@'%'
 GRANT SELECT ON `mysql`.* TO 'b'@'%'
 # change user b
+SHOW GRANTS FOR b;
+Grants for b@%
+GRANT r1 TO 'b'@'%'
+GRANT r2 TO 'b'@'%'
+GRANT USAGE ON *.* TO 'b'@'%'
+GRANT SELECT ON `mysql`.* TO 'b'@'%'
+# THIS IS GOOD (not 1044) !!!
 SET DEFAULT ROLE r1 FOR a;
-ERROR 42000: Access denied for user 'b'@'%' to database 'mysql'
+ERROR OP000: User `a@%` has not been granted a role `r1`
 # change user root
 GRANT UPDATE ON mysql.* TO b;
 SHOW GRANTS FOR b;

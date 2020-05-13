@@ -1,0 +1,24 @@
+CREATE USER a;
+CREATE USER b;
+CREATE ROLE r1;
+CREATE ROLE r2;
+
+GRANT r1 TO b;
+GRANT r2 TO b;
+# SELECT PRIV may not be enough because of `check_alter_table()`
+GRANT SELECT ON mysql.* TO b;
+SHOW GRANTS FOR b;
+
+--echo # change user b
+change_user b;
+SHOW GRANTS FOR b;
+# This should return new error message?!
+--error ER_INVALID_ROLE
+SET DEFAULT ROLE r1 FOR a;
+
+change_user root;
+DROP USER a;
+DROP USER b;
+DROP ROLE r1;
+DROP ROLE r2;
+#select * from mysql.user;

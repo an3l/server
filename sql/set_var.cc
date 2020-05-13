@@ -923,7 +923,8 @@ int set_var_default_role::check(THD *thd)
 {
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
   real_user= get_current_user(thd, user);
-  int status= acl_check_set_default_role(thd, real_user->host.str, real_user->user.str);
+  int status= acl_check_set_default_role(thd, real_user->host.str,
+                                         real_user->user.str, role.str);
   return status;
 #else
   return 0;
