@@ -16,6 +16,11 @@ root@localhost	r2	YES	NO
 SELECT CURRENT_ROLE;
 CURRENT_ROLE
 NULL
+SELECT * FROM mysql.roles_mapping;
+Host	User	Role	Admin_option
+localhost	root	r1	Y
+localhost	root	r2	Y
+%	b	r1	N
 GRANT r2 TO b;
 SELECT * FROM information_schema.applicable_roles;
 GRANTEE	ROLE_NAME	IS_GRANTABLE	IS_DEFAULT
@@ -24,6 +29,12 @@ root@localhost	r2	YES	NO
 SELECT CURRENT_ROLE;
 CURRENT_ROLE
 NULL
+SELECT * FROM mysql.roles_mapping;
+Host	User	Role	Admin_option
+localhost	root	r1	Y
+localhost	root	r2	Y
+%	b	r1	N
+%	b	r2	N
 SET DEFAULT ROLE r1 FOR b;
 SET DEFAULT ROLE r1 FOR a;
 ERROR OP000: User `a@%` has not been granted a role `r1`
@@ -44,8 +55,9 @@ SET ROLE r2;
 SELECT CURRENT_ROLE;
 CURRENT_ROLE
 r2
-# GOOD SHOULD WORK WITH NO ERRORS!!!!
+# NOT GOOD, SHOULDN'T FAIL WITH 1044 !!!!
 SET DEFAULT ROLE r2;
+ERROR 42000: Access denied for user 'b'@'%' to database 'mysql'
 # change user root
 GRANT SELECT ON mysql.* TO b;
 SHOW GRANTS FOR b;

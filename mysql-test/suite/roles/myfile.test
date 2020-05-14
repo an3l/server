@@ -16,12 +16,12 @@ SET DEFAULT ROLE r1 FOR a;
 GRANT r1 TO b;
 SELECT * FROM information_schema.applicable_roles;
 SELECT CURRENT_ROLE;
-SELECT * FROM mysql.roles_mapping;
+#SELECT * FROM mysql.roles_mapping;
 
 GRANT r2 TO b;
 SELECT * FROM information_schema.applicable_roles;
 SELECT CURRENT_ROLE;
-SELECT * FROM mysql.roles_mapping;
+#SELECT * FROM mysql.roles_mapping;
 
 SET DEFAULT ROLE r1 FOR b;
 # User a has not been granted a role r1
@@ -37,8 +37,7 @@ SELECT CURRENT_ROLE;
 SET DEFAULT ROLE r1 FOR a;
 SET ROLE r2;
 SELECT CURRENT_ROLE;
---echo # NOT GOOD, SHOULDN'T FAIL WITH 1044 !!!!
---error 1044
+--echo # GOOD SHOULD WORK WITH NO ERRORS!!!!
 SET DEFAULT ROLE r2;
 
 --echo # change user root
