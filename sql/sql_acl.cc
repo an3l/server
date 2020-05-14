@@ -201,6 +201,9 @@ LEX_STRING current_user= { C_STRING_WITH_LEN("*current_user") };
 LEX_STRING current_role= { C_STRING_WITH_LEN("*current_role") };
 LEX_STRING current_user_and_current_role= { C_STRING_WITH_LEN("*current_user_and_current_role") };
 
+class ACL_USER;
+static ACL_USER *find_user_or_anon(const char *host, const char *user, const char *ip);
+
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
 static plugin_ref old_password_plugin;
 #endif
@@ -2061,7 +2064,8 @@ static int check_role_is_granted_callback(ACL_USER_BASE *grantee, void *data)
 */
 
 static void handle_error_set_role(int type, const char *curr_user,
-                                  const char* curr_host, const char *user,
+                                  const char* curr_host, const char *curr_ip,
+                                  const char *user,
                                   const char *host, const char *rolename,
                                   bool read_access)
 {
@@ -2081,9 +2085,10 @@ static void handle_error_set_role(int type, const char *curr_user,
       role_lex.length= strlen(rolename);
 
       mysql_mutex_lock(&acl_cache->lock);
-      ACL_USER *cur_user= find_user_exact(curr_host, curr_user);
-      if (read_access || traverse_role_graph_down(cur_user, &role_lex,
-                                   check_role_is_granted_callback, NULL) == -1)
+      ACL_USER *cur_user= find_user_or_anon(curr_host, curr_user, curr_ip);
+      
+      if (cur_user && (read_access || traverse_role_graph_down(cur_user, &role_lex,
+                                   check_role_is_granted_callback, NULL) == -1))
       {
         /* Role is not granted but current user can see the role */
         c_usr.append(user, strlen(user));
@@ -2103,7 +2108,9 @@ static void handle_error_set_role(int type, const char *curr_user,
 }
 
 static int check_user_can_set_role(const char *user, const char *host,
-                      const char *ip, const char *rolename, ulonglong *access)
+                      const char *ip, const char *rolename, ulonglong *access,
+                      ulong read_access= 0, const char *curr_user= NULL,
+                      const char *curr_host= NULL, const char *curr_ip= NULL)
 {
   ACL_ROLE *role;
   ACL_USER_BASE *acl_user_base;
@@ -2165,15 +2172,27 @@ static int check_user_can_set_role(const char *user, const char *host,
   }
 end:
   mysql_mutex_unlock(&acl_cache->lock);
+  if(result)
+  {
+    handle_error_set_role(result, curr_user,
+                          curr_host, curr_ip, user, host,
+                          rolename, read_access);
+  }
+
   return result;
 
 }
 
 int acl_check_setrole(THD *thd, char *rolename, ulonglong *access)
 {
-    /* Yes! priv_user@host. Don't ask why - that's what check_access() does. */
+  ulong read_access= acl_get(thd->security_ctx->priv_host, thd->security_ctx->ip,
+                             thd->security_ctx->priv_user, "mysql", 0);
+
   return check_user_can_set_role(thd->security_ctx->priv_user,
-        thd->security_ctx->host, thd->security_ctx->ip, rolename, access);
+           thd->security_ctx->host, thd->security_ctx->ip, rolename, access,
+           read_access, thd->security_ctx->priv_user,
+           thd->security_ctx->priv_host, thd->security_ctx->ip);
+  
 }
 
 
@@ -3000,12 +3019,10 @@ int acl_set_default_role(THD *thd, const char *host, const char *user,
       rolename= thd->security_ctx->priv_role;
   }
 
-  int check_result= 0;
-  if ((check_result= check_user_can_set_role(user, host, host, rolename, NULL)))
+  if (check_user_can_set_role(user, host, host, rolename, NULL, read_access,
+                 thd->security_ctx->priv_user, thd->security_ctx->priv_host,
+                 thd->security_ctx->ip))
   {
-    handle_error_set_role(check_result, thd->security_ctx->priv_user,
-                          thd->security_ctx->priv_host, user, host,
-                          rolename, read_access);
     DBUG_RETURN(result);
   }
 
