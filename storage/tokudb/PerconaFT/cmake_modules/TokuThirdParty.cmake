@@ -16,10 +16,13 @@ set(XZ_SOURCE_DIR "${TokuDB_SOURCE_DIR}/third_party/xz-4.999.9beta" CACHE FILEPA
 if (NOT EXISTS "${XZ_SOURCE_DIR}/configure")
     message(FATAL_ERROR "Can't find the xz sources.  Please check them out to ${XZ_SOURCE_DIR} or modify XZ_SOURCE_DIR.")
 endif ()
+set(MY_CFG_INTDIR ${CMAKE_CFG_INTDIR})
 
 if (CMAKE_GENERATOR STREQUAL Ninja)
   ## ninja doesn't understand "$(MAKE)"
   set(SUBMAKE_COMMAND make)
+  ## CMAKE_CFG_INTDIR is evaluated to '.', use ${CMAKE_BUILD_TYPE} for out of source
+  set(MY_CFG_INTDIR ${CMAKE_BUILD_TYPE})
 else ()
   ## use "$(MAKE)" for submakes so they can use the jobserver, doesn't
   ## seem to break Xcode...
@@ -28,17 +31,18 @@ endif ()
 
 FILE(GLOB XZ_ALL_FILES ${XZ_SOURCE_DIR}/*)
 ExternalProject_Add(build_lzma
-    PREFIX xz
+    PREFIX "${MY_CFG_INTDIR}/xz"
     DOWNLOAD_COMMAND
         cp -a "${XZ_ALL_FILES}" "<SOURCE_DIR>/"
     CONFIGURE_COMMAND
         "<SOURCE_DIR>/configure" ${xz_configure_opts}
-        "--prefix=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz"
-        "--libdir=${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/lib"
+        "--prefix=${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz"
+        "--libdir=${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/lib"
     BUILD_COMMAND
         ${SUBMAKE_COMMAND} -C src/liblzma
     INSTALL_COMMAND
         ${SUBMAKE_COMMAND} -C src/liblzma install
+    BUILD_BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/lib/liblzma.a"
 )
 FILE(GLOB_RECURSE XZ_ALL_FILES_RECURSIVE ${XZ_SOURCE_DIR}/*)
 ExternalProject_Add_Step(build_lzma reclone_src # Names of project and custom step
@@ -48,28 +52,28 @@ ExternalProject_Add_Step(build_lzma reclone_src # Names of project and custom st
 )
 
 set_source_files_properties(
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/base.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/bcj.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/block.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/check.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/container.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/delta.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/filter.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/index.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/index_hash.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/lzma.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/stream_flags.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/subblock.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/version.h"
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include/lzma/vli.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/base.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/bcj.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/block.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/check.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/container.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/delta.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/filter.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/index.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/index_hash.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/lzma.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/stream_flags.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/subblock.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/version.h"
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include/lzma/vli.h"
   PROPERTIES GENERATED TRUE)
 
-include_directories("${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/include")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/include")
 
 add_library(lzma STATIC IMPORTED)
 set_target_properties(lzma PROPERTIES IMPORTED_LOCATION
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/xz/lib/liblzma.a")
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/xz/lib/liblzma.a")
 add_dependencies(lzma build_lzma)
 
 
@@ -81,7 +85,7 @@ endif ()
 
 FILE(GLOB SNAPPY_ALL_FILES ${SNAPPY_SOURCE_DIR}/*)
 ExternalProject_Add(build_snappy
-    PREFIX snappy
+    PREFIX "${MY_CFG_INTDIR}/snappy"
     DOWNLOAD_COMMAND
         cp -a "${SNAPPY_ALL_FILES}" "<SOURCE_DIR>/"
     CMAKE_ARGS
@@ -95,6 +99,7 @@ ExternalProject_Add(build_snappy
         -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         ${USE_PROJECT_CMAKE_MODULE_PATH}
+    BUILD_BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/snappy/lib/libsnappy.a"
 )
 FILE(GLOB_RECURSE SNAPPY_ALL_FILES_RECURSIVE ${SNAPPY_SOURCE_DIR}/*)
 ExternalProject_Add_Step(build_snappy reclone_src # Names of project and custom step
@@ -103,9 +108,9 @@ ExternalProject_Add_Step(build_snappy reclone_src # Names of project and custom 
     DEPENDS   ${SNAPPY_ALL_FILES_RECURSIVE}   # Files on which this step depends
 )
 
-include_directories("${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/snappy/include")
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/snappy/include")
 
 add_library(snappy STATIC IMPORTED)
 set_target_properties(snappy PROPERTIES IMPORTED_LOCATION
-  "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/snappy/lib/libsnappy.a")
+  "${CMAKE_CURRENT_BINARY_DIR}/${MY_CFG_INTDIR}/snappy/lib/libsnappy.a")
 add_dependencies(snappy build_snappy)
