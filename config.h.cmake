@@ -566,9 +566,11 @@
 #cmakedefine TIME_T_UNSIGNED @TIME_T_UNSIGNED@
 
 #ifndef EMBEDDED_LIBRARY
+#ifndef WITHOUT_SERVER
 #cmakedefine WSREP_INTERFACE_VERSION "@WSREP_INTERFACE_VERSION@"
 #cmakedefine WITH_WSREP 1
 #cmakedefine WSREP_PROC_INFO 1
+#endif
 #endif
 
 #if !defined(__STDC_FORMAT_MACROS)
