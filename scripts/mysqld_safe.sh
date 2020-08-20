@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright Abandoned 1996 TCX DataKonsult AB & Monty Program KB & Detron HB
 # This file is public domain and comes with NO WARRANTY of any kind
 #
@@ -484,12 +484,15 @@ set_malloc_lib() {
   malloc_lib="$1"
 
   if expr "$malloc_lib" : "\(tcmalloc\|jemalloc\)" > /dev/null ; then
-    pkglibdir=`get_mysql_config --variable=pkglibdir`
     where=''
     # This list is kept intentionally simple.  Simply set --malloc-lib
     # to a full path if another location is desired.
-    for libdir in /usr/lib /usr/lib64 "$pkglibdir" "$pkglibdir/mysql"; do
+    for libdir in /usr/lib/* /usr/lib64/*; do
        tmp=`echo "$libdir/lib$malloc_lib.so".[0-9]`
+       re="[[:space:]]+"
+       if [[ $tmp =~ $re ]]; then
+         tmp=${tmp% *}
+       fi
        where="$where $libdir"
        # log_notice "DEBUG: Checking for malloc lib '$tmp'"
        [ -r "$tmp" ] || continue
@@ -499,8 +502,26 @@ set_malloc_lib() {
     done
 
     if [ -n "$where" ]; then
-      log_error "no shared library for lib$malloc_lib.so.[0-9] found in$where"
-      exit 1
+      # For the source builds mysql_config may be used.
+      pkglibdir=`get_mysql_config --variable=pkglibdir`
+      where2=''
+      for libdir in "$pkglibdir" "$pkglibdir/mysql"; do
+         tmp=`echo "$libdir/lib$malloc_lib.so".[0-9]`
+         re="[[:space:]]+"
+         if [[ $tmp =~ $re ]]; then
+           tmp=${tmp% *}
+         fi
+         where2="$where2 $libdir"
+         # log_notice "DEBUG: Checking for malloc lib '$tmp'"
+         [ -r "$tmp" ] || continue
+         malloc_lib="$tmp"
+         where2=''
+         break
+      done
+      if [ -n "$where2" ]; then
+        log_error "no shared library for lib$malloc_lib.so.[0-9] found in$where $where2"
+        exit 1
+      fi
     fi
   fi
 
