@@ -156,13 +156,13 @@ static MYSQL_RES *get_table_name_result= NULL;
 static MEM_ROOT glob_root;
 static MYSQL_RES *routine_res, *routine_list_res;
 static MEM_ROOT store_table_root;
-static struct store_tb
+typedef struct store_tb
 {
-  char *db;
-  char *table;
+  const char *db;
+  const char *table;
+  struct store_tb *next;
 } store_tb;
-static struct store_tb stb_start= {0};
-static struct store_tb *stb_end= &store_tb;
+store_tb *sequence_head= NULL;
 
 #include <sslopt-vars.h>
 FILE *md_result_file= 0;
@@ -1682,6 +1682,16 @@ static FILE* open_sql_file_for_table(const char* table, int flags)
   return res;
 }
 
+void free_sequence(store_tb **head)
+{
+  store_tb *tmp= *head;
+  while(tmp != NULL)
+  {
+    *head=tmp->next;
+    free(tmp);
+    tmp=*head;
+  }
+}
 
 static void free_resources()
 {
@@ -1713,12 +1723,12 @@ static void free_resources()
   dynstr_free(&insert_pat);
   dynstr_free(&select_field_names);
   free_root(&store_table_root, 0);
+  free_sequence(&sequence_head);
   if (defaults_argv)
     free_defaults(defaults_argv);
   mysql_library_end();
   my_end(my_end_arg);
 }
-
 
 static void maybe_exit(int error)
 {
@@ -2767,7 +2777,7 @@ static inline my_bool general_log_or_slow_log_tables(const char *db,
 */
 
 static uint get_table_structure(char *table, char *db, char *table_type,
-                                char *ignore_flag, my_bool dump_seqt)
+                                char *ignore_flag, my_bool dump_seqt, store_tb **head)
 {
   my_bool    init=0, delayed, write_data, complete_insert;
   my_ulonglong num_fields;
@@ -2796,24 +2806,18 @@ static uint get_table_structure(char *table, char *db, char *table_type,
   DBUG_PRINT("enter", ("db: %s  table: %s", db, table));
 
   *ignore_flag= check_if_ignore_table(table, table_type);
-  if(!dump_seqt && (*ignore_flag & IGNORE_SEQUENCE_TABLE))
+  if(*head && !dump_seqt && (*ignore_flag & IGNORE_SEQUENCE_TABLE))
   {
+    store_tb *stb_end= (store_tb *) calloc(1, sizeof(*stb_end));
     db_len= strlen(db) + 1;
     table_len= strlen(table) + 1;
 
-    if (!(stb_end->db= (char*) alloc_root(&store_table_root, db_len)))
-      die(EX_EOM, "alloc_root failure.");
-    strmake(stb_end->db, db, db_len);
-
-    if (!(stb_end->table= (char*) alloc_root(&store_table_root, table_len)))
-      die(EX_EOM, "alloc_root failure.");
-    strmake(stb_end->table, table, table_len);
-
-    /* stb_start is initialized with zeros */
-    if (!stb_start.db)
-      stb_start= *stb_end;
-
-    stb_end++;
+    if (!(stb_end->db= strmake_root(&store_table_root, db, db_len)) ||
+       !(stb_end->table= strmake_root(&store_table_root, table, table_len)))
+     die(EX_EOM, "alloc_root failure.");
+    
+    stb_end->next= *head;
+    *head=stb_end;
   }
 
   delayed= opt_delayed;
@@ -3759,7 +3763,7 @@ static void dump_table(char *table, char *db, const uchar *hash_key, size_t len,
     --no-data flag below. Otherwise, the create table info won't be printed.
   */
   num_fields= get_table_structure(table, db, table_type, &ignore_flag,
-                                  dump_seqt);
+                                  dump_seqt, &sequence_head);
 
   /*
     The "table" could be a view.  If so, we don't do anything here.
@@ -3808,14 +3812,14 @@ static void dump_table(char *table, char *db, const uchar *hash_key, size_t len,
     DBUG_VOID_RETURN;
   }
 
+  if (!dump_seqt && (ignore_flag & IGNORE_SEQUENCE_TABLE))
+    DBUG_VOID_RETURN;
   result_table= quote_name(table,table_buff, 1);
   opt_quoted_table= quote_name(table, table_buff2, 0);
 
   verbose_msg("-- Sending SELECT query...\n");
 
   init_dynamic_string_checked(&query_string, "", 1024, 1024);
-  if (!dump_seqt && (ignore_flag & IGNORE_SEQUENCE_TABLE))
-    goto end;
 
   if (path)
   {
@@ -4237,9 +4241,6 @@ static void dump_table(char *table, char *db, const uchar *hash_key, size_t len,
 err:
   dynstr_free(&query_string);
   maybe_exit(error);
-  DBUG_VOID_RETURN;
-end:
-  dynstr_free(&query_string);
   DBUG_VOID_RETURN;
 
 } /* dump_table */
@@ -4889,21 +4890,21 @@ static int dump_all_tables_in_db(char *database)
     if (general_log_table_exists)
     {
       if (!get_table_structure((char *) "general_log",
-                               database, table_type, &ignore_flag, 0) )
+                               database, table_type, &ignore_flag, 0, &sequence_head) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'general_log' table\n");
     }
     if (slow_log_table_exists)
     {
       if (!get_table_structure((char *) "slow_log",
-                               database, table_type, &ignore_flag, 0) )
+                               database, table_type, &ignore_flag, 0, &sequence_head) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'slow_log' table\n");
     }
     if (transaction_registry_table_exists)
     {
       if (!get_table_structure((char *) "transaction_registry",
-                               database, table_type, &ignore_flag, 0) )
+                               database, table_type, &ignore_flag, 0, &sequence_head) )
         verbose_msg("-- Warning: get_table_structure() failed with some internal "
                     "error for 'transaction_registry' table\n");
     }
@@ -5785,7 +5786,7 @@ char check_if_ignore_table(const char *table_name, char *table_type)
     strmake(table_type, row[1], NAME_LEN-1);
     if (!strcmp(table_type,"SEQUENCE"))
       result|= IGNORE_SEQUENCE_TABLE;
-      /*
+    
     /*
       If these two types, we do want to skip dumping the table
     */
@@ -6181,7 +6182,6 @@ int main(int argc, char **argv)
   int exit_code;
   int consistent_binlog_pos= 0;
   int have_mariadb_gtid= 0;
-  struct store_tb *pos;
   MY_INIT(argv[0]);
   init_alloc_root(&store_table_root, "store_table_root", 8192, 0, MYF(0));
 
@@ -6327,16 +6327,15 @@ int main(int argc, char **argv)
   }
 
   /* If any SEQUENCE tables were found, now it's time to dump them */
-  pos= &stb_start;
   /*
     Begin dumping from the first element in the struct array.
     We use pos-- (position) here, because after the first set
     of data, pointed by stb_start, it was pointed to the second
     position in the mem-allocated struct-array.
   */
-  for (pos--; pos < stb_end; pos++)
+  while (sequence_head != NULL)
   {
-    dump_selected_tables((char*) pos->db, &pos->table, 1, 1);
+    dump_selected_tables((char*) sequence_head->db, (char  **)&sequence_head->table, 1, 1);
   }
 
   /* add 'START SLAVE' to end of dump */
