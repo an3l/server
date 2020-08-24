@@ -1,0 +1,55 @@
+#
+# MDEV-21786:
+# myslqdump will forget sequence definition details on --no-data dump
+#
+create database d;
+use d;
+CREATE SEQUENCE s1 START WITH 100 INCREMENT BY 10 MINVALUE=100 MAXVALUE=1100 CYCLE;
+CREATE SEQUENCE s2 START WITH 200 INCREMENT BY 20 MINVALUE=200 MAXVALUE=1200 CYCLE;
+CREATE SEQUENCE s3 START WITH 300 INCREMENT BY 30 MINVALUE=300 MAXVALUE=1300 CYCLE;
+CREATE SEQUENCE s4 START WITH 400 INCREMENT BY 40 MINVALUE=400 MAXVALUE=1400 CYCLE;
+# Show create before dump
+show create sequence s1;
+Table	Create Table
+s1	CREATE SEQUENCE `s1` start with 100 minvalue 100 maxvalue 1100 increment by 10 cache 1000 cycle ENGINE=MyISAM
+show create sequence s2;
+Table	Create Table
+s2	CREATE SEQUENCE `s2` start with 200 minvalue 200 maxvalue 1200 increment by 20 cache 1000 cycle ENGINE=MyISAM
+show create sequence s3;
+Table	Create Table
+s3	CREATE SEQUENCE `s3` start with 300 minvalue 300 maxvalue 1300 increment by 30 cache 1000 cycle ENGINE=MyISAM
+show create sequence s4;
+Table	Create Table
+s4	CREATE SEQUENCE `s4` start with 400 minvalue 400 maxvalue 1400 increment by 40 cache 1000 cycle ENGINE=MyISAM
+# Dump sequence without no-data
+# Restore from mysqldump
+# Show create after dump
+show create sequence s1;
+Table	Create Table
+s1	CREATE SEQUENCE `s1` start with 100 minvalue 100 maxvalue 1100 increment by 10 cache 1000 cycle ENGINE=MyISAM
+show create sequence s2;
+Table	Create Table
+s2	CREATE SEQUENCE `s2` start with 200 minvalue 200 maxvalue 1200 increment by 20 cache 1000 cycle ENGINE=MyISAM
+show create sequence s3;
+Table	Create Table
+s3	CREATE SEQUENCE `s3` start with 300 minvalue 300 maxvalue 1300 increment by 30 cache 1000 cycle ENGINE=MyISAM
+show create sequence s4;
+Table	Create Table
+s4	CREATE SEQUENCE `s4` start with 400 minvalue 400 maxvalue 1400 increment by 40 cache 1000 cycle ENGINE=MyISAM
+# Dump sequence with no-data
+# Restore from mysqldump
+# Show create after dump --no-data
+show create sequence s1;
+Table	Create Table
+s1	CREATE SEQUENCE `s1` start with 1 minvalue 1 maxvalue 9223372036854775806 increment by 1 cache 1000 nocycle ENGINE=MyISAM
+show create sequence s2;
+Table	Create Table
+s2	CREATE SEQUENCE `s2` start with 1 minvalue 1 maxvalue 9223372036854775806 increment by 1 cache 1000 nocycle ENGINE=MyISAM
+show create sequence s3;
+Table	Create Table
+s3	CREATE SEQUENCE `s3` start with 1 minvalue 1 maxvalue 9223372036854775806 increment by 1 cache 1000 nocycle ENGINE=MyISAM
+show create sequence s4;
+Table	Create Table
+s4	CREATE SEQUENCE `s4` start with 1 minvalue 1 maxvalue 9223372036854775806 increment by 1 cache 1000 nocycle ENGINE=MyISAM
+drop sequence s1, s2, s3, s4;
+drop database d;
