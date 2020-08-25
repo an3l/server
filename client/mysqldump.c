@@ -2806,7 +2806,7 @@ static uint get_table_structure(char *table, char *db, char *table_type,
   DBUG_PRINT("enter", ("db: %s  table: %s", db, table));
 
   *ignore_flag= check_if_ignore_table(table, table_type);
-  if(*head && !dump_seqt && (*ignore_flag & IGNORE_SEQUENCE_TABLE))
+  if(!dump_seqt && (*ignore_flag & IGNORE_SEQUENCE_TABLE))
   {
     store_tb *stb_end= (store_tb *) calloc(1, sizeof(*stb_end));
     db_len= strlen(db) + 1;
@@ -3772,7 +3772,7 @@ static void dump_table(char *table, char *db, const uchar *hash_key, size_t len,
     DBUG_VOID_RETURN;
 
   /* Check --no-data flag */
-  if (opt_no_data || (hash_key && ignore_table_data(hash_key, len)))
+  if ((opt_no_data && !dump_seqt) || (hash_key && ignore_table_data(hash_key, len)))
   {
     verbose_msg("-- Skipping dump data for table '%s', --no-data was used\n",
                 table);
@@ -4249,21 +4249,9 @@ err:
 static char *getTableName(int reset)
 {
   MYSQL_ROW row;
-  char buff[FN_REFLEN+80];
 
   if (!get_table_name_result)
   {
-    /* We want sequence tables first for create statements */
-    /* Sequence tables data will be dumped last though */
-    my_snprintf(buff, sizeof(buff),
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema=DATABASE() "
-                "ORDER BY IF(table_type='SEQUENCE',0,1)");
-    if (mysql_query_with_error_report(mysql, &get_table_name_result, buff))
-    {
-      mysql_errno(mysql);
-      return(NULL);
-    }
     if (!(get_table_name_result= mysql_list_tables(mysql,NullS)))
       return(NULL);
   }
@@ -6336,6 +6324,7 @@ int main(int argc, char **argv)
   while (sequence_head != NULL)
   {
     dump_selected_tables((char*) sequence_head->db, (char  **)&sequence_head->table, 1, 1);
+    sequence_head= sequence_head->next;
   }
 
   /* add 'START SLAVE' to end of dump */
