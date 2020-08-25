@@ -456,25 +456,10 @@ mysqld_ld_preload_text() {
   echo "$text"
 }
 
-
-mysql_config=
-get_mysql_config() {
-  if [ -z "$mysql_config" ]; then
-    mysql_config=`echo "$0" | sed 's,/[^/][^/]*$,/mysql_config,'`
-    if [ ! -x "$mysql_config" ]; then
-      log_error "Can not run mysql_config $@ from '$mysql_config'"
-      exit 1
-    fi
-  fi
-
-  "$mysql_config" "$@"
-}
-
-
 # set_malloc_lib LIB
 # - If LIB is empty, do nothing and return
 # - If LIB starts with 'tcmalloc' or 'jemalloc', look for the shared library in
-#   /usr/lib, /usr/lib64 and then pkglibdir.
+#   /usr/lib/[{$arch}], /usr/lib64/[{$arch}] and then pkglibdir.
 #   tcmalloc is part of the Google perftools project.
 # - If LIB is an absolute path, assume it is a malloc shared library
 #
@@ -487,13 +472,15 @@ set_malloc_lib() {
     where=''
     # This list is kept intentionally simple.  Simply set --malloc-lib
     # to a full path if another location is desired.
-    for libdir in /usr/lib/* /usr/lib64/*; do
-       tmp=`echo "$libdir/lib$malloc_lib.so".[0-9]`
-       re="[[:space:]]+"
-       if [[ $tmp =~ $re ]]; then
-         tmp=${tmp% *}
-       fi
-       where="$where $libdir"
+    library=lib${malloc_lib}.so.[0-9]
+    arch=`dpkg-architecture -q DEB_HOST_MULTIARCH`
+    #path="/usr/lib/ /usr/lib64/"
+    #if [ ! -z $arch ]; then
+    #  path="$path /usr/lib/${arch}/${library} /usr/lib64/${arch}/${library}"
+    #fi
+    for lib in /usr/lib/${library} /usr/lib64/${library} /usr/lib/${arch}/${library} /usr/lib64/${arch}/${library}; do
+       tmp=`echo "$lib"`
+       where="$where $lib"
        # log_notice "DEBUG: Checking for malloc lib '$tmp'"
        [ -r "$tmp" ] || continue
        malloc_lib="$tmp"
@@ -502,26 +489,8 @@ set_malloc_lib() {
     done
 
     if [ -n "$where" ]; then
-      # For the source builds mysql_config may be used.
-      pkglibdir=`get_mysql_config --variable=pkglibdir`
-      where2=''
-      for libdir in "$pkglibdir" "$pkglibdir/mysql"; do
-         tmp=`echo "$libdir/lib$malloc_lib.so".[0-9]`
-         re="[[:space:]]+"
-         if [[ $tmp =~ $re ]]; then
-           tmp=${tmp% *}
-         fi
-         where2="$where2 $libdir"
-         # log_notice "DEBUG: Checking for malloc lib '$tmp'"
-         [ -r "$tmp" ] || continue
-         malloc_lib="$tmp"
-         where2=''
-         break
-      done
-      if [ -n "$where2" ]; then
-        log_error "no shared library for lib$malloc_lib.so.[0-9] found in$where $where2"
-        exit 1
-      fi
+      log_error "no shared library for lib$malloc_lib.so.[0-9] found in$where $where2"
+      exit 1
     fi
   fi
 
