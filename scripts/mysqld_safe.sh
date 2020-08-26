@@ -459,38 +459,46 @@ mysqld_ld_preload_text() {
 # set_malloc_lib LIB
 # - If LIB is empty, do nothing and return
 # - If LIB starts with 'tcmalloc' or 'jemalloc', look for the shared library in
-#   /usr/lib/[{$arch}], /usr/lib64/[{$arch}] and then pkglibdir.
+#   /usr/lib/[{$arch}], /usr/lib64/[{$arch}] and then in standard libraries.
+#   If there are multiple .so's choose the first one.
 #   tcmalloc is part of the Google perftools project.
-# - If LIB is an absolute path, assume it is a malloc shared library
+# - If LIB is an absolute path, assume it is a malloc shared library.
 #
 # Put LIB in mysqld_ld_preload, which will be added to LD_PRELOAD when
 # running mysqld.  See ld.so for details.
 set_malloc_lib() {
   malloc_lib="$1"
-
+  # Helper function to look for libraries passed as an array from the caller
+  search_lib(){
+    for lib in "${!1}";do
+      where="$where $lib"
+      [ -r "$lib" ] && [ -f "$lib" ] || continue
+      malloc_lib="$lib"
+      where=''
+      break
+    done
+  }
   if expr "$malloc_lib" : "\(tcmalloc\|jemalloc\)" > /dev/null ; then
     where=''
     # This list is kept intentionally simple.  Simply set --malloc-lib
     # to a full path if another location is desired.
     library=lib${malloc_lib}.so.[0-9]
-    arch=`dpkg-architecture -q DEB_HOST_MULTIARCH`
-    #path="/usr/lib/ /usr/lib64/"
-    #if [ ! -z $arch ]; then
-    #  path="$path /usr/lib/${arch}/${library} /usr/lib64/${arch}/${library}"
-    #fi
-    for lib in /usr/lib/${library} /usr/lib64/${library} /usr/lib/${arch}/${library} /usr/lib64/${arch}/${library}; do
-       tmp=`echo "$lib"`
-       where="$where $lib"
-       # log_notice "DEBUG: Checking for malloc lib '$tmp'"
-       [ -r "$tmp" ] || continue
-       malloc_lib="$tmp"
-       where=''
-       break
-    done
+    arch=''
+    # First find arch specific directories and look there for the library
+    if which dpkg-architecture > /dev/null 2>&1;then
+      arch=`dpkg-architecture -q DEB_HOST_MULTIARCH`
+      path=(/usr/lib/${arch}/${library}  /usr/lib64/${arch}/${library})
+      search_lib path[@]
+    fi
 
-    if [ -n "$where" ]; then
-      log_error "no shared library for lib$malloc_lib.so.[0-9] found in$where $where2"
-      exit 1
+    # Look into the standard libraries if not found in special libraries or dpkg-architecture fails
+    if [ -n "$where" ] || [ -z "$arch" ]; then
+      path=(/usr/lib/${library} /usr/lib64/${library})
+      search_lib path[@]
+      if [ -n "$where" ]; then
+        log_error "no shared library for $library found in $where"
+        exit 1
+      fi
     fi
   fi
 
