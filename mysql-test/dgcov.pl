@@ -154,27 +154,17 @@ END
 
   exit 1;
 }
-
-sub gcov_one_file {
-  return unless /\.gcda$/;
-  unless ($opt_skip_gcov) {
-    $cmd= "gcov -i '$_' 2>/dev/null >/dev/null";
-    print STDERR ++$file_no,"\r" if not $opt_verbose and -t STDERR;
-    logv "Running: $cmd";
-    system($cmd)==0 or die "system($cmd): $? $!";
+sub check_gcov_file {
+  
+  my ($ext) = $_ =~ m/(\.[^.]+)$/;
+  if (!defined($ext) || $ext ne ".gcov")
+  {
+    return;
   }
 
-  # now, read the generated file
-  if($gcov_vers<7)
-  {
-    open FH, '<', "$_.gcov" or die "open(<$_.gcov): $!";
-  }
-  else
-  {
-    my $f=substr $_, 0, -5;
-    open FH, '<', "$f.gcov" or die "open(<$f.gcov): $!";
-    undef $f;
-  }
+  # Now, read the generated file
+  open FH, '<', "$_" or die "open(<$_): $!";
+
   my $fname;
   while (<FH>) {
     chomp;
@@ -193,6 +183,23 @@ sub gcov_one_file {
     $cov{$fname}->{$1}+=$2;
   }
   close(FH);
+}
+sub gcov_one_file {
+  return unless /\.gcda$/;
+  unless ($opt_skip_gcov) {
+    $cmd= "gcov -i '$_' 2>/dev/null >/dev/null";
+    print STDERR ++$file_no,"\r" if not $opt_verbose and -t STDERR;
+    logv "Running: $cmd";
+    system($cmd)==0 or die "system($cmd): $? $!";
+  }
+  # After generating .gcov files we have to find the file, since it may not be
+  # created.
+  (my $filename = $_)=~ s/\.[^.]+$//;
+  my $gcov_file_path= $File::Find::dir."/$filename.gcov";
+  if (-f $gcov_file_path)
+  {
+    find(\&check_gcov_file, $gcov_file_path);
+  }
 }
 
 sub write_coverage {
