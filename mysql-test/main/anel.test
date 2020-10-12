@@ -1,0 +1,63 @@
+#--source include/have_debug_sync.inc
+# Run test case with ./mtr <> --debug
+select @@debug_dbug;
+
+connect  conn1, localhost, root,,;
+connect  conn2, localhost, root,,;
+create table t1(t int);
+--connection conn1
+# lock_tables() sql_base.cc
+select @@debug_sync;
+show variables like 'debug_sync';
+SET DEBUG_SYNC= 'before_lock_tables_takes_lock SIGNAL opened WAIT_FOR flushed';
+select @@debug_sync;
+send INSERT INTO t1 VALUES(1);
+
+    --connection conn2
+    SET DEBUG_SYNC= 'now WAIT_FOR opened';
+    # close_cached_tables() sql_base.cc
+    SET DEBUG_SYNC= 'after_flush_unlock SIGNAL flushed';
+    FLUSH TABLE t1;
+    show variables like 'debug_sync';
+
+ connection default;
+ SELECT * FROM t1;
+ SET DEBUG_SYNC='RESET';
+ show variables like 'debug_sync';
+ DROP TABLE t1;
+
+#$ egrep 'query:|debug_sync_exec:' mysql-test/var/log/mysqld.1.trace
+#T@6    : | | query: SHOW SLAVE STATUS
+#T@6    : | | query: SELECT 'No such row' = 'No such row'
+#T@6    : | | query: select count(*) from mysql.proc
+#T@6    : | | query: call mtr.check_testcase()
+#T@6    : | | query: select @@datadir
+#T@6    : | | query: SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME = 'wsrep' AND PLUGIN_STATUS='ACTIVE'
+#T@6    : | | query: SELECT @@wsrep_on
+#T@8    : | | query: create table t1(t int)
+#T@7    : | | query: SET DEBUG_SYNC= 'before_lock_tables_takes_lock SIGNAL opened WAIT_FOR #flushed'
+#T@7    : | | query: INSERT INTO t1 VALUES(1)
+#T@8    : | | query: SET DEBUG_SYNC= 'now WAIT_FOR opened'
+#T@8    : | | | | | | | | | | debug_sync_exec: wait for 'opened'  at: 'now'  curr: ''
+#T@7    : | | | | | | | | | debug_sync_exec: signal 'opened'  at: 'before_lock_tables_takes_lock'
+#T@7    : | | | | | | | | | debug_sync_exec: wait for 'flushed'  at: 'before_lock_tables_takes_lock'  curr: 'opened'
+#T@8    : | | | | | | | | | | debug_sync_exec: resume from 'opened'  at: 'now'
+#T@8    : | | query: SET DEBUG_SYNC= 'after_flush_unlock SIGNAL flushed'
+#T@8    : | | query: FLUSH TABLE t1
+#T@8    : | | | | | | | debug_sync_exec: signal 'flushed'  at: 'after_flush_unlock'
+#T@7    : | | | | | | | | | debug_sync_exec: resume from 'flushed'  at: 'before_lock_tables_takes_lock'
+#T@8    : | | query: show variables like 'debug_sync'
+#T@6    : | | query: SELECT * FROM t1
+#T@6    : | | query: SET DEBUG_SYNC='RESET'
+#T@6    : | | query: show variables like 'debug_sync'
+#T@6    : | | query: DROP TABLE t1
+#T@7    : | | query: set SQL_LOG_BIN=0
+#T@7    : | | query: set WSREP_ON=0
+#T@7    : | | query: set debug_dbug=""
+#T@8    : | | query: SHOW SLAVE STATUS
+#T@8    : | | query: SELECT 'No such row' = 'No such row'
+#T@8    : | | query: select count(*) from mysql.proc
+#T@8    : | | query: call mtr.check_testcase()
+#T@8    : | | query: select @@datadir
+#T@8    : | | query: SELECT COUNT(*)=1 FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME = 'wsrep' AND PLUGIN_STATUS='ACTIVE'
+#T@8    : | | query: SELECT @@wsrep_on
