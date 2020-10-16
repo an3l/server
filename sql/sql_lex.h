@@ -148,6 +148,10 @@ public:
   bool convert(THD *thd, const LEX_CSTRING *str, CHARSET_INFO *cs);
   bool copy_or_convert(THD *thd, const Lex_ident_cli_st *str, CHARSET_INFO *cs);
   bool is_null() const { return str == NULL; }
+  bool streq(const Lex_ident_sys_st &str) const
+  {
+    return lex_string_cmp(system_charset_info, this, &str) == 0;
+  }
   bool to_size_number(ulonglong *to) const;
   void set_valid_utf8(const LEX_CSTRING *name)
   {
@@ -4365,6 +4369,12 @@ public:
 
     if (check_exists && info.name.streq(name))
       return 0;
+
+    if (start.streq(end))
+    {
+      my_error(ER_FIELD_SPECIFIED_TWICE, MYF(0), start.str);
+      return 1;
+    }
 
     if (info.is_set())
     {
