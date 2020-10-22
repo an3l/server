@@ -25,6 +25,7 @@ use warnings;
 use Getopt::Long;
 use File::Find;
 use Cwd qw/realpath/;
+use Cwd qw(getcwd);
 
 my $opt_verbose=0;
 my $opt_generate;
@@ -32,6 +33,7 @@ my $opt_help;
 my $opt_purge;
 my $opt_only_gcov;
 my $opt_skip_gcov;
+my $opt_base_dir; #where diffs are
 
 my %cov;
 my $file_no=0;
@@ -43,6 +45,7 @@ GetOptions
    "g|generate"    => \$opt_generate,
    "o|only-gcov"   => \$opt_only_gcov,
    "s|skip-gcov"   => \$opt_skip_gcov,
+   "b|basedir=s"   => \$opt_base_dir,
   ) or usage();
 
 usage() if $opt_help;
@@ -50,6 +53,8 @@ usage() if $opt_help;
 sub logv(@)     { print STDERR @_,"\n" if $opt_verbose; }
 sub gcov_prefix($) { defined($_[0]) ? $_[0] || '#####' : '-' }
 
+my $build_dir= getcwd(); # where .gcda files are
+chdir "$opt_base_dir" if $build_dir ne $opt_base_dir; #for out-of-source builds 
 my $root= `git rev-parse --show-toplevel`;
 chomp $root;
 
@@ -62,16 +67,17 @@ my $res;
 my $cmd;
 if ($opt_purge)
 {
-  $cmd= "find . -name '*.da' -o -name '*.gcda' -o -name '*.gcov' -o ".
+  $cmd= "find $build_dir -name '*.da' -o -name '*.gcda' -o -name '*.gcov' -o ".
                "-name '*.dgcov' | grep -v 'README\.gcov' | xargs rm -f ''";
   logv "Running: $cmd";
   system($cmd)==0 or die "system($cmd): $? $!";
   exit 0;
 }
 
-find(\&gcov_one_file, $root);
-find(\&write_coverage, $root) if $opt_generate;
+find(\&gcov_one_file, $build_dir);
+find(\&write_coverage, $build_dir) if $opt_generate;
 exit 0 if $opt_only_gcov;
+chdir "$opt_base_dir";
 
 if (@ARGV) {
   print_gcov_for_diff(@ARGV);

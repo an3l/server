@@ -742,7 +742,12 @@ sub main {
 
   if ($opt_gcov) {
     mtr_report("Running dgcov");
-    system "./dgcov.pl --generate > $opt_vardir/last_changes.dgcov";
+    if (!length($ENV{MTR_BINDIR})){
+      system "./dgcov.pl --generate -b . > $opt_vardir/last_changes.dgcov";
+    }
+    else{
+      system("/usr/bin/perl $basedir/mysql-test/dgcov.pl --generate -b $basedir > $opt_vardir/last_changes.dgcov");
+    }
   }
 
   if ( @$completed != $num_tests)
@@ -1791,7 +1796,7 @@ sub command_line_setup {
   # --------------------------------------------------------------------------
   # Gcov flag
   # --------------------------------------------------------------------------
-  if ( ($opt_gcov or $opt_gprof) and (! $source_dist or -d $ENV{MTR_BINDIR}))
+  if ( ($opt_gcov or $opt_gprof) and ! $source_dist and !length($ENV{MTR_BINDIR}))
   {
     mtr_error("Coverage test needs the source - please use source dist");
   }
