@@ -140,7 +140,6 @@ my $opt_start_dirty;
 my $opt_start_exit;
 my $start_only;
 my $file_wsrep_provider;
-
 our @global_suppressions;
 
 END {
@@ -665,7 +664,6 @@ sub run_test_server ($$$) {
 	  mtr_report_test($result);
 
 	  if ( $result->is_failed() ) {
-
 	    # Save the workers "savedir" in var/log
 	    my $worker_savedir= $result->{savedir};
 	    my $worker_savename= basename($worker_savedir);
@@ -820,6 +818,7 @@ sub run_test_server ($$$) {
             # Test failure due to warnings, force is off
             return ("Warnings in log", 1, $completed, $extra_warnings);
           }
+          next;
         }
 	elsif ($line =~ /^SPENT/) {
 	  add_total_times($line);
@@ -3971,6 +3970,7 @@ sub run_testcase ($$) {
     if (start_servers($tinfo))
     {
       report_failure_and_restart($tinfo);
+      unlink $path_current_testlog;
       return 1;
     }
   }
