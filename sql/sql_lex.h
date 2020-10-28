@@ -4370,12 +4370,12 @@ public:
     if (check_exists && info.name.streq(name))
       return 0;
 
-    if (start.streq(end))
+    /*if (start.streq(end))
     {
       my_error(ER_FIELD_SPECIFIED_TWICE, MYF(0), start.str);
       return 1;
     }
-
+   */
     if (info.is_set())
     {
        my_error(ER_MORE_THAN_ONE_PERIOD, MYF(0));

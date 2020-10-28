@@ -6644,6 +6644,11 @@ period_for_system_time:
 period_for_application_time:
           FOR_SYM ident '(' ident ',' ident ')'
           {
+            if (strcmp($4.str, $6.str) == 0)
+            {
+                my_error(ER_FIELD_SPECIFIED_TWICE, MYF(0), $4.str);
+                return TRUE;
+            }
             if (Lex->add_period($2, $4, $6))
               MYSQL_YYABORT;
           }
