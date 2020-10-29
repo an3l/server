@@ -377,6 +377,8 @@ public:
   { collation.set_numeric(); }
   Item_real_func(THD *thd, Item *a, Item *b): Item_func(thd, a, b)
   { collation.set_numeric(); }
+  Item_real_func(THD *thd, Item *a, Item *b, Item *c): Item_func(thd, a, b, c)
+  { collation.set_numeric(); }
   Item_real_func(THD *thd, List<Item> &list): Item_func(thd, list)
   { collation.set_numeric(); }
   String *val_str(String*str);

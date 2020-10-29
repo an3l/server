@@ -558,6 +558,109 @@ const Geometry::Class_info *Gis_point::get_class_info() const
 }
 
 
+/**
+  Function to calculate haversine.
+  Taking as arguments Point and Multipoint geometries.
+  Multipoint geometry has to be single point only.
+  It is up to caller to ensure valid input.
+
+  @param    g pointer to the Geometry
+  @param    r sphere radius
+
+  @return distance
+*/
+double Gis_point::calculate_haversine(const Geometry *g,
+                                            const double sphere_radius)
+{
+  DBUG_ASSERT(sphere_radius > 0);
+  double x1r= 0.0;
+  double x2r= 0.0;
+  double y1r= 0.0;
+  double y2r= 0.0;
+  double dlong= 0.0;
+  double dlat= 0.0;
+  double res= 0.0;
+  // This check is done only for optimization purposes where we know it will
+  // be one and only one point in Multipoint
+  if (g->get_class_info()->m_type_id == Geometry::wkb_multipoint)
+  {
+    const char point_size= 4 + WKB_HEADER_SIZE + POINT_DATA_SIZE+1; //1 for the type
+    char point_temp[point_size];
+    memset(point_temp+4, Geometry::wkb_point, 1);
+    memcpy(point_temp+5, static_cast<const Gis_multi_point *>(g)->get_data_ptr()+5, 4);
+    memcpy(point_temp+4+WKB_HEADER_SIZE, g->get_data_ptr()+4+WKB_HEADER_SIZE,
+           POINT_DATA_SIZE);
+    point_temp[point_size-1]= '\0';
+    Geometry_buffer gbuff;
+    Geometry *gg= Geometry::construct(&gbuff, point_temp, point_size-1);
+    DBUG_ASSERT(gg);
+    if (static_cast<Gis_point *>(gg)->get_xy_radian(&x2r, &y2r))
+      DBUG_ASSERT(0);
+  }
+  else
+  {
+    if (static_cast<const Gis_point *>(g)->get_xy_radian(&x2r, &y2r))
+     DBUG_ASSERT(0);
+  }
+  if (this->get_xy_radian(&x1r, &y1r))
+    DBUG_ASSERT(0);
+
+  dlong= sin((y2r - y1r)/2)*sin((y2r - y1r)/2);
+  dlat=  sin((x2r - x1r)/2)*sin((x2r - x1r)/2);
+  res= 2*sphere_radius*asin((sqrt(dlong + cos(y1r)*cos(y2r)*dlat)));
+  return res;
+}
+
+
+/**
+  Function that calculate spherical distance of Point from Multipoint geometries.
+  In case there is single point in Multipoint geometries calculate_haversine()
+  can handle such case. Otherwise, new geometry (Point) has to be constructed.
+
+  @param    g pointer to the Geometry
+  @param    r sphere radius
+  @param    result pointer to the result
+
+  @return state
+  @retval TRUE  failed
+  @retval FALSE success
+*/
+int Gis_point::spherical_distance_multipoints(Geometry *g, const double r,
+                                              double *result)
+{
+  const uint32 len= 4 + WKB_HEADER_SIZE + POINT_DATA_SIZE + 1;
+  uint32 num_of_points2;
+    // To find the minimum radius it cannot be greater than Earth radius
+  double res= 6370986.0;
+  double temp_res= 0.0;
+  char s[len];
+
+  DBUG_ASSERT(!g->num_geometries(&num_of_points2) && num_of_points2 >= 1);
+  if (num_of_points2 == 1)
+  {
+    *result= this->calculate_haversine(g, r);
+    return 0;
+  }
+  for (uint32 i=1; i <= num_of_points2; i++)
+  {
+    Geometry_buffer buff_temp;
+    Geometry *temp;
+
+    // First 4 bytes are handled already, make sure to create a Point
+    memset(s + 4, Geometry::wkb_point, 1);
+    memcpy(s + 5, g->get_data_ptr() + 5, 4);
+    memcpy(s + 4 + WKB_HEADER_SIZE, g->get_data_ptr() + 4 + WKB_HEADER_SIZE*i +\
+                                    POINT_DATA_SIZE*(i-1), POINT_DATA_SIZE);
+    s[len-1]= '\0';
+    temp= Geometry::construct(&buff_temp, s, len);
+    DBUG_ASSERT(temp);
+    temp_res= this->calculate_haversine(temp, r);
+    if (res > temp_res)
+      res= temp_res;
+  }
+  *result= res;
+  return 0;
+}
 /***************************** LineString *******************************/
 
 uint32 Gis_line_string::get_data_size() const 
@@ -1478,6 +1581,78 @@ int Gis_multi_point::store_shapes(Gcalc_shape_transporter *trn) const
 const Geometry::Class_info *Gis_multi_point::get_class_info() const
 {
   return &multipoint_class;
+}
+
+
+/**
+  Function that calculate spherical distance of Multipoints geometries.
+  In case there is single point in Multipoint geometries calculate_haversine()
+  can handle such case. Otherwise, new geometry (Point) has to be constructed.
+
+  @param    g pointer to the Geometry
+  @param    r sphere radius
+  @param    result pointer to the result
+
+  @return state
+  @retval TRUE  failed
+  @retval FALSE success
+*/
+int Gis_multi_point::spherical_distance_multipoints(Geometry *g, const double r,
+                                                    double *result)
+{
+  const uint32 len= 4 + WKB_HEADER_SIZE + POINT_DATA_SIZE + 1;
+  // Check how many points are stored in Multipoints
+  uint32 num_of_points1, num_of_points2;
+  // To find the minimum radius it cannot be greater than Earth radius
+  double res= 6370986.0;
+
+  /* From Item_func_sphere_distance::spherical_distance_points,
+     we are sure that there will be multiple points and we have to construct
+     Point geometry and return the smallest result.
+  */
+  DBUG_ASSERT(!num_geometries(&num_of_points1) && num_of_points1 >= 1);
+  DBUG_ASSERT(!g->num_geometries(&num_of_points2) && num_of_points2 >= 1);
+
+  for (uint32 i=1; i <= num_of_points1; i++)
+  {
+    Geometry_buffer buff_temp;
+    Geometry *temp;
+    double temp_res= 0.0;
+    char s[len];
+    // First 4 bytes are handled already, make sure to create a Point
+    memset(s + 4, Geometry::wkb_point, 1);
+    memcpy(s + 5, this->get_data_ptr() + 5, 4);
+    memcpy(s + 4 + WKB_HEADER_SIZE, this->get_data_ptr() + 4 + WKB_HEADER_SIZE*i +\
+                                    POINT_DATA_SIZE*(i-1), POINT_DATA_SIZE);
+    s[len-1]= '\0';
+    temp= Geometry::construct(&buff_temp, s, len);
+    DBUG_ASSERT(temp);
+    // Optimization for single Multipoint
+    if (num_of_points2 == 1)
+    {
+      *result= static_cast<Gis_point *>(temp)->calculate_haversine(g, r);
+      return 0;
+    }
+    for (uint32 j=1; j<= num_of_points2; j++)
+    {
+      Geometry_buffer buff_temp2;
+      Geometry *temp2;
+      char s2[len];
+      // First 4 bytes are handled already, make sure to create a Point
+      memset(s2 + 4, Geometry::wkb_point, 1);
+      memcpy(s2 + 5, g->get_data_ptr() + 5, 4);
+      memcpy(s2 + 4 + WKB_HEADER_SIZE, g->get_data_ptr() + 4 + WKB_HEADER_SIZE*j +\
+                                       POINT_DATA_SIZE*(j-1), POINT_DATA_SIZE);
+      s2[len-1]= '\0';
+      temp2= Geometry::construct(&buff_temp2, s2, len);
+      DBUG_ASSERT(temp2);
+      temp_res= static_cast<Gis_point *>(temp)->calculate_haversine(temp2, r);
+      if (res > temp_res)
+        res= temp_res;
+    }
+  }
+  *result= res;
+  return 0;
 }
 
 

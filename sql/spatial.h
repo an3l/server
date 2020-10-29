@@ -317,6 +317,11 @@ public:
     m_data+= WKB_HEADER_SIZE;
   }
 
+  const char *get_data_ptr() const
+  {
+    return m_data;
+  }
+
   bool envelope(String *result) const;
   static Class_info *ci_collection[wkb_last+1];
 
@@ -392,6 +397,17 @@ public:
     return 0;
   }
 
+  int get_xy_radian(double *x, double *y) const
+  {
+    if (!get_xy(x, y))
+    {
+      *x= (*x)*M_PI/180;
+      *y= (*y)*M_PI/180;
+      return 0;
+    }
+    return 1;
+  }
+
   int get_x(double *x) const
   {
     if (no_data(m_data, SIZEOF_STORED_DOUBLE))
@@ -418,6 +434,8 @@ public:
   }
   int store_shapes(Gcalc_shape_transporter *trn) const;
   const Class_info *get_class_info() const;
+  double calculate_haversine(const Geometry *g, const double sphere_radius);
+  int spherical_distance_multipoints(Geometry *g, const double r, double *result);
 };
 
 
@@ -508,6 +526,7 @@ public:
   }
   int store_shapes(Gcalc_shape_transporter *trn) const;
   const Class_info *get_class_info() const;
+  int spherical_distance_multipoints(Geometry *g, const double r, double *res);
 };
 
 

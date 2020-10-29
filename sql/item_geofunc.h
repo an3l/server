@@ -589,6 +589,22 @@ public:
 };
 
 
+class Item_func_sphere_distance: public Item_real_func
+{
+  double sphere_radius= 6370986.0; // Default radius equals Earth radius
+  static double spherical_distance(Geometry *g1, Geometry *g2, const double sphere_r);
+  static double spherical_distance_points(Geometry *g1, Geometry *g2,
+                                          const double sphere_r);
+public:
+  Item_func_sphere_distance(THD *thd, Item *a, Item *b):
+    Item_real_func(thd, a, b){}
+  Item_func_sphere_distance(THD *thd, Item *a, Item *b, Item *c):
+    Item_real_func(thd, a, b, c){}
+  double val_real();
+  const char *func_name() const { return "st_distance_sphere"; }
+};
+
+
 class Item_func_pointonsurface: public Item_geometry_func
 {
   String tmp_value;
