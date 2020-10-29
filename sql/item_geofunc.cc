@@ -2388,11 +2388,186 @@ mem_error:
 }
 
 
+double Item_func_sphere_distance::val_real()
+{
+  /* In order to use Item.null_value we have to make backup of arguments*/
+  // well-known bytes
+  String *a1= args[0]->val_str(&bak1);
+  String *a2= args[1]->val_str(&bak2);
+  double distance= 0.0;
+  // It has to be 2 Items here
+  null_value= (args[0]->null_value || args[1]->null_value);
+  if (null_value)
+  {
+    // Returned Item cannot be set to null
+    DBUG_ASSERT(maybe_null);
+    return 0;
+  }
+
+  if (!a1 || !a2)
+  {
+    // Item->val_str cannot return nullptr if Item->null_value is 0
+    DBUG_ASSERT(false);
+    my_error(ER_INTERNAL_ERROR, MYF(0), func_name());
+  }
+  if (arg_count == 3)
+  {
+    sphere_radius= args[2]->val_real();
+    // Check radius is NULL
+    null_value= args[2]->null_value;
+    if (null_value)
+    {
+      return 0;
+    }
+
+    if (sphere_radius<=0)
+    {
+      // generate error ? r<0
+      goto mem_error;
+    }
+  }
+  Geometry_buffer buffer1, buffer2;
+  Geometry *g1, *g2;
+  if (!(g1= Geometry::construct(&buffer1, a1->ptr(), a1->length())) ||
+      !(g2= Geometry::construct(&buffer2, a2->ptr(), a2->length())))
+  {
+     goto mem_error;
+  }
+// Method allowed for points and multipoints
+  if (!(g1->get_class_info()->m_type_id == Geometry::wkb_point ||
+        g1->get_class_info()->m_type_id == Geometry::wkb_multipoint) &&
+      !(g2->get_class_info()->m_type_id == Geometry::wkb_point ||
+        g2->get_class_info()->m_type_id == Geometry::wkb_multipoint))
+  {
+    // Generate error message? 
+    goto mem_error;
+  }
+  distance= spherical_distance(g1, g2, sphere_radius);
+  if (distance < 0)
+  {
+    // return error distance<0
+    return 0;
+  }
+  return distance;
+
+  mem_error:
+    return 0;
+}
+
+
+double Item_func_sphere_distance::spherical_distance(Geometry *g1,
+                                                            Geometry *g2,
+                                                            double sphere_radius)
+{
+  double res= 0.0;
+  switch(g1->get_class_info()->m_type_id)
+  {
+    case Geometry::wkb_point:
+      res= spherical_distance_points(g1, g2, sphere_radius);
+      break;
+
+    case Geometry::wkb_multipoint:
+      res= spherical_distance_multipoints(g1, g2, sphere_radius);
+      break;
+    default:
+      DBUG_ASSERT(1);
+      break;
+  }
+  return res;
+}
+
+
+double Item_func_sphere_distance::spherical_distance_points(Geometry *g1, Geometry *g2,
+                                                            double sphere_radius)
+{
+  double res= 0.0;
+  double temp_hav= 0.0;
+  char t[1024]; // should be N*(KB_HEADER_SIZE + POINT_DATA_SIZE)? or create_point(srid, 512)
+  String buff(t, sizeof(t), system_charset_info);
+  
+  uint32 *num= (uint32 *)my_malloc(sizeof(*num), 0);
+  Geometry_buffer buff_temp;
+  Geometry *temp;
+  switch(g2->get_class_info()->m_type_id)
+  {
+    case Geometry::wkb_point:
+      res= calculate_haversine(g1, g2, sphere_radius);
+      break;
+    case Geometry::wkb_multipoint:
+    // The logic is that we find number of Points() in Multipoint and for each  point 
+    // calculate distance and use the lowest. 
+    // Iterating over geometries in Multipoint is ?
+      g2->num_geometries(num);
+      
+      // This function should return string of data per point?
+      // First 4 bytes of m_data are number of points == *num,
+      // next 21 bytes are data from point which should be stored in buff, but are not?
+      // As consequence temp geometry cannot be constructed and returns 0
+      return 12345678; // dummy result because of above
+      if (g2->geometry_n(1,&buff))
+        return 0; // handle error?
+      temp= Geometry::construct(&buff_temp, buff.ptr(), buff.length());
+      buff.length(0);
+      res= calculate_haversine(g1, temp, sphere_radius);
+      temp= NULL;
+      for (uint32 i=2; i < *num; i++)
+      {
+        if (g2->geometry_n(i,&buff))
+          return 0; // handle error?
+        temp= Geometry::construct(&buff_temp, buff.ptr(), buff.length());
+        temp_hav= calculate_haversine(g1, temp, sphere_radius);
+        if (res > temp_hav)
+        {
+          res= temp_hav;
+        }
+        buff.length(0);
+      }
+      delete num;
+      break;
+    default:
+      DBUG_ASSERT(1);
+      break;
+  }
+  return res;
+}
+
+
+double Item_func_sphere_distance::spherical_distance_multipoints(Geometry *g1, Geometry *g2,
+                                                            double sphere_radius)
+{
+  // Above should be here.
+  return 54321;
+}
+
+
+double Item_func_sphere_distance::calculate_haversine(Geometry *g1, Geometry *g2,
+                                                      double sphere_radius)
+{
+  // The approximation of haversin function used for small central(angular) angles
+  // using sin(delta/2)^2 function. Results compared to MySQL output are the same.
+  double x1, x2, y1, y2, x1r, x2r, y1r, y2r;
+  double dlong= 0.0;
+  double dlat= 0.0;
+  double res= 0.0;
+  if (((Gis_point *) g1)->get_xy(&x1, &y1) ||
+     ((Gis_point *) g2)->get_xy(&x2, &y2))
+    return 0.0; // should return error, which?
+  x1r= x1*M_PI/180;
+  x2r= x2*M_PI/180;
+  y1r= y1*M_PI/180;
+  y2r= y2*M_PI/180;
+  dlong= sin((x2r - x1r)/2)*sin((x2r - x1r)/2);
+  dlat=  sin((y2r - y1r)/2)*sin((y2r - y1r)/2);
+  res= 2*sphere_radius*asin((sqrt(dlong + cos(x1r)*cos(x2r)*dlat)));
+  return res;
+}
+
+
 String *Item_func_pointonsurface::val_str(String *str)
 {
   Gcalc_operation_transporter trn(&func, &collector);
 
-  DBUG_ENTER("Item_func_pointonsurface::val_real");
+  DBUG_ENTER("Item_func_pointonsurface::val_str");
   DBUG_ASSERT(fixed == 1);
   String *res= args[0]->val_str(&tmp_value);
   Geometry_buffer buffer;
