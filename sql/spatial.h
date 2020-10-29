@@ -311,7 +311,12 @@ public:
     m_data= data;
     m_data_end= data + data_len;
   }
-
+  
+  const char * get_data_ptr() const
+  {
+    return m_data;
+  }
+  
   inline void shift_wkb_header()
   {
     m_data+= WKB_HEADER_SIZE;
@@ -390,6 +395,17 @@ public:
     float8get(*x, data);
     float8get(*y, data + SIZEOF_STORED_DOUBLE);
     return 0;
+  }
+
+  int get_xy_radian(double *x, double *y) const
+  {
+    if (!get_xy(x, y))
+    {
+      *x= (*x)*M_PI/180;
+      *y= (*y)*M_PI/180;
+      return 0;
+    }
+    return 1;
   }
 
   int get_x(double *x) const
