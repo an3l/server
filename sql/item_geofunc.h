@@ -598,8 +598,9 @@ class Item_func_sphere_distance: public Item_real_func
   static double spherical_distance(Geometry *g1,Geometry *g2, double sphere_radius);
   static double spherical_distance_points(Geometry *g1,Geometry *g2,
                                           double sphere_radius);
-  static double spherical_distance_multipoints(Geometry *g1, Geometry *g2,
-                                               double sphere_radius);
+  static double spherical_distance_multipoints(Geometry *g1,
+                                                 const char *start, uint32 len,
+                                                 uint32 *srid, uint32 *num, double sphere_radius);
   static double calculate_haversine(Geometry *g1,Geometry *g2, double sphere_radius);
 public:
   Item_func_sphere_distance(THD *thd, Item *a, Item *b):

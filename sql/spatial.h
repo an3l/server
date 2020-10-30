@@ -311,6 +311,16 @@ public:
     m_data= data;
     m_data_end= data + data_len;
   }
+  
+  const char * get_data_ptr() const
+  {
+    return m_data;
+  }
+  
+  const char * get_data_len() const
+  {
+    return m_data_end;
+  }
 
   inline void shift_wkb_header()
   {

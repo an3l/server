@@ -2467,7 +2467,8 @@ double Item_func_sphere_distance::spherical_distance(Geometry *g1,
       break;
 
     case Geometry::wkb_multipoint:
-      res= spherical_distance_multipoints(g1, g2, sphere_radius);
+      return 1211212121212;
+      //res= spherical_distance_multipoints(g1, g2, sphere_radius);
       break;
     default:
       DBUG_ASSERT(1);
@@ -2478,51 +2479,45 @@ double Item_func_sphere_distance::spherical_distance(Geometry *g1,
 
 
 double Item_func_sphere_distance::spherical_distance_points(Geometry *g1, Geometry *g2,
-                                                            double sphere_radius)
+                                                            double r)
 {
   double res= 0.0;
-  double temp_hav= 0.0;
-  char t[1024]; // should be N*(KB_HEADER_SIZE + POINT_DATA_SIZE)? or create_point(srid, 512)
-  String buff(t, sizeof(t), system_charset_info);
-  
+  double temp_res= 0.0;
   uint32 *num= (uint32 *)my_malloc(sizeof(*num), 0);
-  Geometry_buffer buff_temp;
-  Geometry *temp;
+  uint32 srid= 0, len= 0;
+  const char* start= NULL;
+
   switch(g2->get_class_info()->m_type_id)
   {
     case Geometry::wkb_point:
-      res= calculate_haversine(g1, g2, sphere_radius);
+      res= calculate_haversine(g1, g2, r);
       break;
     case Geometry::wkb_multipoint:
-    // The logic is that we find number of Points() in Multipoint and for each  point 
-    // calculate distance and use the lowest. 
-    // Iterating over geometries in Multipoint is ?
-      g2->num_geometries(num);
-      
-      // This function should return string of data per point?
-      // First 4 bytes of m_data are number of points == *num,
-      // next 21 bytes are data from point which should be stored in buff, but are not?
-      // As consequence temp geometry cannot be constructed and returns 0
-      return 12345678; // dummy result because of above
-      if (g2->geometry_n(1,&buff))
-        return 0; // handle error?
-      temp= Geometry::construct(&buff_temp, buff.ptr(), buff.length());
-      buff.length(0);
-      res= calculate_haversine(g1, temp, sphere_radius);
-      temp= NULL;
+      if (g2->num_geometries(num))
+      {
+        return 0; // error handling?
+      }
+      DBUG_ASSERT(*num >= 1);
+      start= g2->get_data_ptr();
+      len= SRID_SIZE + WKB_HEADER_SIZE + POINT_DATA_SIZE;
+      if (g2->get_data_size() == len)
+      {
+        res= spherical_distance_multipoints(g1, start, len, &srid, num, r);
+        return res;
+      }
+      // There are multiple points and we should construct geometry 
+      // and find the smallest result
       for (uint32 i=2; i < *num; i++)
       {
-        if (g2->geometry_n(i,&buff))
-          return 0; // handle error?
-        temp= Geometry::construct(&buff_temp, buff.ptr(), buff.length());
-        temp_hav= calculate_haversine(g1, temp, sphere_radius);
-        if (res > temp_hav)
+        start= start + len*(i-1);
+        temp_res= spherical_distance_multipoints(g1, start, len, &srid, num, r);
+        if (res > temp_res)
         {
-          res= temp_hav;
+          res= temp_res;
         }
-        buff.length(0);
       }
       delete num;
+      return res;
       break;
     default:
       DBUG_ASSERT(1);
@@ -2532,11 +2527,33 @@ double Item_func_sphere_distance::spherical_distance_points(Geometry *g1, Geomet
 }
 
 
-double Item_func_sphere_distance::spherical_distance_multipoints(Geometry *g1, Geometry *g2,
-                                                            double sphere_radius)
+double Item_func_sphere_distance::spherical_distance_multipoints(Geometry *g1,
+                                                 const char *start, uint32 len,
+                                                 uint32 *srid, uint32 *num, double sphere_radius)
 {
-  // Above should be here.
-  return 54321;
+  Geometry_buffer buff_temp;
+  Geometry *temp;
+  double res= 0.0;
+  char s[SRID_SIZE + WKB_HEADER_SIZE+ POINT_DATA_SIZE+1];
+  if (*num == 1)
+  {
+    temp= Geometry::construct(&buff_temp, start, len);
+    DBUG_ASSERT(temp);
+    res= calculate_haversine(g1, temp, sphere_radius);
+    return res; 
+  }
+  else
+  {
+    // We need to construct proper Geometry from valid data
+    memcpy(s, (char *)(srid), sizeof(*srid));
+    memcpy(s+SRID_SIZE, start, len);
+    memcpy(s+len+1, "\0", 1);
+
+    temp= Geometry::construct(&buff_temp, s, len+1);
+    DBUG_ASSERT(temp);
+    res= calculate_haversine(g1, temp, sphere_radius);
+    return res; 
+  }
 }
 
 
