@@ -2467,8 +2467,7 @@ double Item_func_sphere_distance::spherical_distance(Geometry *g1,
       break;
 
     case Geometry::wkb_multipoint:
-      return 1211212121212;
-      //res= spherical_distance_multipoints(g1, g2, sphere_radius);
+      res= spherical_distance_points(g2, g1, sphere_radius);
       break;
     default:
       DBUG_ASSERT(1);
@@ -2483,9 +2482,9 @@ double Item_func_sphere_distance::spherical_distance_points(Geometry *g1, Geomet
 {
   double res= 0.0;
   double temp_res= 0.0;
-  uint32 *num= (uint32 *)my_malloc(sizeof(*num), 0);
+  uint32 *num= NULL;
   uint32 srid= 0, len= 0;
-  const char* start= NULL;
+  char* start= NULL;
 
   switch(g2->get_class_info()->m_type_id)
   {
@@ -2493,30 +2492,39 @@ double Item_func_sphere_distance::spherical_distance_points(Geometry *g1, Geomet
       res= calculate_haversine(g1, g2, r);
       break;
     case Geometry::wkb_multipoint:
+      num= (uint32 *) malloc(sizeof(*num));
       if (g2->num_geometries(num))
       {
+        free(num);
         return 0; // error handling?
       }
       DBUG_ASSERT(*num >= 1);
-      start= g2->get_data_ptr();
+      start= const_cast<char*>(g2->get_data_ptr());
       len= SRID_SIZE + WKB_HEADER_SIZE + POINT_DATA_SIZE;
-      if (g2->get_data_size() == len)
+      // There has to be at least 1 point(consisting of len bytes)
+      if (g2->get_data_size() >= len)
       {
-        res= spherical_distance_multipoints(g1, start, len, &srid, num, r);
-        return res;
+        srid= uint4korr(start);
+        res= spherical_distance_multipoints(g1, &start, len, &srid, 0, r);
+        // more points to look
+        if (!start)
+        {
+          free(num);
+          return res;
+        }
       }
       // There are multiple points and we should construct geometry 
       // and find the smallest result
-      for (uint32 i=2; i < *num; i++)
+      for (uint32 i=2; i <= *num; i++)
       {
-        start= start + len*(i-1);
-        temp_res= spherical_distance_multipoints(g1, start, len, &srid, num, r);
+        // Next point wkb_header and values stored in start pointer
+        temp_res= spherical_distance_multipoints(g1, &start, len, &srid, i-1, r);
         if (res > temp_res)
         {
           res= temp_res;
         }
       }
-      delete num;
+      free(num);
       return res;
       break;
     default:
@@ -2528,32 +2536,31 @@ double Item_func_sphere_distance::spherical_distance_points(Geometry *g1, Geomet
 
 
 double Item_func_sphere_distance::spherical_distance_multipoints(Geometry *g1,
-                                                 const char *start, uint32 len,
-                                                 uint32 *srid, uint32 *num, double sphere_radius)
+                                                 char **start, uint32 len,
+                                                 uint32 *srid, uint32 i, double sphere_radius)
 {
   Geometry_buffer buff_temp;
   Geometry *temp;
   double res= 0.0;
-  char s[SRID_SIZE + WKB_HEADER_SIZE+ POINT_DATA_SIZE+1];
-  if (*num == 1)
-  {
-    temp= Geometry::construct(&buff_temp, start, len);
-    DBUG_ASSERT(temp);
-    res= calculate_haversine(g1, temp, sphere_radius);
-    return res; 
-  }
-  else
-  {
-    // We need to construct proper Geometry from valid data
-    memcpy(s, (char *)(srid), sizeof(*srid));
-    memcpy(s+SRID_SIZE, start, len);
-    memcpy(s+len+1, "\0", 1);
+  // constant size of 25B SRID_SIZE + WKB_HEADER_SIZE+ POINT_DATA_SIZE+1
+  char s[26];
+  // We need to construct proper Geometry from valid data
+  memcpy(s, (char *)(srid), sizeof(*srid));
+  /* For the first/single point srid is stored in first 4B, already stored above.
+     After that pointer starts from wkb_header*/
+  *srid == uint4korr(*start) ? memcpy(s+SRID_SIZE, *start + SRID_SIZE,\
+                                                   len - SRID_SIZE) :
+                               memcpy(s+SRID_SIZE, *start, len);
 
-    temp= Geometry::construct(&buff_temp, s, len+1);
-    DBUG_ASSERT(temp);
-    res= calculate_haversine(g1, temp, sphere_radius);
-    return res; 
-  }
+  memcpy(s+SRID_SIZE+len+1, "\0", 1);
+  // Get the current iteration
+  i >= 1 ? *start= *start + WKB_HEADER_SIZE + POINT_DATA_SIZE :
+           *start= *start + SRID_SIZE + WKB_HEADER_SIZE + POINT_DATA_SIZE;
+  temp= Geometry::construct(&buff_temp, s, len+1);
+  DBUG_ASSERT(temp);
+  res= calculate_haversine(g1, temp, sphere_radius);
+  return res; 
+
 }
 
 
