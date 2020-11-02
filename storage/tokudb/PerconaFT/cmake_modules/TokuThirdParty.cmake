@@ -17,6 +17,7 @@ if (NOT EXISTS "${XZ_SOURCE_DIR}/configure")
     message(FATAL_ERROR "Can't find the xz sources.  Please check them out to ${XZ_SOURCE_DIR} or modify XZ_SOURCE_DIR.")
 endif ()
 set(MY_CFG_INTDIR ${CMAKE_CFG_INTDIR})
+set(lzma_prefix "${MY_CFG_INTDIR}/")
 
 if (CMAKE_GENERATOR STREQUAL Ninja)
   ## ninja doesn't understand "$(MAKE)"
@@ -27,11 +28,12 @@ else ()
   ## use "$(MAKE)" for submakes so they can use the jobserver, doesn't
   ## seem to break Xcode...
   set(SUBMAKE_COMMAND $(MAKE))
+  unset(lzma_prefix)
 endif ()
 
 FILE(GLOB XZ_ALL_FILES ${XZ_SOURCE_DIR}/*)
 ExternalProject_Add(build_lzma
-    PREFIX "${MY_CFG_INTDIR}/xz"
+    PREFIX "${lzma_prefix}xz"
     DOWNLOAD_COMMAND
         cp -a "${XZ_ALL_FILES}" "<SOURCE_DIR>/"
     CONFIGURE_COMMAND
