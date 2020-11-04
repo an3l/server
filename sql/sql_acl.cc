@@ -8841,7 +8841,14 @@ static bool show_default_role(THD *thd, ACL_USER *acl_entry,
     String def_str(buff, buffsize, system_charset_info);
     def_str.length(0);
     def_str.append(STRING_WITH_LEN("SET DEFAULT ROLE "));
-    def_str.append(&def_rolename);
+    if (!strcmp(def_rolename.str, "0"))
+    {
+      def_str.append(STRING_WITH_LEN("NONE"));
+    }
+    else
+    {
+      def_str.append(&def_rolename);
+    }
     def_str.append(" FOR '");
     def_str.append(&acl_entry->user);
     DBUG_ASSERT(!(acl_entry->flags & IS_ROLE));
