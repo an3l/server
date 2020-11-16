@@ -5714,4 +5714,22 @@ DELIMITER ;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 DROP TABLE t1;
+#
+# MDEV-6899:Database Dump has Syntax Error When Importing
+#
+create database td;
+CREATE EVENT td.fooEvent
+ON SCHEDULE EVERY 1 DAY
+DO
+DELETE FROM Token WHERE DATE(time_end) < CURRENT_DATE;
+SELECT 1 //
+1
+1
+SHOW CREATE EVENT td.fooEvent;
+Event	sql_mode	time_zone	Create Event	character_set_client	collation_connection	Database Collation
+fooEvent		SYSTEM	CREATE DEFINER=`root`@`localhost` EVENT `fooEvent` ON SCHEDULE EVERY 1 DAY STARTS '2020-11-16 23:37:56' ON COMPLETION NOT PRESERVE ENABLE DO DELETE FROM Token WHERE DATE(time_end) < CURRENT_DATE	utf8	utf8_general_ci	latin1_swedish_ci
+SHOW CREATE EVENT td.fooEvent;
+Event	sql_mode	time_zone	Create Event	character_set_client	collation_connection	Database Collation
+fooEvent		SYSTEM	CREATE DEFINER=`root`@`localhost` EVENT `fooEvent` ON SCHEDULE EVERY 1 DAY STARTS '2020-11-16 23:37:56' ON COMPLETION NOT PRESERVE ENABLE DO DELETE FROM Token WHERE DATE(time_end) < CURRENT_DATE	utf8	utf8_general_ci	latin1_swedish_ci
+DROP DATABASE td;
 # End of 10.2 tests

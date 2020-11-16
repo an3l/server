@@ -9632,7 +9632,9 @@ static bool show_create_trigger_impl(THD *thd, Trigger *trigger)
 
   /* Prepare trigger "object". */
 
-  trigger->get_trigger_info(&trg_sql_original_stmt, &trg_body, &trg_definer);
+  trigger->get_trigger_info(&trg_sql_original_stmt,
+                            &trg_body, &trg_definer);
+
   sql_mode_string_representation(thd, trigger->sql_mode, &trg_sql_mode_str);
 
   /* Resolve trigger client character set. */

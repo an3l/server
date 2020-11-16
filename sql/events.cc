@@ -668,7 +668,7 @@ Events::drop_schema_events(THD *thd, char *db)
 static bool
 send_show_create_event(THD *thd, Event_timed *et, Protocol *protocol)
 {
-  char show_str_buf[10 * STRING_BUFFER_USUAL_SIZE];
+  char show_str_buf[USER_HOST_BUFF_SIZE];
   String show_str(show_str_buf, sizeof(show_str_buf), system_charset_info);
   List<Item> field_list;
   LEX_STRING sql_mode;
@@ -680,6 +680,12 @@ send_show_create_event(THD *thd, Event_timed *et, Protocol *protocol)
   if (et->get_create_event(thd, &show_str))
     DBUG_RETURN(TRUE);
 
+  LEX_STRING def_show_str= show_str.lex_string();
+  if (!strcmp(&def_show_str.str[def_show_str.length -1], ";"))
+  {
+    --def_show_str.length;
+    def_show_str.str[def_show_str.length]='\0';
+  }
   field_list.push_back(new (mem_root)
                        Item_empty_string(thd, "Event", NAME_CHAR_LEN),
                        mem_root);
@@ -722,7 +728,7 @@ send_show_create_event(THD *thd, Event_timed *et, Protocol *protocol)
   protocol->store(et->name.str, et->name.length, system_charset_info);
   protocol->store(sql_mode.str, sql_mode.length, system_charset_info);
   protocol->store(tz_name->ptr(), tz_name->length(), system_charset_info);
-  protocol->store(show_str.ptr(), show_str.length(),
+  protocol->store(def_show_str.str, def_show_str.length,
                   et->creation_ctx->get_client_cs());
   protocol->store(et->creation_ctx->get_client_cs()->csname,
                   strlen(et->creation_ctx->get_client_cs()->csname),
