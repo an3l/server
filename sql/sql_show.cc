@@ -4603,6 +4603,20 @@ fill_schema_table_by_open(THD *thd, MEM_ROOT *mem_root,
   }
 
   DBUG_ASSERT(thd->lex == lex);
+  /* The temporary table is said that is non-existed table
+     (see open_tables_only_view_structure()), but however we have to process it
+     only for I_S.tables table in order to have visible temp tables.
+  */
+  int is_temp= thd->open_temporary_tables(table_list);
+  enum enum_schema_tables schema_table_idx= get_schema_table_idx(schema_table);
+  if (schema_table_idx == SCH_TABLES && thd->open_temporary_tables(table_list))
+  {
+    result= schema_table->process_table(thd, table_list,
+                                    table, result,
+                                    orig_db_name,
+                                    orig_table_name);
+    goto end;
+  }
   result= open_tables_only_view_structure(thd, table_list, can_deadlock);
 
   DEBUG_SYNC(thd, "after_open_table_ignore_flush");
@@ -4659,7 +4673,9 @@ end:
     For safety reset list of open temporary tables before closing
     all tables open within this Open_tables_state.
   */
-  thd->temporary_tables= NULL;
+  // Except for I_S.tables
+  if (!get_schema_table_idx(schema_table) == SCH_TABLES)
+    thd->temporary_tables= NULL;
 
   close_thread_tables(thd);
   /*
@@ -5427,11 +5443,15 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
       table->field[3]->store(STRING_WITH_LEN("SEQUENCE"), cs);
     else
     {
-      DBUG_ASSERT(share->tmp_table == NO_TMP_TABLE);
       if (share->versioned)
         table->field[3]->store(STRING_WITH_LEN("SYSTEM VERSIONED"), cs);
       else
         table->field[3]->store(STRING_WITH_LEN("BASE TABLE"), cs);
+
+      if (share->tmp_table != NO_TMP_TABLE)
+      {
+        table->field[3]->store(STRING_WITH_LEN("TEMPORARY TABLE"), cs);
+      }
     }
 
     for (uint i= 4; i < table->s->fields; i++)
