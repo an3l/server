@@ -5727,9 +5727,69 @@ SELECT 1 //
 1
 SHOW CREATE EVENT td.fooEvent;
 Event	sql_mode	time_zone	Create Event	character_set_client	collation_connection	Database Collation
-fooEvent		SYSTEM	CREATE DEFINER=`root`@`localhost` EVENT `fooEvent` ON SCHEDULE EVERY 1 DAY STARTS '2020-11-16 23:37:56' ON COMPLETION NOT PRESERVE ENABLE DO DELETE FROM Token WHERE DATE(time_end) < CURRENT_DATE	utf8	utf8_general_ci	latin1_swedish_ci
+fooEvent		SYSTEM	CREATE DEFINER=`root`@`localhost` EVENT `fooEvent` ON SCHEDULE EVERY 1 DAY STARTS '2020-11-17 14:54:32' ON COMPLETION NOT PRESERVE ENABLE DO DELETE FROM Token WHERE DATE(time_end) < CURRENT_DATE	utf8	utf8_general_ci	latin1_swedish_ci
 SHOW CREATE EVENT td.fooEvent;
 Event	sql_mode	time_zone	Create Event	character_set_client	collation_connection	Database Collation
-fooEvent		SYSTEM	CREATE DEFINER=`root`@`localhost` EVENT `fooEvent` ON SCHEDULE EVERY 1 DAY STARTS '2020-11-16 23:37:56' ON COMPLETION NOT PRESERVE ENABLE DO DELETE FROM Token WHERE DATE(time_end) < CURRENT_DATE	utf8	utf8_general_ci	latin1_swedish_ci
+fooEvent		SYSTEM	CREATE DEFINER=`root`@`localhost` EVENT `fooEvent` ON SCHEDULE EVERY 1 DAY STARTS '2020-11-17 14:54:32' ON COMPLETION NOT PRESERVE ENABLE DO DELETE FROM Token WHERE DATE(time_end) < CURRENT_DATE	utf8	utf8_general_ci	latin1_swedish_ci
+DROP DATABASE td;
+#
+# MDEV-24200: Syntax error in mysqldump
+#
+create database td;
+create table td.t1 (a int);
+CREATE TRIGGER td.tr BEFORE INSERT ON td.t1 FOR EACH ROW BEGIN
+set @a=1;
+END//
+insert into td.t1 (a) values (1)//
+select * from td.t1//
+a
+1
+create trigger td.tr2 after insert on td.t1 for each row set @a=1 ;
+select 1 //
+1
+1
+# SHOW CREATE TRIGGER before upgrade
+SHOW CREATE TRIGGER td.tr;
+Trigger	tr
+sql_mode	
+SQL Original Statement	CREATE DEFINER=`root`@`localhost` TRIGGER td.tr BEFORE INSERT ON td.t1 FOR EACH ROW BEGIN
+set @a=1;
+END
+character_set_client	utf8
+collation_connection	utf8_general_ci
+Database Collation	latin1_swedish_ci
+Created	Created at date # time #
+SHOW CREATE TRIGGER td.tr2;
+Trigger	tr2
+sql_mode	
+SQL Original Statement	CREATE DEFINER=`root`@`localhost` trigger td.tr2 after insert on td.t1 for each row set @a=1 
+character_set_client	utf8
+collation_connection	utf8_general_ci
+Database Collation	latin1_swedish_ci
+Created	Created at date # time #
+SELECT action_statement FROM information_schema.triggers WHERE TRIGGER_NAME='tr';
+action_statement	BEGIN
+set @a=1;
+END
+# Run mysql_upgrade
+# Show create trigger after upgrade
+SHOW CREATE TRIGGER td.tr;
+Trigger	tr
+sql_mode	
+SQL Original Statement	CREATE DEFINER=`root`@`localhost` TRIGGER td.tr BEFORE INSERT ON td.t1 FOR EACH ROW BEGIN
+set @a=1;
+END
+character_set_client	utf8
+collation_connection	utf8_general_ci
+Database Collation	latin1_swedish_ci
+Created	Created at date # time #
+SHOW CREATE TRIGGER td.tr2;
+Trigger	tr2
+sql_mode	
+SQL Original Statement	CREATE DEFINER=`root`@`localhost` trigger td.tr2 after insert on td.t1 for each row set @a=1
+character_set_client	utf8
+collation_connection	utf8_general_ci
+Database Collation	latin1_swedish_ci
+Created	Created at date # time #
 DROP DATABASE td;
 # End of 10.2 tests
