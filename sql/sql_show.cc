@@ -4526,6 +4526,7 @@ fill_schema_table_by_open(THD *thd, MEM_ROOT *mem_root,
   LEX *old_lex= thd->lex, temp_lex, *lex;
   LEX_CSTRING db_name, table_name;
   TABLE_LIST *table_list;
+  enum enum_schema_tables schema_table_idx;
   bool result= true;
   DBUG_ENTER("fill_schema_table_by_open");
 
@@ -4604,7 +4605,7 @@ fill_schema_table_by_open(THD *thd, MEM_ROOT *mem_root,
 
   DBUG_ASSERT(thd->lex == lex);
   result= open_tables_only_view_structure(thd, table_list, can_deadlock);
-
+  schema_table_idx= get_schema_table_idx(schema_table);
   DEBUG_SYNC(thd, "after_open_table_ignore_flush");
 
   /*
@@ -4621,7 +4622,8 @@ fill_schema_table_by_open(THD *thd, MEM_ROOT *mem_root,
   if (!is_show_fields_or_keys && result && thd->is_error() &&
       (thd->get_stmt_da()->sql_errno() == ER_NO_SUCH_TABLE ||
        thd->get_stmt_da()->sql_errno() == ER_WRONG_OBJECT ||
-       thd->get_stmt_da()->sql_errno() == ER_NOT_SEQUENCE))
+       thd->get_stmt_da()->sql_errno() == ER_NOT_SEQUENCE) &&
+       schema_table_idx != SCH_TABLES)
   {
     /*
       Hide error for a non-existing table.
@@ -4634,6 +4636,12 @@ fill_schema_table_by_open(THD *thd, MEM_ROOT *mem_root,
   }
   else
   {
+    /* For the case of I_S.tables and temporary tables we have to ensure it is
+       not treated as an error for the get_schema_tables_record() and result is
+       set to 0.
+    */
+    if (schema_table_idx == SCH_TABLES)
+      result= -1;
     char buf[NAME_CHAR_LEN + 1];
     if (unlikely(thd->is_error()))
       get_table_engine_for_i_s(thd, buf, table_list, &db_name, &table_name);
@@ -5379,6 +5387,7 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
   MYSQL_TIME time;
   int info_error= 0;
   CHARSET_INFO *cs= system_charset_info;
+  bool is_base= thd->open_temporary_tables(tables);
   DBUG_ENTER("get_schema_tables_record");
 
   restore_record(table, s->default_values);
@@ -5388,20 +5397,38 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
 
   if (res)
   {
-    /* There was a table open error, so set the table type and return */
-    if (tables->view)
-      table->field[3]->store(STRING_WITH_LEN("VIEW"), cs);
-    else if (tables->schema_table)
-      table->field[3]->store(STRING_WITH_LEN("SYSTEM VIEW"), cs);
-    else
-      table->field[3]->store(STRING_WITH_LEN("BASE TABLE"), cs);
-
-    if (tables->option)
+    if (is_base)
     {
-      table->field[4]->store(tables->option, strlen(tables->option), cs);
-      table->field[4]->set_notnull();
+      /* There was a table open error, so set the table type and return */
+      if (tables->view)
+        table->field[3]->store(STRING_WITH_LEN("VIEW"), cs);
+      else if (tables->schema_table)
+        table->field[3]->store(STRING_WITH_LEN("SYSTEM VIEW"), cs);
+      else
+        table->field[3]->store(STRING_WITH_LEN("BASE TABLE"), cs);
+
+      if (tables->option)
+      {
+        table->field[4]->store(tables->option, strlen(tables->option), cs);
+        table->field[4]->set_notnull();
+      }
+      goto err;
     }
-    goto err;
+    else
+    {
+      // Handling temporary tables
+      //char option_buff[512];
+      //String str(option_buff,sizeof(option_buff), system_charset_info);
+      table->field[3]->store(STRING_WITH_LEN("TEMPORARY TABLE"), cs);
+      for (uint i= 4; i < table->s->fields; i++)
+      {
+        if (i == 7 || (i > 12 && i < 17) || i == 18)
+          continue;
+        table->field[i]->set_notnull();
+      }
+      goto err;
+    }
+    
   }
 
   if (tables->view)

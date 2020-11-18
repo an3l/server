@@ -1,0 +1,9 @@
+### Empty table - not good
+--vertical_results
+# Find out why this doesn't give output (don't know exact place in the code where is this handled?!)
+# select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, TABLE_COMMENT from information_schema.tables where table_name='t1';
+# While this give output
+select * from information_schema.tables where table_name='t1';
+create temporary table t1 (t int);
+--vertical_results
+select * from information_schema.tables where table_name='t1';
