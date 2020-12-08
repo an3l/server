@@ -558,6 +558,38 @@ const Geometry::Class_info *Gis_point::get_class_info() const
 }
 
 
+double Gis_point::calculate_haversine(Geometry *g,
+                                      const double sphere_radius)
+{
+  DBUG_ASSERT(sphere_radius>=0);
+  double x1r= 0.0;
+  double x2r= 0.0;
+  double y1r= 0.0;
+  double y2r= 0.0;
+  double dlong= 0.0;
+  double dlat= 0.0;
+  double res= 0.0;
+  // This check is done only for optimization purposes where we know it will
+  // be one and only one point in Multipoint
+  if (g->get_class_info()->m_type_id == Geometry::wkb_multipoint)
+  {
+    Geometry_buffer *gbuff;
+    Gis_point *gp= (Gis_point *)Geometry::construct(gbuff,
+     g->m_data+4+WKB_HEADER_SIZE+POINT_DATA_SIZE,
+     POINT_DATA_SIZE);
+     gp->get_xy_radian(&x2r, &y2r);
+  }
+  else
+  {
+    (Gis_point *)gp->get_xy_radian(&x2r, &y2r);
+  }
+  this->get_xy_radian(&x1r, &y1r);
+  dlong= sin((x2r - x1r)/2)*sin((x2r - x1r)/2);
+  dlat=  sin((y2r - y1r)/2)*sin((y2r - y1r)/2);
+  res= 2*sphere_radius*asin((sqrt(dlong + cos(x1r)*cos(x2r)*dlat)));
+  return res;
+}
+
 /***************************** LineString *******************************/
 
 uint32 Gis_line_string::get_data_size() const 
@@ -1478,6 +1510,70 @@ int Gis_multi_point::store_shapes(Gcalc_shape_transporter *trn) const
 const Geometry::Class_info *Gis_multi_point::get_class_info() const
 {
   return &multipoint_class;
+}
+
+
+void Gis_multi_point::spherical_distance_multipoints(Geometry *g, const double r,
+                                                     double *result)
+{
+  // Check how many points are stored in current MP
+  uint32 num= 0;
+  // Length for the single point + 1
+  const uint32 len= SRID_SIZE + POINT_DATA_SIZE + WKB_HEADER_SIZE + 1;
+  double res= 0.0;
+  char *start= const_cast<char*>(m_data);
+  uint32 srid= uint4korr(start);
+  /* From Item_func_sphere_distance::spherical_distance_points,
+     we are sure that there will be multiple points and we have to construct
+     Point geometry and return smallest result
+   */
+
+  DBUG_ASSERT(!num_geometries(&num) && num >= 1);
+  for (uint32 i=2; i <= num; i++)
+  {
+    /* Next points WKB_HEADER_SIZE and values(POINT_DATA_SIZE) are
+       stored in `m_data` pointer
+    */
+    Geometry_buffer buff_temp;
+    Geometry *temp;
+    double temp_res= 0.0;
+    /* Temporary buffer has the constant size:
+      25B= SRID_SIZE + WKB_HEADER_SIZE+ POINT_DATA_SIZE
+    */
+    char s[len];
+    /* We need to construct proper Geometry from the valid data.
+      It appear that spatial reference ids from Point as a first argument and
+      point obtained from Multipoint geometry have different srids.
+      This is not checked since always is a case and this limitation of the feature.
+    */
+    memcpy(s, &srid, sizeof(srid));
+    /* For each first or single point from Multipoint, srid is stored in first 4B.
+       Since is used as a parameter it is constructed above already and stored.
+       After that address, pointer has for point in Multipoint case
+       WKB_HEADER_SIZE + POINT_DATA_SIZE bytes.
+    */
+    if (srid == uint4korr(start))
+      memcpy(s+SRID_SIZE, start + SRID_SIZE, len - SRID_SIZE);
+    else
+      memcpy(s+SRID_SIZE, start, len);
+
+    memcpy(s+SRID_SIZE+len+1, "\0", 1);
+    // Get the current iteration to create a new raw data for Geometry construct.
+    start+= (i >= 1 ? 0 : SRID_SIZE) + WKB_HEADER_SIZE + POINT_DATA_SIZE;
+    temp= Geometry::construct(&buff_temp, s, len+1);
+    DBUG_ASSERT(temp);
+    if (g->get_class_info()->m_type_id == Geometry::wkb_point)
+      temp_res= static_cast<Gis_point *>(temp)->calculate_haversine((Gis_point *)g, r);
+    else
+    {
+      res=583466;
+    }
+    
+    if (temp_res > res)
+      res= temp_res;
+  }
+
+  *result= res;
 }
 
 

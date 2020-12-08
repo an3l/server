@@ -2454,7 +2454,7 @@ double Item_func_sphere_distance::val_real()
 
 double Item_func_sphere_distance::spherical_distance(Geometry *g1,
                                                      Geometry *g2,
-                                                     double sphere_radius)
+                                                     const double sphere_radius)
 {
   double res= 0.0;
   switch (g1->get_class_info()->m_type_id)
@@ -2464,7 +2464,7 @@ double Item_func_sphere_distance::spherical_distance(Geometry *g1,
       break;
 
     case Geometry::wkb_multipoint:
-      res= spherical_distance_points(g2, g1, sphere_radius);
+      res= spherical_distance_points(g1, g2, sphere_radius);
       break;
 
     default:
@@ -2477,127 +2477,65 @@ double Item_func_sphere_distance::spherical_distance(Geometry *g1,
 
 double Item_func_sphere_distance::spherical_distance_points(Geometry *g1,
                                                             Geometry *g2,
-                                                            double r)
+                                                            const double r)
 {
   double res= 0.0;
-  double temp_res= 0.0;
-  uint32 *num= NULL;
-  uint32 srid= 0, len= 0;
-  char* start= NULL;
+   // Length for the single point (25 Bytes)
+  uint32 len= SRID_SIZE + POINT_DATA_SIZE + WKB_HEADER_SIZE;
 
   switch (g2->get_class_info()->m_type_id)
   {
     case Geometry::wkb_point:
-      res= calculate_haversine(g1, g2, r);
+    // Optimization for point-point case
+      if (g1->get_class_info()->m_type_id == Geometry::wkb_point)
+        res= static_cast<Gis_point *>(g2)->calculate_haversine(g1, r);
+      else
+      {
+        // Optimization for single point in Multipoint
+        if (g1->get_data_size() == len)
+        {
+          res= static_cast<Gis_point *>(g2)->calculate_haversine(g1, r);
+        }
+        else
+        {
+          // There are multipoints in g1
+          // g1 is MultiPoint and calculate MP.sphericaldistance from g2 Point
+          if (g1->get_data_size() != GET_SIZE_ERROR)
+            static_cast<Gis_multi_point *>(g1)->spherical_distance_multipoints(
+                                                (Gis_multi_point *)g2, r, &res);
+        }
+      }
       break;
 
     case Geometry::wkb_multipoint:
-      num= (uint32 *) malloc(sizeof(*num));
-      if (g2->num_geometries(num))
+      // Optimization for point-point case
+      if (g1->get_class_info()->m_type_id == Geometry::wkb_point)
       {
-        free(num);
-        return 0; // error handling?
-      }
-      DBUG_ASSERT(*num >= 1);
-      start= const_cast<char*>(g2->get_data_ptr());
-      len= SRID_SIZE + WKB_HEADER_SIZE + POINT_DATA_SIZE;
-      // There has to be at least 1 Point geometry (consisting of len bytes)
-      if (g2->get_data_size() >= len)
-      {
-        srid= uint4korr(start);
-        res= spherical_distance_multipoints(g1, &start, len, &srid, 0, r);
-        // Optimization for single point
-        if (!start)
+         // Optimization for single point in Multipoint g2
+        if (g2->get_data_size() == len)
         {
-          free(num);
-          return res;
+          res= static_cast<Gis_point *>(g1)->calculate_haversine(g2, r);
+        }
+        else
+        {
+          if (g2->get_data_size() != GET_SIZE_ERROR)
+          // g1 is a point (casted to multi_poitn) and g2 multipoint
+            static_cast<Gis_multi_point *>(g1)->spherical_distance_multipoints(
+                                                (Gis_multi_point *)g2, r, &res);
         }
       }
-      /* In case when there are multiple points, we should construct the geometry 
-         and find the smallest result.
-      */
-      for (uint32 i=2; i <= *num; i++)
+      else
       {
-        /* Next points WKB_HEADER_SIZE and values(POINT_DATA_SIZE) are
-           stored in `start` pointer
-        */
-        temp_res= spherical_distance_multipoints(g1, &start, len, &srid, i-1, r);
-        if (res > temp_res)
-        {
-          res= temp_res;
-        }
+        // Multipoints in g1 and g2 - no optimization
+        static_cast<Gis_multi_point *>(g1)->spherical_distance_multipoints(
+                                    (Gis_multi_point *)g2, r, &res);
       }
-      free(num);
-      return res;
       break;
 
     default:
       DBUG_ASSERT(0);
       break;
   }
-  return res;
-}
-
-
-double Item_func_sphere_distance::spherical_distance_multipoints(Geometry *g1,
-                                                                 char **start,
-                                                                 uint32 len,
-                                                                 uint32 *srid,
-                                                                 uint32 i, 
-                                                                 double sphere_radius)
-{
-  Geometry_buffer buff_temp;
-  Geometry *temp;
-  double res= 0.0;
-  /* Temporary buffer has the constant size:
-     25B= SRID_SIZE + WKB_HEADER_SIZE+ POINT_DATA_SIZE
-  */
-  char s[26];
-  /* We need to construct proper Geometry from valid data. 
-     It appear that spatial reference ids from Point as a first argument and
-     point obtained from Multipoint geometry have different srids.
-     This is not checked since always is a case.
-  */
-  memcpy(s, (char *)(srid), sizeof(*srid));
-  /* For each first or single point from Multipoing, srid is stored in first 4B.
-     Since is used as a parameter it is constructed above already and stored.
-     After that address, pointer has for point in Multipoint case
-     WKB_HEADER_SIZE + POINT_DATA_SIZE bytes.
-  */
-  *srid == uint4korr(*start) ? memcpy(s+SRID_SIZE, *start + SRID_SIZE,
-                                      len - SRID_SIZE) :
-                               memcpy(s+SRID_SIZE, *start, len);
-
-  memcpy(s+SRID_SIZE+len+1, "\0", 1);
-  // Get the current iteration to create a new raw data for Geometry construct.
-  i >= 1 ? *start= *start + WKB_HEADER_SIZE + POINT_DATA_SIZE :
-           *start= *start + SRID_SIZE + WKB_HEADER_SIZE + POINT_DATA_SIZE;
-  temp= Geometry::construct(&buff_temp, s, len+1);
-  DBUG_ASSERT(temp);
-  res= calculate_haversine(g1, temp, sphere_radius);
-  return res; 
-}
-
-
-double Item_func_sphere_distance::calculate_haversine(Geometry *g1, Geometry *g2,
-                                                      double sphere_radius)
-{
-  /* The approximation of haversin function used for small central(angular) 
-     angles using sin(delta/2)^2 function.
-  */
-  double x1r= 0.0;
-  double x2r= 0.0;
-  double y1r= 0.0;
-  double y2r= 0.0;
-  double dlong= 0.0;
-  double dlat= 0.0;
-  double res= 0.0;
-  if (((Gis_point *) g1)->get_xy_radian(&x1r, &y1r) ||
-      ((Gis_point *) g2)->get_xy_radian(&x2r, &y2r))
-    return 0.0; // should return error, which?
-  dlong= sin((x2r - x1r)/2)*sin((x2r - x1r)/2);
-  dlat=  sin((y2r - y1r)/2)*sin((y2r - y1r)/2);
-  res= 2*sphere_radius*asin((sqrt(dlong + cos(x1r)*cos(x2r)*dlat)));
   return res;
 }
 

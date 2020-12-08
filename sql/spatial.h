@@ -312,11 +312,6 @@ public:
     m_data_end= data + data_len;
   }
   
-  const char * get_data_ptr() const
-  {
-    return m_data;
-  }
-  
   inline void shift_wkb_header()
   {
     m_data+= WKB_HEADER_SIZE;
@@ -434,6 +429,7 @@ public:
   }
   int store_shapes(Gcalc_shape_transporter *trn) const;
   const Class_info *get_class_info() const;
+  double calculate_haversine(Geometry *g, const double sphere_radius);
 };
 
 
@@ -524,6 +520,7 @@ public:
   }
   int store_shapes(Gcalc_shape_transporter *trn) const;
   const Class_info *get_class_info() const;
+  void spherical_distance_multipoints(Geometry *g, double r, double *res);
 };
 
 

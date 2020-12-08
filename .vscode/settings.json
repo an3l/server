@@ -1,0 +1,22 @@
+{
+  "files.associations": {
+    "*.ipp": "cpp",
+    "memory_resource": "cpp",
+    "cmath": "cpp",
+    "complex": "cpp",
+    "*.tcc": "cpp",
+    "vector": "cpp",
+    "array": "cpp",
+    "deque": "cpp",
+    "list": "cpp",
+    "string": "cpp",
+    "unordered_map": "cpp",
+    "unordered_set": "cpp",
+    "string_view": "cpp",
+    "initializer_list": "cpp",
+    "valarray": "cpp",
+    "ratio": "cpp",
+    "*.ic": "cpp",
+    "random": "cpp"
+  }
+}

@@ -245,10 +245,10 @@ public:
   virtual Item *create_func(THD *thd, LEX_STRING name, List<Item> *item_list);
 
   /**
-    Builder method, with twor or three arguments.
+    Builder method, with two or three arguments.
     @param thd The current thread
     @param arg1 The first argument of the function
-    @param arg2 The second argument of the function and/or
+    @param arg2 The second argument of the function
     @param arg3 The third argument of the function
     @return An item representing the function call
   */
