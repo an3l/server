@@ -51,6 +51,7 @@ static my_bool upgrade_from_mysql;
 
 static DYNAMIC_STRING ds_args;
 static DYNAMIC_STRING conn_args;
+static DYNAMIC_STRING ds_plugin_data_types;
 
 static char *opt_password= 0;
 static char *opt_plugin_dir= 0, *opt_default_auth= 0;
@@ -187,6 +188,7 @@ static void free_used_memory(void)
 
   dynstr_free(&ds_args);
   dynstr_free(&conn_args);
+  dynstr_free(&ds_plugin_data_types);
   if (cnf_file_path)
     my_delete(cnf_file_path, MYF(MY_WME));
 }
@@ -965,6 +967,61 @@ static my_bool from_before_10_1()
 }
 
 
+static void uninstall_plugins(void)
+{
+  if (ds_plugin_data_types.length)
+  {
+    char *plugins= ds_plugin_data_types.str;
+    char *next= get_line(plugins);
+    char buff[512];
+    while(*plugins)
+    {
+      if (next[-1] == '\n')
+        next[-1]= 0;
+      verbose("uninstalling plugin for %s data type", plugins);
+      strxnmov(buff, sizeof(buff)-1, "UNINSTALL SONAME ", plugins,"", NULL);
+      run_query(buff, NULL, TRUE);
+      plugins= next;
+      next= get_line(next);
+    }
+  }
+}
+/*
+  Check for entries with "Unknown data type" in I_S.TABLES,
+  try to load plugins for these tables if available (MDEV-24093)
+*/
+static void install_used_plugin_data_types(void)
+{
+  DYNAMIC_STRING ds_result;
+  const char *query = "SELECT table_comment FROM information_schema.tables"
+                      " WHERE table_comment LIKE 'Unknown data type: %'";
+  if (init_dynamic_string(&ds_result, "", 512, 512))
+    die("Out of memory");
+  verbose("Checking for tables with unknown data type");
+  run_query(query, &ds_result, TRUE);
+
+  if (ds_result.length)
+  {
+    char *line= ds_result.str;
+    char *next= get_line(line);
+    while(*line)
+    {
+      if (next[-1] == '\n')
+        next[-1]= 0;
+      if (strstr(line, "'MYSQL_JSON'"))
+      {
+        verbose("installing plugin for MYSQL_JSON data type");
+        run_query("INSTALL SONAME 'type_mysql_json'", NULL, TRUE);
+        dynstr_append(&ds_plugin_data_types, "'type_mysql_json'");
+        dynstr_append(&ds_plugin_data_types, "\n");
+        break;
+      }
+      line= next;
+      next= get_line(next);
+    }
+  }
+  dynstr_free(&ds_result);
+}
 /*
   Check for entries with "Unknown storage engine" in I_S.TABLES,
   try to load plugins for these tables if available (MDEV-11942)
@@ -976,6 +1033,7 @@ static int install_used_engines(void)
   const char *query = "SELECT DISTINCT LOWER(engine) AS c1 FROM information_schema.tables"
                       " WHERE table_comment LIKE 'Unknown storage engine%'"
                       " ORDER BY c1";
+  install_used_plugin_data_types();
 
   if (opt_systables_only || !from_before_10_1())
   {
@@ -1218,7 +1276,8 @@ int main(int argc, char **argv)
   }
 
   if (init_dynamic_string(&ds_args, "", 512, 256) ||
-      init_dynamic_string(&conn_args, "", 512, 256))
+      init_dynamic_string(&conn_args, "", 512, 256) ||
+      init_dynamic_string(&ds_plugin_data_types, "", 512, 256))
     die("Out of memory");
 
   if (handle_options(&argc, &argv, my_long_options, get_one_option))
@@ -1300,6 +1359,7 @@ int main(int argc, char **argv)
   DBUG_ASSERT(phase == phases_total);
 
 end:
+  uninstall_plugins();
   free_used_memory();
   my_end(my_end_arg);
   exit(0);
