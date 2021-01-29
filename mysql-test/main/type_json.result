@@ -16,7 +16,8 @@ create or replace table t1(a json not null check (json_valid(a)));
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`a`))
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`a`)),
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
 insert t1 values ('[]');
 insert t1 values ('a');
@@ -69,7 +70,8 @@ create table t1 (t json check (length(t) > 0));
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `t` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (octet_length(`t`) > 0)
+  `t` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (octet_length(`t`) > 0),
+  CONSTRAINT `t` CHECK (octet_length(`t`) > 0)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
 drop table t1;
 create table t1 (t text) engine=myisam;
@@ -91,7 +93,8 @@ a
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT json_object('now',1) CHECK (json_valid(`a`))
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT json_object('now',1) CHECK (json_valid(`a`)),
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
 drop table t1;
 select cast('{a:1}' as text);

@@ -906,6 +906,12 @@ some new text
 select 0 as "will not lower case ÄËÐ";
 will not lower case ÄËÐ
 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 CREATE TABLE t1(
 a int, b varchar(255), c datetime
 );

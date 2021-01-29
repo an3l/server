@@ -5363,6 +5363,7 @@ START TRANSACTION
 #010909  4:46:40 server id 1  end_log_pos # CRC32 XXX 	Write_rows: table id # flags: STMT_END_F
 
 Error: Found Old DECIMAL (mysql-4.1 or earlier). Not enough metadata to display the value.
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 /*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=1*/;
 /*!40019 SET @@session.max_insert_delayed_threads=0*/;
 /*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;

@@ -64,6 +64,7 @@ check view v3 for upgrade;
 Table	Op	Msg_type	Msg_text
 test.v3	check	error	Upgrade required. Please do "REPAIR VIEW `v3`" or dump/reload to fix it!
 Phase 1/7: Checking and upgrading mysql database
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 mysql
 mysql.column_stats                                 OK
@@ -113,6 +114,7 @@ Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysql.user                                         OK
 test.v1                                            OK
 test.v1badcheck                                    OK
@@ -120,7 +122,9 @@ test.v2                                            OK
 test.v3                                            OK
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Phase 6/7: Checking and upgrading tables
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 information_schema
 mtr
@@ -131,7 +135,9 @@ test
 test.kv                                            OK
 test.t1                                            OK
 Phase 7/7: Running 'FLUSH PRIVILEGES'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 OK
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 show create view v1;
 View	Create View	character_set_client	collation_connection
 v1	CREATE ALGORITHM=MERGE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v1` AS select `t1`.`a` AS `a` from `t1`	utf8	utf8_general_ci
@@ -213,6 +219,7 @@ View	Create View	character_set_client	collation_connection
 v4	CREATE ALGORITHM=TEMPTABLE DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v4` AS select `t1`.`a` AS `a` from `t1`	latin1	latin1_swedish_ci
 MariaDB upgrade detected
 Phase 1/7: Checking and upgrading mysql database
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 mysql
 mysql.column_stats                                 OK
@@ -263,6 +270,7 @@ Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views from mysql
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysql.user                                         OK
 test.v1                                            OK
 test.v2                                            OK
@@ -270,7 +278,9 @@ test.v3                                            OK
 test.v4                                            OK
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Phase 6/7: Checking and upgrading tables
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 information_schema
 mtr
@@ -281,7 +291,9 @@ test
 test.kv                                            OK
 test.t1                                            OK
 Phase 7/7: Running 'FLUSH PRIVILEGES'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 OK
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 flush tables;
 show create view v1;
 View	Create View	character_set_client	collation_connection
@@ -307,6 +319,7 @@ truncate table kv;
 drop view if exists v1,v2,v3;
 drop table mysql.event;
 rename table mysql.ev_bk to mysql.event;
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 test.kv                                            OK
 test.t1                                            OK
 test.v1                                            OK
@@ -338,6 +351,7 @@ flush tables;
 The --upgrade-system-tables option was used, user tables won't be touched.
 MariaDB upgrade detected
 Phase 1/7: Checking and upgrading mysql database
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 mysql
 mysql.column_stats                                 OK
@@ -388,6 +402,7 @@ Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views from mysql
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysql.user                                         OK
 test.v1                                            OK
 test.v2                                            OK
@@ -396,7 +411,9 @@ Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names ... Skipped
 Phase 6/7: Checking and upgrading tables... Skipped
 Phase 7/7: Running 'FLUSH PRIVILEGES'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 OK
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 drop table mysql.event;
 rename table mysql.ev_bk to mysql.event;
 drop view v1,v2,v3;

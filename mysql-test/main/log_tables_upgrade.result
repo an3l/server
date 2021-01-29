@@ -12,6 +12,7 @@ test.bug49823	repair	status	OK
 RENAME TABLE general_log TO renamed_general_log;
 RENAME TABLE test.bug49823 TO general_log;
 Phase 1/7: Checking and upgrading mysql database
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 mysql
 mysql.column_stats                                 OK
@@ -45,10 +46,13 @@ mysql.time_zone_transition_type                    OK
 mysql.transaction_registry                         OK
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysql.user                                         OK
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Phase 6/7: Checking and upgrading tables
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 information_schema
 mtr
@@ -57,7 +61,9 @@ mtr.test_suppressions                              OK
 performance_schema
 test
 Phase 7/7: Running 'FLUSH PRIVILEGES'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 OK
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 DROP TABLE general_log;
 RENAME TABLE renamed_general_log TO general_log;
 SET GLOBAL general_log = @saved_general_log;

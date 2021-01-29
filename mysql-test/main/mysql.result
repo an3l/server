@@ -4,6 +4,7 @@ drop table if exists t1,t2,t3;
 create table t1(a int);
 insert into t1 values(1);
 ERROR at line 9: DELIMITER must be followed by a 'delimiter' character or string
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 
 Test default delimiter ;
 a
@@ -63,6 +64,7 @@ database()
 test
 unlock tables;
 drop table t1;
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 +----------------------+------------+--------+
 | concat('>',col1,'<') | col2       | col3   |
 +----------------------+------------+--------+
@@ -70,6 +72,7 @@ drop table t1;
 | >a   <               | 0123456789 |      4 |
 | >abcd<               |            |      4 |
 +----------------------+------------+--------+
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 +-------------------+
 | __tañgè Ñãmé      |
 +-------------------+
@@ -135,10 +138,15 @@ a	int(11)	YES		NULL
 b	varchar(255)	YES		NULL	
 c	int(11)	YES		NULL	
 drop table t1;
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 1
 1
 ERROR 1064 (42000) at line 3: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 1
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 ERROR at line 1: USE must be followed by a database name
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 1  +1
 2
 1  +1
@@ -147,8 +155,10 @@ ERROR at line 1: USE must be followed by a database name
 2
 1  +1
 2
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 \
 \\
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 ';
 ';
 create table t17583 (a int);
@@ -165,39 +175,65 @@ count(*)
 1280
 drop table t17583;
 Test connect without db- or host-name => reconnect
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Test connect with dbname only => new dbname, old hostname
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'connecttest' at line 1
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Test connect with _invalid_ dbname only => new invalid dbname, old hostname
 ERROR 1049 (42000) at line 1: Unknown database 'invalid'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 ERROR 1049 (42000) at line 1: Unknown database 'invalid'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Test connect with dbname + hostname
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Test connect with dbname + _invalid_ hostname
 ERROR 2005 (HY000) at line 1: Unknown MySQL server host 'invalid_hostname' (errno)
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 ERROR 2005 (HY000) at line 1: Unknown MySQL server host 'invalid_hostname' (errno)
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 The commands reported in the bug report
 ERROR 2005 (HY000) at line 1: Unknown MySQL server host 'cyril has found a bug :)XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' (errno)
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Too long dbname
 ERROR 1102 (42000) at line 1: Incorrect database name 'test_really_long_dbnamexxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Too long hostname
 ERROR 2005 (HY000) at line 1: Unknown MySQL server host 'cyrils_superlonghostnameXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX' (errno)
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 1
 1
 ERROR at line 1: DELIMITER cannot contain a backslash character
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 ERROR at line 1: DELIMITER cannot contain a backslash character
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 1
 1
 1
 1
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 This is a file starting with UTF8 BOM 0xEFBBBF
 This is a file starting with UTF8 BOM 0xEFBBBF
 delimiter
 1
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 2
 2
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 2
 2
 @z:='1'	@z=database()
 1	NULL
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 1
 1
 1
@@ -209,6 +245,8 @@ COUNT (*)
 COUNT (*)
 1
 ERROR 2005 (HY000) at line 1: Unknown MySQL server host 'invalid_hostname' (errno)
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 End of 5.0 tests
 WARNING: --server-arg option not supported in this configuration.
 *************************** 1. row ***************************
@@ -539,6 +577,7 @@ a
 # End of 10.1 tests
 #
 ERROR 1300 (HY000) at line 2: Invalid utf8 character string: 'test\xF0\x9F\x98\x81'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 set GLOBAL sql_mode=default;
 
 End of tests

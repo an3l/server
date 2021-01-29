@@ -6,6 +6,7 @@ drop user bad;
 set global debug_dbug='+d,auth_invalid_plugin';
 create user 'bad' identified by 'worse';
 ERROR 1045 (28000): Plugin foo/bar could not be loaded: invalid plugin name
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 set global debug_dbug=@old_dbug;
 drop user bad;
 set global debug_dbug='+d,increase_srv_handshake_scramble_len';

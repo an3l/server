@@ -3,13 +3,17 @@ select if(variable_value > '','yes','no') as 'have_ssl'
   from information_schema.session_status
 where variable_name='ssl_cipher';
 mysql --ssl-ca=cacert.pem -e "call test.have_ssl()"
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 have_ssl
 no
 mysql --ssl -e "call test.have_ssl()"
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 have_ssl
 no
 mysql --ssl-ca=cacert.pem --ssl-verify-server-cert -e "call test.have_ssl()"
 ERROR 2026 (HY000): SSL connection error: SSL is required, but the server does not support it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysql --ssl --ssl-verify-server-cert -e "call test.have_ssl()"
 ERROR 2026 (HY000): SSL connection error: SSL is required, but the server does not support it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 drop procedure have_ssl;

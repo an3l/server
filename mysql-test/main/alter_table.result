@@ -2456,6 +2456,7 @@ t1	CREATE TABLE `t1` (
   `b` char(1) DEFAULT NULL,
   PRIMARY KEY (`a`),
   KEY `b` (`new_b`),
+  CONSTRAINT `c` CHECK (`a` + `new_b` > 0),
   CONSTRAINT `test` CHECK (`a` + `new_b` > 1),
   CONSTRAINT `new` CHECK (octet_length(`b`) > 0)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1

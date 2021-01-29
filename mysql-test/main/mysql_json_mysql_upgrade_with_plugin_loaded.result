@@ -7,6 +7,7 @@ call mtr.add_suppression("Table rebuild required");
 show create table mysql_json_test;
 ERROR HY000: Table rebuild required. Please do "ALTER TABLE `test.mysql_json_test` FORCE" or dump/reload to fix it!
 Phase 1/7: Checking and upgrading mysql database
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 mysql
 mysql.column_stats                                 OK
@@ -56,10 +57,13 @@ Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysql.user                                         OK
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Phase 6/7: Checking and upgrading tables
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 information_schema
 mtr
@@ -74,7 +78,9 @@ Repairing tables
 test.mysql_json_test                               OK
 test.mysql_json_test_big                           OK
 Phase 7/7: Running 'FLUSH PRIVILEGES'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 OK
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 show create table mysql_json_test;
 Table	Create Table
 mysql_json_test	CREATE TABLE `mysql_json_test` (

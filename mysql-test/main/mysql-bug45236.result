@@ -5,6 +5,7 @@ connect  con1, localhost, root,,;
 CREATE TABLE t1(data LONGBLOB);
 INSERT INTO t1 SELECT CONCAT(REPEAT('1', 1024*1024 - 27), 
 "\'\r dummydb dummyhost");
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 DROP TABLE t1;
 disconnect con1;
 connection default;

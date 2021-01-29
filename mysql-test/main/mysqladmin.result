@@ -1,6 +1,9 @@
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysqld is alive
 mysqladmin: unknown variable 'database=db1'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Warning: mysqladmin: unknown variable 'loose-database=db2'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysqld is alive
 #
 # Bug#58221 : mysqladmin --sleep=x --count=x keeps looping
@@ -16,4 +19,6 @@ mysqld is alive
 #
 # Creating an empty file 'cnf_file'
 # Using --defaults-extra-file option with 'cnf_file'.
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysqld is alive
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0

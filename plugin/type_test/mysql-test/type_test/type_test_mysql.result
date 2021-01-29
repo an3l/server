@@ -1,4 +1,5 @@
 CREATE TABLE t1 (a TEST_INT8, b TEST_DOUBLE);
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Field   1:  `a`
 Catalog:    `def`
 Database:   `test`

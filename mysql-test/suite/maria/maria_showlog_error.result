@@ -3,6 +3,7 @@ connection default;
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 connection default;
 show engine aria logs;
@@ -11,6 +12,7 @@ Aria	Size unknown ; aria_log.00000001	can't stat
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 disconnect admin;
 connection default;

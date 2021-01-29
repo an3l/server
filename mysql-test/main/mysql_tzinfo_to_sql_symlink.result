@@ -33,6 +33,7 @@ INSERT INTO time_zone_transition_type (Time_zone_id, Transition_type_id, Offset,
 Warning: Unable to load 'MYSQLTEST_VARDIR/zoneinfo/posix/garbage' as time zone. Skipping it.
 Warning: Unable to load 'MYSQLTEST_VARDIR/zoneinfo/posix/ignored.tab' as time zone. Skipping it.
 Warning: Skipping directory 'MYSQLTEST_VARDIR/zoneinfo/posix/posix': to avoid infinite symlink recursion.
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 COMMIT;
 ALTER TABLE time_zone_transition ORDER BY Time_zone_id, Transition_time;
 ALTER TABLE time_zone_transition_type ORDER BY Time_zone_id, Transition_type_id;
@@ -74,6 +75,7 @@ INSERT INTO time_zone_transition_type (Time_zone_id, Transition_type_id, Offset,
  (@time_zone_id, 0, 0, 0, 'GMT')
 ;
 Warning: Unable to load 'MYSQLTEST_VARDIR/zoneinfo/posix/garbage' as time zone. Skipping it.
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 COMMIT;
 ALTER TABLE time_zone_transition ORDER BY Time_zone_id, Transition_time;
 ALTER TABLE time_zone_transition_type ORDER BY Time_zone_id, Transition_type_id;
@@ -89,6 +91,7 @@ END IF|
 #
 # Testing with explicit timezonefile
 #
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 \d |
 IF (select count(*) from information_schema.global_variables where
 variable_name='wsrep_on' and variable_value='ON') = 1 THEN
@@ -116,6 +119,7 @@ END IF|
 #
 # Testing --leap
 #
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 \d |
 IF (select count(*) from information_schema.global_variables where
 variable_name='wsrep_on' and variable_value='ON') = 1 THEN
@@ -151,6 +155,7 @@ END IF|
 #
 # MDEV-6236 - [PATCH] mysql_tzinfo_to_sql may produce invalid SQL
 #
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 \d |
 IF (select count(*) from information_schema.global_variables where
 variable_name='wsrep_on' and variable_value='ON') = 1 THEN

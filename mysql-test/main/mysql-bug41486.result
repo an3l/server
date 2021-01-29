@@ -9,6 +9,7 @@ COUNT(*)
 1
 SET @old_general_log = @@global.general_log;
 SET @@global.general_log = 0;
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 SET @@global.general_log = @old_general_log;
 SELECT LENGTH(data) FROM t1;
 LENGTH(data)

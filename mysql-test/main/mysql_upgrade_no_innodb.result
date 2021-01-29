@@ -1,5 +1,6 @@
 The --upgrade-system-tables option was used, user tables won't be touched.
 Phase 1/7: Checking and upgrading mysql database
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 mysql
 mysql.column_stats                                 OK
@@ -53,4 +54,6 @@ Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names ... Skipped
 Phase 6/7: Checking and upgrading tables... Skipped
 Phase 7/7: Running 'FLUSH PRIVILEGES'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 OK
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0

@@ -4,9 +4,12 @@
 SET NAMES utf8;
 # Bad delimiter
 --delimiter cannot be used with utf16 to utf8 conversion
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 # Bad delimiter
 --delimiter cannot be used with utf8 to utf16 conversion
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 # Start of file01.utf16.txt
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 aaa
 xxxяяяxxx
 bbb

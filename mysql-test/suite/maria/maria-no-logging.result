@@ -16,6 +16,7 @@ insert into t2 select * from t2;
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 create table t1 (a varchar(100)) engine=aria transactional=1;
 show create table t1;
@@ -37,6 +38,7 @@ count(*)
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 truncate table t1;
 insert into t1 select * from t2;
@@ -50,6 +52,7 @@ drop table t1;
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 create table t1 (a varchar(100)) engine=aria transactional=1;
 insert into t1 values('a');
@@ -62,6 +65,7 @@ Aria	Size        16384 aria_log.00000001	unknown
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 drop table t1;
 create table t1 engine=aria transactional=1 select * from t2;

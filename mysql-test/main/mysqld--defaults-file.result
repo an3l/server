@@ -1,15 +1,87 @@
 Could not open required defaults file: /path/with/no/extension
 Fatal error in defaults handling. Program aborted
+profiling:/home/anel/mariadb/builds/10.5/extra/wolfssl/CMakeFiles/wolfcrypt.dir/wolfssl/wolfcrypt/src/asn.c.gcda:Merge mismatch for function 67
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/srv/srv0srv.cc.gcda:Merge mismatch for function 45
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/lock/lock0wait.cc.gcda:Merge mismatch for function 75
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/wsrep.dir/wsrep_high_priority_service.cc.gcda:Merge mismatch for function 101
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_windowfunc.cc.gcda:Merge mismatch for function 434
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_timefunc.cc.gcda:Merge mismatch for function 1156
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_func.cc.gcda:Merge mismatch for function 678
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item.cc.gcda:Merge mismatch for function 726
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/table.cc.gcda:Merge mismatch for function 802
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/sp_rcontext.cc.gcda:Merge mismatch for function 130
 Could not open required defaults file: /path/with.ext
 Fatal error in defaults handling. Program aborted
+profiling:/home/anel/mariadb/builds/10.5/extra/wolfssl/CMakeFiles/wolfcrypt.dir/wolfssl/wolfcrypt/src/asn.c.gcda:Merge mismatch for function 67
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/srv/srv0srv.cc.gcda:Merge mismatch for function 45
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/lock/lock0wait.cc.gcda:Merge mismatch for function 75
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/wsrep.dir/wsrep_high_priority_service.cc.gcda:Merge mismatch for function 101
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_windowfunc.cc.gcda:Merge mismatch for function 434
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_timefunc.cc.gcda:Merge mismatch for function 1156
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_func.cc.gcda:Merge mismatch for function 678
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item.cc.gcda:Merge mismatch for function 726
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/table.cc.gcda:Merge mismatch for function 802
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/sp_rcontext.cc.gcda:Merge mismatch for function 130
 Could not open required defaults file: MYSQL_TEST_DIR/relative/path/with.ext
 Fatal error in defaults handling. Program aborted
+profiling:/home/anel/mariadb/builds/10.5/extra/wolfssl/CMakeFiles/wolfcrypt.dir/wolfssl/wolfcrypt/src/asn.c.gcda:Merge mismatch for function 67
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/srv/srv0srv.cc.gcda:Merge mismatch for function 45
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/lock/lock0wait.cc.gcda:Merge mismatch for function 75
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/wsrep.dir/wsrep_high_priority_service.cc.gcda:Merge mismatch for function 101
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_windowfunc.cc.gcda:Merge mismatch for function 434
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_timefunc.cc.gcda:Merge mismatch for function 1156
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_func.cc.gcda:Merge mismatch for function 678
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item.cc.gcda:Merge mismatch for function 726
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/table.cc.gcda:Merge mismatch for function 802
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/sp_rcontext.cc.gcda:Merge mismatch for function 130
 Could not open required defaults file: MYSQL_TEST_DIR/relative/path/without/extension
 Fatal error in defaults handling. Program aborted
+profiling:/home/anel/mariadb/builds/10.5/extra/wolfssl/CMakeFiles/wolfcrypt.dir/wolfssl/wolfcrypt/src/asn.c.gcda:Merge mismatch for function 67
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/srv/srv0srv.cc.gcda:Merge mismatch for function 45
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/lock/lock0wait.cc.gcda:Merge mismatch for function 75
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/wsrep.dir/wsrep_high_priority_service.cc.gcda:Merge mismatch for function 101
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_windowfunc.cc.gcda:Merge mismatch for function 434
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_timefunc.cc.gcda:Merge mismatch for function 1156
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_func.cc.gcda:Merge mismatch for function 678
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item.cc.gcda:Merge mismatch for function 726
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/table.cc.gcda:Merge mismatch for function 802
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/sp_rcontext.cc.gcda:Merge mismatch for function 130
 Could not open required defaults file: MYSQL_TEST_DIR/with.ext
 Fatal error in defaults handling. Program aborted
+profiling:/home/anel/mariadb/builds/10.5/extra/wolfssl/CMakeFiles/wolfcrypt.dir/wolfssl/wolfcrypt/src/asn.c.gcda:Merge mismatch for function 67
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/srv/srv0srv.cc.gcda:Merge mismatch for function 45
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/lock/lock0wait.cc.gcda:Merge mismatch for function 75
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/wsrep.dir/wsrep_high_priority_service.cc.gcda:Merge mismatch for function 101
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_windowfunc.cc.gcda:Merge mismatch for function 434
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_timefunc.cc.gcda:Merge mismatch for function 1156
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_func.cc.gcda:Merge mismatch for function 678
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item.cc.gcda:Merge mismatch for function 726
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/table.cc.gcda:Merge mismatch for function 802
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/sp_rcontext.cc.gcda:Merge mismatch for function 130
 Could not open required defaults file: MYSQL_TEST_DIR/no_extension
 Fatal error in defaults handling. Program aborted
+profiling:/home/anel/mariadb/builds/10.5/extra/wolfssl/CMakeFiles/wolfcrypt.dir/wolfssl/wolfcrypt/src/asn.c.gcda:Merge mismatch for function 67
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/stacktrace.c.gcda:Merge mismatch for function 9
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/srv/srv0srv.cc.gcda:Merge mismatch for function 45
+profiling:/home/anel/mariadb/builds/10.5/storage/innobase/CMakeFiles/innobase.dir/lock/lock0wait.cc.gcda:Merge mismatch for function 75
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/wsrep.dir/wsrep_high_priority_service.cc.gcda:Merge mismatch for function 101
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_windowfunc.cc.gcda:Merge mismatch for function 434
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_timefunc.cc.gcda:Merge mismatch for function 1156
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item_func.cc.gcda:Merge mismatch for function 678
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/item.cc.gcda:Merge mismatch for function 726
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/table.cc.gcda:Merge mismatch for function 802
+profiling:/home/anel/mariadb/builds/10.5/sql/CMakeFiles/sql.dir/sp_rcontext.cc.gcda:Merge mismatch for function 130
 #
 # MDEV-21374: When "--help --verbose" prints out configuration file paths,
 # the --defaults-file option is not considered

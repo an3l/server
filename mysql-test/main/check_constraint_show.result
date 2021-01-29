@@ -6,11 +6,15 @@ t1	CREATE TABLE `t1` (
   `c2` int(11) DEFAULT NULL CHECK (`c2` > 0),
   `c3` int(11) DEFAULT NULL,
   PRIMARY KEY (`c1`),
+  CONSTRAINT `c1` CHECK (`c1` > 0),
+  CONSTRAINT `c2` CHECK (`c2` > 0),
   CONSTRAINT `range` CHECK (`c3` >= `c1` and `c3` <= `c2`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1
 select * from information_schema.table_constraints where table_name = 't1';
 CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	CONSTRAINT_NAME	TABLE_SCHEMA	TABLE_NAME	CONSTRAINT_TYPE
 def	test	PRIMARY	test	t1	PRIMARY KEY
+def	test	c1	test	t1	CHECK
+def	test	c2	test	t1	CHECK
 def	test	c1	test	t1	CHECK
 def	test	c2	test	t1	CHECK
 def	test	range	test	t1	CHECK

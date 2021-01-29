@@ -105,6 +105,7 @@ SELECT * FROM information_schema.TABLE_PRIVILEGES WHERE GRANTEE="'mariadb.sys'@'
 GRANTEE	TABLE_CATALOG	TABLE_SCHEMA	TABLE_NAME	PRIVILEGE_TYPE	IS_GRANTABLE
 # Run mysql_upgrade
 Phase 1/7: Checking and upgrading mysql database
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 mysql
 mysql.column_stats                                 OK
@@ -155,10 +156,13 @@ Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 mysql.user                                         OK
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Phase 6/7: Checking and upgrading tables
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 information_schema
 mtr
@@ -171,7 +175,9 @@ mysqltest1.save_tables_priv                        OK
 performance_schema
 test
 Phase 7/7: Running 'FLUSH PRIVILEGES'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 OK
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 # check new definitions mysql_upgrade
 SELECT count(*) FROM information_schema.VIEWS WHERE TABLE_CATALOG = 'def'
 and TABLE_SCHEMA = 'mysql' and TABLE_NAME='user' and DEFINER = 'superuser@localhost';
@@ -202,6 +208,7 @@ DROP VIEW mysql.user;
 DROP PROCEDURE AddGeometryColumn;
 DROP PROCEDURE DropGeometryColumn;
 Phase 1/7: Checking and upgrading mysql database
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 mysql
 mysql.column_stats                                 OK
@@ -252,9 +259,12 @@ Error    : Unknown storage engine 'InnoDB'
 error    : Corrupt
 Phase 2/7: Installing used storage engines... Skipped
 Phase 3/7: Fixing views
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Phase 4/7: Running 'mysql_fix_privilege_tables'
 Phase 5/7: Fixing table and database names
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Phase 6/7: Checking and upgrading tables
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Processing databases
 information_schema
 mtr
@@ -267,7 +277,9 @@ mysqltest1.save_tables_priv                        OK
 performance_schema
 test
 Phase 7/7: Running 'FLUSH PRIVILEGES'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 OK
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 delete from global_priv;
 delete from tables_priv;
 delete from proxies_priv;

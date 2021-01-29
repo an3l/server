@@ -5,7 +5,10 @@ TCP
 SOCKET
  ok
 ERROR 2047 (HY000): Wrong or unknown protocol
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Unknown option to protocol: MEMORY
 Alternatives are: 'TCP','SOCKET','PIPE'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 Unknown option to protocol: NullS
 Alternatives are: 'TCP','SOCKET','PIPE'
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0

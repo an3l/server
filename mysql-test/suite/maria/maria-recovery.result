@@ -7,6 +7,7 @@ use mysqltest;
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 create table t1 (a varchar(1000)) engine=aria;
 * TEST of REDO: see if recovery can reconstruct if we give it an old table
@@ -149,6 +150,7 @@ drop table t1;
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 CREATE TABLE t1 (
 i int,
@@ -190,6 +192,7 @@ drop table t1;
 connection default;
 connection admin;
 * shut down mysqld, removed logs, restarted it
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 connection default;
 CREATE TABLE t1 (
 i int auto_increment primary key,

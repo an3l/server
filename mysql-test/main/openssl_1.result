@@ -52,6 +52,7 @@ mysqltest: Could not open connection 'default': 2026 SSL connection error: xxxx
 mysqltest: Could not open connection 'default': 2026 SSL connection error: xxxx
 mysqltest: Could not open connection 'default': 2026 SSL connection error: xxxx
 mysqltest: Could not open connection 'default': 2026 SSL connection error: xxxx
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 have_ssl
 1
 End of 5.0 tests
@@ -179,7 +180,8 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
-mysqldump: Got error: 2026: "SSL connection error: xxxx
+mysqldump: Got error: 2026: "SSL connection error: xxxxprofiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
+
 DROP TABLE t1;
 GRANT SELECT ON test.* TO bug42158@localhost REQUIRE X509;
 FLUSH PRIVILEGES;
@@ -196,4 +198,4 @@ End of 5.1 tests
 /*!40019 SET @@session.max_insert_delayed_threads=0*/;
 /*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
 DELIMITER /*!*/;
-ERROR: Failed on connect: SSL connection error
+ERROR: Failed on connect: SSL connection errorprofiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0

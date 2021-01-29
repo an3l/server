@@ -7,6 +7,7 @@ drop procedure if exists nicesp;
 drop trigger if exists t1_empty;
 drop trigger if exists t1_bi;
 "Pass 1 : --disable-comments"
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 1
 1
 2
@@ -34,6 +35,7 @@ t1_bi		CREATE DEFINER=`root`@`localhost` trigger t1_bi before insert on t1\nfor 
 id	data
 trig	12
 "Pass 2 : --enable-comments"
+profiling:/home/anel/mariadb/builds/10.5/mysys/CMakeFiles/mysys.dir/my_mess.c.gcda:Merge mismatch for function 0
 1
 1
 2
