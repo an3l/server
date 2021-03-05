@@ -1,0 +1,23 @@
+
+--source include/have_innodb.inc
+ 
+INSTALL SONAME 'ha_connect';
+CREATE TABLE t (f INT) ENGINE=CONNECT;
+show create table t;
+ALTER TABLE t ENGINE InnoDB;
+show create table t;
+# Cleanup
+DROP TABLE t;
+
+CREATE TABLE t (f INT) ENGINE=CONNECT;
+show create table t;
+ALTER TABLE t ENGINE Aria;
+show create table t;
+DROP TABLE t;
+
+CREATE TABLE t (f INT) ENGINE=CONNECT;
+show create table t;
+ALTER TABLE t ENGINE MYISAM;
+show create table t;
+DROP TABLE t;
+UNINSTALL SONAME 'ha_connect';

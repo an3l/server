@@ -11036,14 +11036,6 @@ do_continue:;
   error= quick_rm_table(thd, old_db_type, &alter_ctx.db, &backup_name,
                         FN_IS_TMP |
                         (engine_changed ? NO_HA_TABLE | NO_PAR_TABLE: 0));
-  if (engine_changed)
-  {
-    /* the .frm file was removed but not the original table */
-    error|= quick_rm_table(thd, old_db_type, &alter_ctx.db,
-                           &alter_ctx.table_name,
-                           NO_FRM_RENAME |
-                           (engine_changed ? 0 : FN_IS_TMP));
-  }
   if (binlog_as_create_select)
   {
     /*

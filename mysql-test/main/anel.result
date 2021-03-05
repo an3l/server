@@ -1,0 +1,52 @@
+INSTALL SONAME 'ha_connect';
+CREATE TABLE t (f INT) ENGINE=CONNECT;
+Warnings:
+Warning	1105	No table_type. Will be set to DOS
+Warning	1105	No file name. Table will use t.dos
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `f` int(11) DEFAULT NULL
+) ENGINE=CONNECT DEFAULT CHARSET=latin1
+ALTER TABLE t ENGINE InnoDB;
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `f` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+DROP TABLE t;
+CREATE TABLE t (f INT) ENGINE=CONNECT;
+Warnings:
+Warning	1105	No table_type. Will be set to DOS
+Warning	1105	No file name. Table will use t.dos
+Warning	1105	Default file /dev/shm/var_auto_p2EI/mysqld.1/data/./test/t.dos already exists
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `f` int(11) DEFAULT NULL
+) ENGINE=CONNECT DEFAULT CHARSET=latin1
+ALTER TABLE t ENGINE Aria;
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `f` int(11) DEFAULT NULL
+) ENGINE=Aria DEFAULT CHARSET=latin1 PAGE_CHECKSUM=1
+DROP TABLE t;
+CREATE TABLE t (f INT) ENGINE=CONNECT;
+Warnings:
+Warning	1105	No table_type. Will be set to DOS
+Warning	1105	No file name. Table will use t.dos
+Warning	1105	Default file /dev/shm/var_auto_p2EI/mysqld.1/data/./test/t.dos already exists
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `f` int(11) DEFAULT NULL
+) ENGINE=CONNECT DEFAULT CHARSET=latin1
+ALTER TABLE t ENGINE MYISAM;
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `f` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1
+DROP TABLE t;
+UNINSTALL SONAME 'ha_connect';
