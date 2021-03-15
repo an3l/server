@@ -75,10 +75,10 @@ FOREACH(f ${HEADERS_GEN_CONFIGURE})
     DESTINATION ${INSTALL_INCLUDEDIR}/server COMPONENT Development)
 ENDFOREACH(f)
 IF (WITHOUT_SERVER)
-  SET(wsrep_file "service_wsrep.h" CACHE STRING "service_wsrep" FORCE)
+  SET(service_wsrep "service_wsrep.h")
+  SET(wsrep_file "wsrep.h")
 ENDIF()
-message("Relative path: ${service_wsrep}")
-INSTALL(DIRECTORY mysql/ DESTINATION ${INSTALL_INCLUDEDIR}/server/mysql COMPONENT Development FILES_MATCHING PATTERN "*.h" REGEX "${wsrep_file}" EXCLUDE)
+INSTALL(DIRECTORY mysql/ DESTINATION ${INSTALL_INCLUDEDIR}/server/mysql COMPONENT Development FILES_MATCHING PATTERN "*.h" REGEX "${service_wsrep}" EXCLUDE)
 
 STRING(REPLACE "." "\\." EXCL_RE "${HEADERS};${HEADERS_GEN_CONFIGURE}")
 STRING(REPLACE ";" "|" EXCL_RE "${EXCL_RE}")
@@ -89,7 +89,8 @@ MACRO(INSTALL_PRIVATE DIR)
     FILES_MATCHING PATTERN "*.h"
     PATTERN CMakeFiles EXCLUDE
     PATTERN mysql EXCLUDE
-    REGEX "\\./(${EXCL_RE}$)" EXCLUDE)
+    REGEX "\\./(${EXCL_RE}$)" EXCLUDE
+    REGEX "${wsrep_file}" EXCLUDE)
 ENDMACRO()
 
 INSTALL_PRIVATE(${CMAKE_CURRENT_BINARY_DIR})
