@@ -78,14 +78,6 @@ ADD_CUSTOM_TARGET(GenFixPrivs
   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/mysql_fix_privilege_tables_sql.c
 )
 
-IF(UNIX)
- FILE(WRITE ${CMAKE_CURRENT_BINARY_DIR}/make_binary_distribution
-   "cd ${CMAKE_BINARY_DIR} && '${CMAKE_CPACK_COMMAND}' -G TGZ --config CPackConfig.cmake\n" )
- EXECUTE_PROCESS(
-  COMMAND chmod +x ${CMAKE_CURRENT_BINARY_DIR}/make_binary_distribution
-)
-ENDIF()
-
 # Configure two scripts from one 'in' file.
 # The maria_add_gis_sp.sql - to be sent to 'mysql' tool
 # and the maria_add_gis_sp_bootstrap.sql, that can be sent to
@@ -209,7 +201,7 @@ SET(pkgdata_locations "$basedir/${INSTALL_MYSQLSHAREDIR} $basedir/share $basedir
 # install mysql_install_db.sh at this point since it needs
 # different values for the above variables that will change
 # afterwards
-IF(UNIX)
+IF(UNIX AND NOT WITHOUT_SERVER)
   CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/mysql_install_db.sh
     ${CMAKE_CURRENT_BINARY_DIR}/mariadb-install-db ESCAPE_QUOTES @ONLY)
   EXECUTE_PROCESS(COMMAND chmod +x ${CMAKE_CURRENT_BINARY_DIR}/mariadb-install-db)
@@ -218,7 +210,7 @@ IF(UNIX)
     DESTINATION ${INSTALL_SCRIPTDIR}
     COMPONENT Server)
 
-  INSTALL_LINK(mariadb-install-db mysql_install_db ${INSTALL_SCRIPTDIR} Server)
+  INSTALL_LINK(mariadb-install-db mysql_install_db ${INSTALL_SCRIPTDIR} Client)
 ENDIF()
 
 SET(prefix "${CMAKE_INSTALL_PREFIX}")
@@ -255,6 +247,10 @@ SET(msql2mysql_COMPONENT Client)
 SET(mariadb-access_COMPONENT Client)
 SET(mariadb-find-rows_COMPONENT Client)
 SET(mytop_COMPONENT Mytop)
+SET(mariadb-hotcopy_COMPONENT COMPONENT Client)
+SET(mariadb-convert-table-format_COMPONENT COMPONENT Client)
+SET(mariadb-setpermission_COMPONENT COMPONENT Client)
+SET(mariadb-secure-installation_COMPONENT COMPONENT Client)
 
 IF(WIN32)
   # On Windows, some .sh and some .pl.in files are configured
