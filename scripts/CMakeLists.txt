@@ -279,7 +279,7 @@ IF(WIN32)
     INSTALL_SCRIPT(${CMAKE_CURRENT_BINARY_DIR}/${file}.pl COMPONENT Server_Scripts)
   ENDFOREACH()
 ELSE()
-  IF(WITH_WSREP AND NOT WITHOUT_SERVER)
+  IF(WITH_WSREP)
     SET(WSREP_SCRIPTS
       wsrep_sst_mysqldump
       wsrep_sst_rsync
@@ -322,6 +322,7 @@ ELSE()
     mariadb-access
     mariadb-convert-table-format
     mariadb-find-rows
+    mariadb-dumpslow
     mysql_config
     mytop
     mariadb-hotcopy
