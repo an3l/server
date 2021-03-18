@@ -18,10 +18,7 @@ usr/bin/aria_pack
 usr/bin/aria_read_log
 usr/bin/galera_new_cluster
 usr/bin/galera_recovery
-usr/bin/mariadb-binlog
-usr/bin/mariadb-plugin
 usr/bin/mariadb-service-convert
-usr/bin/mariadb-tzinfo-to-sql
 usr/bin/mariadbd-multi
 usr/bin/mariadbd-safe
 usr/bin/mariadbd-safe-helper
@@ -29,8 +26,6 @@ usr/bin/myisam_ftdump
 usr/bin/myisamchk
 usr/bin/myisamlog
 usr/bin/myisampack
-usr/bin/perror
-usr/bin/resolve_stack_dump
 usr/bin/wsrep_sst_common
 usr/bin/wsrep_sst_mariabackup
 usr/bin/wsrep_sst_mysqldump
@@ -65,10 +60,7 @@ usr/share/man/man1/aria_pack.1
 usr/share/man/man1/aria_read_log.1
 usr/share/man/man1/galera_new_cluster.1
 usr/share/man/man1/galera_recovery.1
-usr/share/man/man1/mariadb-binlog.1
-usr/share/man/man1/mariadb-plugin.1
 usr/share/man/man1/mariadb-service-convert.1
-usr/share/man/man1/mariadb-tzinfo-to-sql.1
 usr/share/man/man1/mariadbd-multi.1
 usr/share/man/man1/mariadbd-safe-helper.1
 usr/share/man/man1/mariadbd-safe.1
@@ -76,14 +68,9 @@ usr/share/man/man1/myisam_ftdump.1
 usr/share/man/man1/myisamchk.1
 usr/share/man/man1/myisamlog.1
 usr/share/man/man1/myisampack.1
-usr/share/man/man1/mysql_plugin.1
-usr/share/man/man1/mysql_tzinfo_to_sql.1
-usr/share/man/man1/mysqlbinlog.1
 usr/share/man/man1/mysqld_multi.1
 usr/share/man/man1/mysqld_safe.1
 usr/share/man/man1/mysqld_safe_helper.1
-usr/share/man/man1/perror.1
-usr/share/man/man1/resolve_stack_dump.1
 usr/share/man/man1/wsrep_sst_common.1
 usr/share/man/man1/wsrep_sst_mariabackup.1
 usr/share/man/man1/wsrep_sst_mysqldump.1
