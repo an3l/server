@@ -58,6 +58,12 @@
 #define pclose _pclose
 #endif
 
+// alternatively can be put in storage/connect/global.h
+#include <sys/types.h>
+#include <unistd.h>
+#include "stdio.h"
+#include <sys/wait.h>
+
 static XGETREST getRestFnc = NULL;
 static int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename);
 
@@ -142,20 +148,20 @@ int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename)
 
 	if (pID == 0) {
 		// Code executed by child process
-		execlp("curl", "curl", buf, fn, (char*)NULL);
+		  execl("/usr/bin/curl","--url", buf, "-o", filename, NULL);
 		// If execlp() is successful, we should not reach this next line.
-			strcpy(g->Message, explain_execlp());
+			strcpy(g->Message, "I shouldn't be called after exec from vfork()");
 			rc = 1;
 			exit(rc);
 		}	// endif execlp
 
-	} else if (pID < 0) {
+	  else if (pID < 0) {
 		// failed to fork
 		strcpy(g->Message, "Failed to fork");
 		rc = 1;
 	} else {
 		// Parent process
-		wait(0);  // Wait for the child to terminate
+		wait(NULL);  // Wait for the child to terminate
 	}	// endif pID
 #endif  // !__WIN__
 
