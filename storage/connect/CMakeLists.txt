@@ -354,6 +354,7 @@ IF(CONNECT_WITH_REST)
 ##ELSE(NOT cpprestsdk_FOUND)
 ##  MESSAGE(STATUS "=====> cpprestsdk package not found")
 # ENDIF (cpprestsdk_FOUND)
+  SET(REST_LIBRARY -lexplain)
 ENDIF(CONNECT_WITH_REST)
 
 #

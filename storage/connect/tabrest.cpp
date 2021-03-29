@@ -58,6 +58,13 @@
 #define pclose _pclose
 #endif
 
+// alternatively can be put in storage/connect/global.h
+#include <sys/types.h>
+#include <unistd.h>
+#include "stdio.h"
+#include <sys/wait.h>
+#include <libexplain/execlp.h>
+
 static XGETREST getRestFnc = NULL;
 static int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename);
 
@@ -93,20 +100,87 @@ PTABDEF __stdcall GetREST(PGLOBAL g, void *memp)
 /***********************************************************************/
 int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename)
 {
-	char  buf[1024];
-	int   rc;
-	FILE *pipe;
+	char buf[512];
+	int  rc = 0;
+
+	if (strchr(filename, '"')) {
+		strcpy(g->Message, "Invalid file name");
+		return 1;
+	} // endif filename
 
 	if (Uri) {
 		if (*Uri == '/' || Http[strlen(Http) - 1] == '/')
-			sprintf(buf, "curl %s%s -o %s", Http, Uri, filename);
+			sprintf(buf, "%s%s", Http, Uri);
 		else
-			sprintf(buf, "curl %s/%s -o %s", Http, Uri, filename);
+			sprintf(buf, "%s/%s", Http, Uri);
 
 	} else
-		sprintf(buf, "curl %s -o %s", Http, filename);
+		strcpy(buf, Http);
 
-	if ((pipe = popen(buf, "rt"))) {
+#if defined(__WIN__)
+	char cmd[1024];
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	sprintf(cmd, "curl \"%s\" -o \"%s\"", buf, filename);
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	// Start the child process. 
+	if (CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+		// Wait until child process exits.
+		WaitForSingleObject(pi.hProcess, INFINITE);
+
+		// Close process and thread handles. 
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+	} else {
+		sprintf(g->Message, "CreateProcess failed (%d)", GetLastError());
+		rc = 1;
+	}	// endif CreateProcess
+#else   // !__WIN__
+	char  fn[600];
+	int   rcd;
+	// Check if curl package is availabe by executing subprocess
+	FILE *f= popen("command -v curl", "r");
+	if(!f)
+	{
+	  strcpy(g->Message, "curl CLI not installed");
+		rc = 1;
+		return 1;
+	}
+	pid_t pID = vfork();
+
+	sprintf(fn, "-o%s", filename);
+
+	if (pID == 0) {
+		// Code executed by child process
+			execlp("curl", "curl", buf, fn, (char*)NULL);
+		// If execlp() is successful, we should not reach this next line.
+			strcpy(g->Message, explain_execlp("curl", "curl", buf, fn, (char*)NULL));
+		// If execlp() is successful, we should not reach this next line.
+			strcpy(g->Message, "I shouldn't be called after exec from vfork()");
+			rc = 1;
+			exit(rc);
+		}	// endif execlp
+
+	  else if (pID < 0) {
+		// failed to fork
+		strcpy(g->Message, "Failed to fork");
+		rc = 1;
+	} else {
+		// Parent process
+		wait(NULL);  // Wait for the child to terminate
+	}	// endif pID
+#endif  // !__WIN__
+
+#if 0
+	// Not used because unsecure
+	FILE *pipe;
+
+	if ((pipe = popen(buf, "r"))) {
 		if (trace(515))
 			while (fgets(buf, sizeof(buf), pipe)) {
 				htrc("%s", buf);
@@ -115,12 +189,13 @@ int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename)
 		pclose(pipe);
 		rc = 0;
 	} else {
-		sprintf(g->Message, "curl failed, errno =%d", errno);
+		sprintf(g->Message, "curl failed, errno=%d", errno);
 		rc = 1;
 	} // endif pipe
+#endif // 0__
 
 	return rc;
-} // end od Xcurl
+} // end of Xcurl
 
 /***********************************************************************/
 /*  GetREST: load the Rest lib and get the Rest function.              */
@@ -202,11 +277,11 @@ PQRYRES __stdcall ColREST(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
   PQRYRES  qrp= NULL;
   char     filename[_MAX_PATH + 1];  // MAX PATH ???
 	int      rc;
-	bool     curl = false;
   PCSZ     http, uri, fn, ftype;
-	XGETREST grf = GetRestFunction(g);
+	XGETREST grf = NULL;
+	bool     curl = GetBooleanTableOption(g, tp, "Curl", false);
 
-	if (!grf)
+	if (!curl && !(grf = GetRestFunction(g)))
 		curl = true;
 
   http = GetStringTableOption(g, tp, "Http", NULL);
@@ -230,28 +305,25 @@ PQRYRES __stdcall ColREST(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
 			filename[n + i] = tolower(ftype[i]);
 
 		fn = filename;
-		tp->filename = PlugDup(g, fn);
+		tp->subtype = PlugDup(g, fn);
 		sprintf(g->Message, "No file name. Table will use %s", fn);
 		PUSH_WARNING(g->Message);
 	}	// endif fn
 
   //  We used the file name relative to recorded datapath
 	PlugSetPath(filename, fn, db);
-	curl = GetBooleanTableOption(g, tp, "Curl", curl);
+	remove(filename);
 
   // Retrieve the file from the web and copy it locally
 	if (curl)
 		rc = Xcurl(g, http, uri, filename);
-	else if (grf)
+	else
 		rc = grf(g->Message, trace(515), http, uri, filename);
-	else {
-		strcpy(g->Message, "Cannot access to curl nor casablanca");
-		rc = 1;
-	}	// endif !grf
 
-	if (rc)
+	if (rc) {
+		strcpy(g->Message, "Cannot access to curl nor casablanca");
 		return NULL;
-  else if (!stricmp(ftype, "JSON"))
+	} else if (!stricmp(ftype, "JSON"))
     qrp = JSONColumns(g, db, NULL, tp, info);
   else if (!stricmp(ftype, "CSV"))
     qrp = CSVColumns(g, NULL, tp, info);
@@ -274,11 +346,12 @@ bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
 {
 	char     filename[_MAX_PATH + 1];
   int      rc = 0, n;
-	bool     curl = false, xt = trace(515);
+	bool     xt = trace(515);
 	LPCSTR   ftype;
-	XGETREST grf = GetRestFunction(g);
+	XGETREST grf = NULL;
+	bool     curl = GetBoolCatInfo("Curl", false);
 
-	if (!grf)
+	if (!curl && !(grf = GetRestFunction(g)))
 		curl = true;
 
 #if defined(MARIADB)
@@ -309,24 +382,21 @@ bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
 
   //  We used the file name relative to recorded datapath
   PlugSetPath(filename, Fn, GetPath());
-
-	curl = GetBoolCatInfo("Curl", curl);
+	remove(filename);
 
   // Retrieve the file from the web and copy it locally
 	if (curl) {
 		rc = Xcurl(g, Http, Uri, filename);
 		xtrc(515, "Return from Xcurl: rc=%d\n", rc);
-	} else if (grf) {
+	} else {
 		rc = grf(g->Message, xt, Http, Uri, filename);
 		xtrc(515, "Return from restGetFile: rc=%d\n", rc);
-	} else {
-		strcpy(g->Message, "Cannot access to curl nor casablanca");
-		rc = 1;
-	}	// endif !grf
+	} // endelse
 
-  if (rc)
-    return true;
-  else switch (n) {
+	if (rc) {
+		// strcpy(g->Message, "Cannot access to curl nor casablanca");
+		return true;
+	} else switch (n) {
     case 1: Tdp = new (g) JSONDEF; break;
 #if defined(XML_SUPPORT)
 		case 2: Tdp = new (g) XMLDEF;  break;
