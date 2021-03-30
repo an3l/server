@@ -63,6 +63,7 @@
 #include <unistd.h>
 #include "stdio.h"
 #include <sys/wait.h>
+#include <libexplain/execlp.h>
 
 static XGETREST getRestFnc = NULL;
 static int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename);
@@ -148,7 +149,11 @@ int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename)
 
 	if (pID == 0) {
 		// Code executed by child process
-		  execl("/usr/bin/curl","--url", buf, "-o", filename, NULL);
+				// Code executed by child process
+				execlp("curl", "curl", buf, fn, (char*)NULL);
+		// If execlp() is successful, we should not reach this next line.
+			strcpy(g->Message, explain_execlp("curl", "curl", buf, fn, (char*)NULL));
+		//  execl("/usr/bin/curl","--url", buf, "-o", filename, NULL);
 		// If execlp() is successful, we should not reach this next line.
 			strcpy(g->Message, "I shouldn't be called after exec from vfork()");
 			rc = 1;
