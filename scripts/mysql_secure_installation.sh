@@ -21,7 +21,13 @@ output=".my.output.$$"
 
 trap "interrupt" 1 2 3 6 15
 
-rootpass=""
+args=
+user=""
+password=""
+host="localhost"
+set_from_cli=0
+emptyuser=0
+emptypass=0
 echo_n=
 echo_c=
 basedir=
@@ -48,11 +54,12 @@ parse_arguments()
 
   for arg
   do
+  val=$(parse_arg "$arg")
     case "$arg" in
-      --basedir=*) basedir=`parse_arg "$arg"` ;;
-      --defaults-file=*) defaults_file="$arg" ;;
-      --defaults-extra-file=*) defaults_extra_file="$arg" ;;
-      --no-defaults) no_defaults="$arg" ;;
+      --basedir=*) basedir="$val";;
+      --defaults-file=*) defaults_file="$val" ;;
+      --defaults-extra-file=*) defaults_extra_file="$val" ;;
+      --no-defaults) no_defaults="$val" ;;
       *)
         if test -n "$pick_args"
         then
@@ -61,6 +68,11 @@ parse_arguments()
           # XXX: This is broken; true fix requires using eval and proper
           # quoting of every single arg ($basedir, $ldata, etc.)
           #args="$args "`echo "$arg" | sed -e 's,\([^a-zA-Z0-9_.-]\),\\\\\1,g'`
+          case $arg in
+            --user=*) user="$val" set_from_cli=1;;
+            --password=*) password="$val";;
+            --host=*) host="$val";;
+          esac
           args="$args $arg"
         fi
         ;;
@@ -181,8 +193,7 @@ then
   cannot_find_file "$mysql_command"
   exit 1
 fi
-
-# Now we can get arguments from the group [client] and [client-server]
+# Now we can get arguments from the group [client], [client-server] and [client-mariadb]
 # in the my.cfg file, then re-run to merge with command line arguments.
 parse_arguments `$print_defaults $defaults_file $defaults_extra_file $no_defaults client client-server client-mariadb`
 parse_arguments PICK-ARGS-FROM-ARGV "$@"
@@ -242,14 +253,14 @@ basic_single_escape () {
 }
 
 #
-# create a simple my.cnf file to be able to pass the root password to the mysql
+# create a simple my.cnf file to be able to pass the user password to the mysql
 # client without putting it on the command line
 #
 make_config() {
     echo "# mysql_secure_installation config file" >$config
     echo "[mysql]" >>$config
-    echo "user=root" >>$config
-    esc_pass=`basic_single_escape "$rootpass"`
+    echo "user=$user" >>$config
+    esc_pass=`basic_single_escape "$password"`
     echo "password='$esc_pass'" >>$config
     #sed 's,^,> ,' < $config  # Debugging
 
@@ -260,32 +271,59 @@ make_config() {
     fi
 }
 
-get_root_password() {
-    status=1
-    while [ $status -eq 1 ]; do
-	stty -echo
-	echo $echo_n "Enter current password for root (enter for none): $echo_c"
-	read password
-	echo
-	stty echo
-	if [ "x$password" = "x" ]; then
-	    emptypass=1
-	else
-	    emptypass=0
-	fi
-	rootpass=$password
-	make_config
-	do_query "show create user root@localhost"
-	status=$?
+get_user_and_password() {
+    status_priv_user=1
+    while [ $status_priv_user -ne 0 ]; do
+    if test -z "$user"; then
+        stty -echo
+        echo $echo_n "For which user do you want to specify a password (press enter for unix_socket user): $echo_c"
+        read user
+        echo
+        stty echo
+        if [ "x$user" = "x" ]; then
+            emptyuser=1
+            emptypass=1
+            user=$USER
+        else
+            emptyuser=0
+        fi
+    fi
+    if [ -z "$password" ] && [ "$emptyuser" -eq 0 ] && [ "$emptypass" -eq 0 ]; then
+        stty -echo
+        # If the empty user it means we are connecting with unix_socket else need password
+        echo $echo_n "Enter current password for user $user@$host (enter for none): $echo_c"
+        read password
+        echo
+        stty echo
+        if [ "x$password" = "x" ]; then
+            emptypass=1
+        else
+            emptypass=0
+        fi
+    fi
+    make_config
+    # Only privileged user that has access to mysql DB can make changes
+    do_query "use mysql"
+    status_priv_user=$?
+    if test $status_priv_user -ne 0; then
+        echo "Only privileged user can make changes to mysql DB."
+        if test $set_from_cli -eq 1; then
+            clean_and_exit
+        fi
+        user=
+        password=
+        emptypass=0
+    fi
     done
+    do_query "show create user $user@$host"
     if grep -q unix_socket $output; then
-      emptypass=0
+        emptypass=0
     fi
     echo "OK, successfully used password, moving on..."
     echo
 }
 
-set_root_password() {
+set_user_password() {
     stty -echo
     echo $echo_n "New password: $echo_c"
     read password1
@@ -296,32 +334,24 @@ set_root_password() {
     stty echo
 
     if [ "$password1" != "$password2" ]; then
-	echo "Sorry, passwords do not match."
-	echo
-	return 1
+        echo "Sorry, passwords do not match."
+        echo
+        return 1
     fi
 
     if [ "$password1" = "" ]; then
-	echo "Sorry, you can't use an empty password here."
-	echo
-	return 1
+        echo "Sorry, you can't use an empty password here."
+        echo
+        return 1
     fi
 
-    esc_pass=`basic_single_escape "$password1"`
-    do_query "UPDATE mysql.global_priv SET priv=json_set(priv, '$.plugin', 'mysql_native_password', '$.authentication_string', PASSWORD('$esc_pass')) WHERE User='root';"
+    esc_pass=$(basic_single_escape "$password1")
+    do_query "UPDATE mysql.global_priv SET priv=json_set(priv, '$.plugin', 'mysql_native_password', '$.authentication_string', PASSWORD('$esc_pass')) WHERE User='$user';"
     if [ $? -eq 0 ]; then
-	echo "Password updated successfully!"
-	echo "Reloading privilege tables.."
-	reload_privilege_tables
-	if [ $? -eq 1 ]; then
-		clean_and_exit
-	fi
-	echo
-	rootpass=$password1
-	make_config
+        echo "Password updated successfully!"
     else
-	echo "Password update failed!"
-	clean_and_exit
+        echo "Password update failed!"
+        clean_and_exit
     fi
 
     return 0
@@ -330,10 +360,10 @@ set_root_password() {
 remove_anonymous_users() {
     do_query "DELETE FROM mysql.global_priv WHERE User='';"
     if [ $? -eq 0 ]; then
-	echo " ... Success!"
+        echo " ... Success!"
     else
-	echo " ... Failed!"
-	clean_and_exit
+        echo " ... Failed!"
+        clean_and_exit
     fi
 
     return 0
@@ -342,9 +372,9 @@ remove_anonymous_users() {
 remove_remote_root() {
     do_query "DELETE FROM mysql.global_priv WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
     if [ $? -eq 0 ]; then
-	echo " ... Success!"
+        echo " ... Success!"
     else
-	echo " ... Failed!"
+        echo " ... Failed!"
     fi
 }
 
@@ -352,17 +382,17 @@ remove_test_database() {
     echo " - Dropping test database..."
     do_query "DROP DATABASE IF EXISTS test;"
     if [ $? -eq 0 ]; then
-	echo " ... Success!"
+        echo " ... Success!"
     else
-	echo " ... Failed!  Not critical, keep moving..."
+        echo " ... Failed!  Not critical, keep moving..."
     fi
 
     echo " - Removing privileges on test database..."
     do_query "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%'"
     if [ $? -eq 0 ]; then
-	echo " ... Success!"
+        echo " ... Success!"
     else
-	echo " ... Failed!  Not critical, keep moving..."
+        echo " ... Failed!  Not critical, keep moving..."
     fi
 
     return 0
@@ -371,11 +401,11 @@ remove_test_database() {
 reload_privilege_tables() {
     do_query "FLUSH PRIVILEGES;"
     if [ $? -eq 0 ]; then
-	echo " ... Success!"
-	return 0
+        echo " ... Success!"
+        return 0
     else
-	echo " ... Failed!"
-	return 1
+        echo " ... Failed!"
+        return 1
     fi
 }
 
@@ -395,8 +425,8 @@ cleanup() {
 
 # Remove the files before exiting.
 clean_and_exit() {
-	cleanup
-	exit 1
+    cleanup
+    exit 1
 }
 
 # The actual script starts here
@@ -413,56 +443,58 @@ echo "password for the root user. If you've just installed MariaDB, and"
 echo "haven't set the root password yet, you should just press enter here."
 echo
 
-get_root_password
+get_user_and_password
 
 
 #
-# Set the root password
+# Set the user password (if not unix_socket)
 #
 
-echo "Setting the root password or using the unix_socket ensures that nobody"
-echo "can log into the MariaDB root user without the proper authorisation."
-echo
+if [ $emptyuser -eq 0 ]; then
+    echo "Setting the user password or using the unix_socket ensures that nobody"
+    echo "can log into the MariaDB root user without the proper authorisation."
+    echo
 
-while true ; do
-    if [ $emptypass -eq 1 ]; then
-	echo $echo_n "Enable unix_socket authentication? [Y/n] $echo_c"
+    while true ; do
+        if [ $emptypass -eq 1 ]; then
+        echo $echo_n "Enable unix_socket authentication? [Y/n] $echo_c"
+        else
+        echo "You already have your account protected, so you can safely answer 'n'."
+        echo
+        echo $echo_n "Switch to unix_socket authentication [Y/n] $echo_c"
+        fi
+        read reply
+        validate_reply $reply && break
+    done
+
+    if [ "$reply" = "n" ]; then
+        echo " ... skipping."
     else
-	echo "You already have your root account protected, so you can safely answer 'n'."
-	echo
-	echo $echo_n "Switch to unix_socket authentication [Y/n] $echo_c"
+        # Here we are assuming only 2 types of authentication options native/unix_socket
+        if [ $emptypass -eq 1 ]; then
+            do_query "ALTER USER $user@$host IDENTIFIED VIA mysql_native_password USING PASSWORD('invalid') OR unix_socket;"
+        else
+            do_query "ALTER USER $user@$host IDENTIFIED VIA mysql_native_password USING PASSWORD('$password') OR unix_socket;"
+        fi
+        emptypass=0
+        if [ $? -eq 0 ]; then
+            echo "Enabled successfully!"
+        else
+            echo "Failed!"
+            clean_and_exit
+        fi
     fi
-    read reply
-    validate_reply $reply && break
-done
 
-if [ "$reply" = "n" ]; then
-  echo " ... skipping."
-else
-  emptypass=0
-  do_query "UPDATE mysql.global_priv SET priv=json_set(priv, '$.password_last_changed', UNIX_TIMESTAMP(), '$.plugin', 'mysql_native_password', '$.authentication_string', 'invalid', '$.auth_or', json_array(json_object(), json_object('plugin', 'unix_socket'))) WHERE User='root';"
-  if [ $? -eq 0 ]; then
-   echo "Enabled successfully!"
-   echo "Reloading privilege tables.."
-   reload_privilege_tables
-   if [ $? -eq 1 ]; then
-     clean_and_exit
-   fi
-   echo
-  else
-   echo "Failed!"
-   clean_and_exit
-  fi
 fi
 echo
 
 while true ; do
     if [ $emptypass -eq 1 ]; then
-	echo $echo_n "Set root password? [Y/n] $echo_c"
+        echo $echo_n "Set user: $user@$host password? [Y/n] $echo_c"
     else
-	echo "You already have your root account protected, so you can safely answer 'n'."
-	echo
-	echo $echo_n "Change the root password? [Y/n] $echo_c"
+        echo "You already have your user account protected, so you can safely answer 'n'."
+        echo
+        echo $echo_n "Change the user: $user@$host password? [Y/n] $echo_c"
     fi
     read reply
     validate_reply $reply && break
@@ -473,8 +505,8 @@ if [ "$reply" = "n" ]; then
 else
     status=1
     while [ $status -eq 1 ]; do
-	set_root_password
-	status=$?
+        set_user_password
+        status=$?
     done
 fi
 echo
