@@ -208,8 +208,9 @@ set_echo_compat() {
 
 validate_reply () {
     ret=0
+    local default=${2:-y}
     if [ -z "$1" ]; then
-	reply=y
+	reply=$default
 	return $ret
     fi
     case $1 in
@@ -491,13 +492,15 @@ echo
 while true ; do
     if [ $emptypass -eq 1 ]; then
         echo $echo_n "Set user: $user@$host password? [Y/n] $echo_c"
+        defsetpass=Y
     else
         echo "You already have your user account protected, so you can safely answer 'n'."
         echo
-        echo $echo_n "Change the user: $user@$host password? [Y/n] $echo_c"
+        echo $echo_n "Change the user: $user@$host password? [y/N] $echo_c"
+	defsetpass=N
     fi
     read reply
-    validate_reply $reply && break
+    validate_reply $reply $defsetpass && break
 done
 
 if [ "$reply" = "n" ]; then
