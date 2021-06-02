@@ -276,7 +276,7 @@ get_user_and_password() {
     while [ $status_priv_user -ne 0 ]; do
     if test -z "$user"; then
         stty -echo
-        echo $echo_n "For which user do you want to specify a password (press enter for unix_socket user): $echo_c"
+        echo $echo_n "For which user do you want to specify a password (press enter for $USER): $echo_c"
         read user
         echo
         stty echo
@@ -439,8 +439,8 @@ echo "NOTE: RUNNING ALL PARTS OF THIS SCRIPT IS RECOMMENDED FOR ALL MariaDB"
 echo "      SERVERS IN PRODUCTION USE!  PLEASE READ EACH STEP CAREFULLY!"
 echo
 echo "In order to log into MariaDB to secure it, we'll need the current"
-echo "password for the root user. If you've just installed MariaDB, and"
-echo "haven't set the root password yet, you should just press enter here."
+echo "password for a privileged user. If you've just installed MariaDB, and"
+echo "haven't set a privileged password yet, you should just press enter here."
 echo
 
 get_user_and_password
