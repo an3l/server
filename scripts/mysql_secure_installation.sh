@@ -327,6 +327,7 @@ get_user_and_password() {
     if grep -q unix_socket $output; then
         emptypass=0
     fi
+    read -r show_create < "$output"
     echo "OK, successfully used password, moving on..."
     echo
 }
@@ -496,32 +497,29 @@ get_user_and_password
 
 if [ $emptyuser -eq 0 ]; then
     echo "Setting the user password or using the unix_socket ensures that nobody"
-    echo "can log into the MariaDB root user without the proper authorisation."
+    echo "can log into the MariaDB privileged user without authentication."
     echo
 
     while true ; do
         if [ $emptypass -eq 1 ]; then
             echo $echo_n "Enable unix_socket authentication? [Y/n] $echo_c"
+            defunix_socket=Y
         else
             echo "You already have your account protected, so you can safely answer 'n'."
             echo
-            echo $echo_n "Switch to unix_socket authentication [Y/n] $echo_c"
+            echo $echo_n "Switch to unix_socket authentication [y/N] $echo_c"
+            defunix_socket=N
         fi
         read reply
-        validate_reply $reply && break
+        validate_reply $reply $defunix_socket && break
     done
 
     if [ "$reply" = "n" ]; then
         echo " ... skipping."
     else
-        # Here we are assuming only 2 types of authentication options native/unix_socket
-        if [ $emptypass -eq 1 ]; then
-            do_query "ALTER USER $user@$host IDENTIFIED VIA mysql_native_password USING PASSWORD('invalid') OR unix_socket;"
-        else
-            do_query "ALTER USER $user@$host IDENTIFIED VIA mysql_native_password USING PASSWORD('$password') OR unix_socket;"
-        fi
-        emptypass=0
+        do_query "ALTER ${show_create:7} OR unix_socket"
         if [ $? -eq 0 ]; then
+            emptypass=0
             echo "Enabled successfully!"
         else
             echo "Failed!"
