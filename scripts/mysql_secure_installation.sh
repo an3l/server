@@ -559,26 +559,6 @@ echo
 
 
 #
-# Disallow remote root login
-#
-
-echo "Normally, root should only be allowed to connect from 'localhost'.  This"
-echo "ensures that someone cannot guess at the root password from the network."
-echo
-while true ; do
-    echo $echo_n "Disallow root login remotely? [Y/n] $echo_c"
-    read reply
-    validate_reply $reply && break
-done
-if [ "$reply" = "n" ]; then
-    echo " ... skipping."
-else
-    remove_remote_root
-fi
-echo
-
-
-#
 # Remove test database
 #
 
@@ -597,6 +577,26 @@ if [ "$reply" = "n" ]; then
     echo " ... skipping."
 else
     remove_test_database
+fi
+echo
+
+
+#
+# Disallow remote root login
+#
+
+echo "Normally, root should only be allowed to connect from 'localhost'.  This"
+echo "ensures that someone cannot guess at the root password from the network."
+echo
+while true ; do
+    echo $echo_n "Disallow root login remotely? [Y/n] $echo_c"
+    read reply
+    validate_reply $reply && break
+done
+if [ "$reply" = "n" ]; then
+    echo " ... skipping."
+else
+    remove_remote_root
 fi
 echo
 
