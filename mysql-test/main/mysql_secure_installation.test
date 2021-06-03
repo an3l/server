@@ -1,0 +1,11 @@
+--source include/not_windows.inc
+
+SELECT user,host FROM mysql.global_priv ORDER BY user,host;
+
+--replace_result $USER USERNAME
+--exec echo -e "root\n\nbob\nY\nsecret\nsecret\nY\n\n\n" | bash -x -v $MYSQL_SECURE_INSTALLATION -S $MASTER_MYSOCK
+
+SHOW DATABASES;
+SELECT user,host FROM mysql.global_priv ORDER BY user,host;
+
+SELECT 1;
