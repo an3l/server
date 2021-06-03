@@ -28,7 +28,6 @@ password=""
 host=
 set_from_cli=0
 emptyuser=0
-emptypass=0
 echo_n=
 echo_c=
 basedir=
@@ -289,24 +288,18 @@ get_user_and_password() {
         echo
         if [ "x$user" = "x" ]; then
             emptyuser=1
-            emptypass=1
             user=$USER
         else
             emptyuser=0
         fi
     fi
-    if [ -z "$password" ] && [ "$emptyuser" -eq 0 ] && [ "$emptypass" -eq 0 ]; then
+    if [ -z "$password" ] && [ "$emptyuser" -eq 0 ]; then
         stty -echo
         # If the empty user it means we are connecting with unix_socket else need password
         echo $echo_n "Enter current password for user $user (enter for none): $echo_c"
         read password
         echo
         stty echo
-        if [ "x$password" = "x" ]; then
-            emptypass=1
-        else
-            emptypass=0
-        fi
     fi
     make_config
     # Only privileged user that has access to mysql DB can make changes
@@ -319,12 +312,13 @@ get_user_and_password() {
         fi
         user=
         password=
-        emptypass=0
     fi
     done
     do_query "show create user"
     if grep -q unix_socket $output; then
-        emptypass=0
+        unix_socket_auth=1
+    else
+        unix_socket_auth=
     fi
     read -r show_create < "$output"
     echo "OK, successfully used password, moving on..."
@@ -495,23 +489,15 @@ get_user_and_password
 # Set unix_socket auth (if not already)
 #
 
-if [ $emptyuser -eq 0 ]; then
-    echo "Setting the user password or using the unix_socket ensures that nobody"
-    echo "can log into the MariaDB privileged user without authentication."
+if [ $emptyuser -eq 0 ] && [ $unix_socket_auth -ne 1 ] && [ -z $host ] && [ $host = localhost ]; then
+    echo "Setting the user to use unix_socket ensures that nobody"
+    echo "can log into the MariaDB privileged user without being the same unix user."
     echo
 
     while true ; do
-        if [ $emptypass -eq 1 ]; then
-            echo $echo_n "Enable unix_socket authentication? [Y/n] $echo_c"
-            defunix_socket=Y
-        else
-            echo "You already have your account protected, so you can safely answer 'n'."
-            echo
-            echo $echo_n "Switch to unix_socket authentication [y/N] $echo_c"
-            defunix_socket=N
-        fi
+        echo $echo_n "Enable unix_socket authentication? [Y/n] $echo_c"
         read reply
-        validate_reply $reply $defunix_socket && break
+        validate_reply $reply && break
     done
 
     if [ "$reply" = "n" ]; then
@@ -519,7 +505,6 @@ if [ $emptyuser -eq 0 ]; then
     else
         do_query "ALTER ${show_create:7} OR unix_socket"
         if [ $? -eq 0 ]; then
-            emptypass=0
             echo "Enabled successfully!"
         else
             echo "Failed!"
@@ -535,13 +520,13 @@ echo
 #
 
 while true ; do
-    if [ $emptypass -eq 1 ]; then
+    if [ $unix_socket_auth -ne 1 ]; then
         echo $echo_n "Set user: $user password? [Y/n] $echo_c"
         defsetpass=Y
     else
         echo "You already have your user account protected, so you can safely answer 'n'."
         echo
-        echo $echo_n "Change the user: $user password? [y/N] $echo_c"
+        echo $echo_n "Set/change the user: $user password? [y/N] $echo_c"
 	defsetpass=N
     fi
     read reply
