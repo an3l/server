@@ -315,10 +315,15 @@ get_user_and_password() {
     fi
     done
     do_query "show create user"
-    if grep -q unix_socket $output; then
+    if grep -q unix_socket "$output"; then
         unix_socket_auth=1
     else
-        unix_socket_auth=
+        unix_socket_auth=0
+    fi
+    if grep -q "USING '" "$output"; then
+        password_set=1
+    else
+        password_set=0
     fi
     read -r show_create < "$output"
     echo "OK, successfully used password, moving on..."
@@ -478,7 +483,7 @@ get_user_and_password
 # Set unix_socket auth (if not already)
 #
 
-if [ $emptyuser -eq 0 ] && [ $unix_socket_auth -ne 1 ] && [ -z $host ] && [ $host = localhost ]; then
+if [ $emptyuser -eq 0 ] && [ $unix_socket_auth -ne 1 ] && [ -z "$host" ] && [ "$host" = localhost ]; then
     echo "Setting the user to use unix_socket ensures that nobody"
     echo "can log into the MariaDB privileged user without being the same unix user."
     echo
@@ -509,13 +514,13 @@ echo
 #
 
 while true ; do
-    if [ $unix_socket_auth -ne 1 ]; then
+    if [ $unix_socket_auth -ne 1 ] || [ $password_set -ne 1 ]; then
         echo $echo_n "Set user: $user password? [Y/n] $echo_c"
         defsetpass=Y
     else
-        echo "You already have your user account protected, so you can safely answer 'n'."
+        echo "You already have your user account protected (unix_socket auth and password set, or password impossible to use), so you can safely answer 'n'."
         echo
-        echo $echo_n "Set/change the user: $user password? [y/N] $echo_c"
+        echo $echo_n "Set the user: $user password? [y/N] $echo_c"
 	defsetpass=N
     fi
     read reply
