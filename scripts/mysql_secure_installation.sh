@@ -492,7 +492,7 @@ get_user_and_password
 
 
 #
-# Set the user password (if not unix_socket)
+# Set unix_socket auth (if not already)
 #
 
 if [ $emptyuser -eq 0 ]; then
@@ -529,6 +529,10 @@ if [ $emptyuser -eq 0 ]; then
 
 fi
 echo
+
+#
+# Set the user password
+#
 
 while true ; do
     if [ $emptypass -eq 1 ]; then
