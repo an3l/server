@@ -478,6 +478,21 @@ echo
 
 get_user_and_password
 
+if [ $user = root ] && [ $unix_socket_auth -ne 1 ]; then
+    echo "Changing the root username obfuscates administrative users and"
+    echo "helps prevent targeted attacks."
+    echo
+    echo "If you change the root username you must provide a password for"
+    echo "the user."
+    echo
+    echo $echo_n "Change root username to what username? (blank for no change) $echo_c"
+    read reply
+    if [ -n "$reply" ]; then
+        user=$reply
+        do_query "EXECUTE IMMEDIATE CONCAT('RENAME USER ', CURRENT_USER(), ' TO $user')"
+        make_config
+    fi
+fi
 
 #
 # Set unix_socket auth (if not already)
