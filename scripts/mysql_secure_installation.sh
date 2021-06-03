@@ -232,10 +232,10 @@ do_query() {
     then
         echo "$1" >$command
         #sed 's,^,> ,' < $command  # Debugging
-        $mysql_command --defaults-file=$config $defaults_extra_file $no_defaults $args <$command >$output
+        $mysql_command --defaults-file=$config $defaults_extra_file $no_defaults --skip-column-names --batch $args <$command >$output
     else
         # rely on stdin
-        $mysql_command --defaults-file=$config $defaults_extra_file $no_defaults $args >$output
+        $mysql_command --defaults-file=$config $defaults_extra_file $no_defaults --skip-column-names --batch $args >$output
     fi
     return $?
 }
@@ -337,11 +337,11 @@ set_user_password() {
     read password1
     echo
     echo $echo_n "Re-enter new password: $echo_c"
-    read password2
+    read password
     echo
     stty echo
 
-    if [ "$password1" != "$password2" ]; then
+    if [ "$password1" != "$password" ]; then
         echo "Sorry, passwords do not match."
         echo
         return 1
@@ -355,6 +355,7 @@ set_user_password() {
 
     esc_pass=$(basic_single_escape "$password1")
     do_query "SET PASSWORD = PASSWORD('$esc_pass')"
+    make_config
     if [ $? -eq 0 ]; then
         echo "Password updated successfully!"
     else
