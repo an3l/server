@@ -228,9 +228,15 @@ prepare() {
 }
 
 do_query() {
-    echo "$1" >$command
-    #sed 's,^,> ,' < $command  # Debugging
-    $mysql_command --defaults-file=$config $defaults_extra_file $no_defaults $args <$command >$output
+    if [ -n "$1" ]
+    then
+        echo "$1" >$command
+        #sed 's,^,> ,' < $command  # Debugging
+        $mysql_command --defaults-file=$config $defaults_extra_file $no_defaults $args <$command >$output
+    else
+        # rely on stdin
+        $mysql_command --defaults-file=$config $defaults_extra_file $no_defaults $args >$output
+    fi
     return $?
 }
 
@@ -348,7 +354,7 @@ set_user_password() {
     fi
 
     esc_pass=$(basic_single_escape "$password1")
-    do_query "UPDATE mysql.global_priv SET priv=json_set(priv, '$.plugin', 'mysql_native_password', '$.authentication_string', PASSWORD('$esc_pass')) WHERE User='$user';"
+    do_query "SET PASSWORD FOR $user@$host = PASSWORD('$esc_pass')"
     if [ $? -eq 0 ]; then
         echo "Password updated successfully!"
     else
@@ -360,7 +366,11 @@ set_user_password() {
 }
 
 remove_anonymous_users() {
-    do_query "DELETE FROM mysql.global_priv WHERE User='';"
+    do_query <<EOANON
+DROP USER /*M!100103 IF EXISTS */ ''@localhost;
+/*M!100203 EXECUTE IMMEDIATE CONCAT('DROP USER IF EXISTS \'\'@', @@hostname) */;
+EOANON
+
     if [ $? -eq 0 ]; then
         echo " ... Success!"
     else
@@ -372,7 +382,21 @@ remove_anonymous_users() {
 }
 
 remove_remote_root() {
-    do_query "DELETE FROM mysql.global_priv WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
+    do_query <<-EOREMOTEROOT
+DELIMITER &&
+CREATE OR REPLACE PROCEDURE mysql.secure_users()
+BEGIN
+SELECT GROUP_CONCAT(DISTINCT CONCAT(QUOTE(user),'@',QUOTE(host))) INTO @users FROM mysql.global_priv WHERE user='root' AND host!='localhost';
+IF @users IS NOT NULL THEN
+	EXECUTE IMMEDIATE CONCAT('DROP USER ', @users);
+END IF;
+END;
+&&
+DELIMITER ;
+/*M!100301 call mysql.secure_users() */;
+/*M!100301 DROP PROCEDURE mysql.secure_users */;
+EOREMOTEROOT
+
     if [ $? -eq 0 ]; then
         echo " ... Success!"
     else
@@ -390,7 +414,25 @@ remove_test_database() {
     fi
 
     echo " - Removing privileges on test database..."
-    do_query "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%'"
+    do_query <<-EOTEST
+DELIMITER &&
+CREATE OR REPLACE PROCEDURE mysql.secure_test_users()
+BEGIN
+SELECT GROUP_CONCAT(DISTINCT CONCAT(QUOTE(user),'@',QUOTE(host))) INTO @users FROM mysql.db WHERE Db='test' AND user!='';
+IF @users IS NOT NULL THEN
+	EXECUTE IMMEDIATE CONCAT('REVOKE ALL ON test.* FROM ', @users);
+END IF;
+SELECT GROUP_CONCAT(DISTINCT CONCAT(QUOTE(user),'@',QUOTE(host))) INTO @users FROM mysql.db WHERE Db='test\\_%' AND user!='';
+IF @users IS NOT NULL THEN
+	EXECUTE IMMEDIATE CONCAT('REVOKE ALL ON \`test\\_%\`.* FROM ', @users);
+END IF;
+END;
+&&
+DELIMITER ;
+/*M!100301 call mysql.secure_test_users() */;
+/*M!100301 DROP PROCEDURE mysql.secure_test_users */;
+EOTEST
+
     if [ $? -eq 0 ]; then
         echo " ... Success!"
     else
