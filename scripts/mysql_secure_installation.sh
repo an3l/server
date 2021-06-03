@@ -25,7 +25,7 @@ trap "interrupt" 1 2 3 6 15
 args=
 user=""
 password=""
-host="localhost"
+host=
 set_from_cli=0
 emptyuser=0
 emptypass=0
@@ -270,6 +270,7 @@ make_config() {
     echo "user=$user" >>$config
     esc_pass=`basic_single_escape "$password"`
     echo "password='$esc_pass'" >>$config
+    echo "${host:+host=$host}" >>$config
     #sed 's,^,> ,' < $config  # Debugging
 
     if test -n "$defaults_file"
@@ -297,7 +298,7 @@ get_user_and_password() {
     if [ -z "$password" ] && [ "$emptyuser" -eq 0 ] && [ "$emptypass" -eq 0 ]; then
         stty -echo
         # If the empty user it means we are connecting with unix_socket else need password
-        echo $echo_n "Enter current password for user $user@$host (enter for none): $echo_c"
+        echo $echo_n "Enter current password for user $user (enter for none): $echo_c"
         read password
         echo
         stty echo
@@ -321,7 +322,7 @@ get_user_and_password() {
         emptypass=0
     fi
     done
-    do_query "show create user $user@$host"
+    do_query "show create user"
     if grep -q unix_socket $output; then
         emptypass=0
     fi
@@ -353,7 +354,7 @@ set_user_password() {
     fi
 
     esc_pass=$(basic_single_escape "$password1")
-    do_query "SET PASSWORD FOR $user@$host = PASSWORD('$esc_pass')"
+    do_query "SET PASSWORD = PASSWORD('$esc_pass')"
     if [ $? -eq 0 ]; then
         echo "Password updated successfully!"
     else
@@ -530,12 +531,12 @@ echo
 
 while true ; do
     if [ $emptypass -eq 1 ]; then
-        echo $echo_n "Set user: $user@$host password? [Y/n] $echo_c"
+        echo $echo_n "Set user: $user password? [Y/n] $echo_c"
         defsetpass=Y
     else
         echo "You already have your user account protected, so you can safely answer 'n'."
         echo
-        echo $echo_n "Change the user: $user@$host password? [y/N] $echo_c"
+        echo $echo_n "Change the user: $user password? [y/N] $echo_c"
 	defsetpass=N
     fi
     read reply
