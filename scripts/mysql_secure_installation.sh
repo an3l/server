@@ -354,13 +354,13 @@ set_user_password() {
 
     esc_pass=$(basic_single_escape "$password1")
     do_query "SET PASSWORD = PASSWORD('$esc_pass')"
-    make_config
     if [ $? -eq 0 ]; then
         echo "Password updated successfully!"
     else
         echo "Password update failed!"
         clean_and_exit
     fi
+    make_config
 
     return 0
 }
