@@ -501,11 +501,11 @@ if [ $emptyuser -eq 0 ]; then
 
     while true ; do
         if [ $emptypass -eq 1 ]; then
-        echo $echo_n "Enable unix_socket authentication? [Y/n] $echo_c"
+            echo $echo_n "Enable unix_socket authentication? [Y/n] $echo_c"
         else
-        echo "You already have your account protected, so you can safely answer 'n'."
-        echo
-        echo $echo_n "Switch to unix_socket authentication [Y/n] $echo_c"
+            echo "You already have your account protected, so you can safely answer 'n'."
+            echo
+            echo $echo_n "Switch to unix_socket authentication [Y/n] $echo_c"
         fi
         read reply
         validate_reply $reply && break
