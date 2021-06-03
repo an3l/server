@@ -17,7 +17,8 @@ if ($restart_parameters)
   --exec echo "restart: $restart_parameters" > $_expect_file_name
   if (!$restart_noprint)
   {
-    --replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR $MYSQLTEST_VARDIR MYSQLTEST_VARDIR 
+    --replace_result $MYSQL_TEST_DIR MYSQL_TEST_DIR $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+    --replace_regex /\.so|\.dll]//
     --exec echo "# restart: $restart_parameters"
   }
   if ($restart_noprint == 1)
