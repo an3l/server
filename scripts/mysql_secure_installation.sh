@@ -283,11 +283,9 @@ get_user_and_password() {
     status_priv_user=1
     while [ $status_priv_user -ne 0 ]; do
     if test -z "$user"; then
-        stty -echo
         echo $echo_n "For which user do you want to specify a password (press enter for $USER): $echo_c"
         read user
         echo
-        stty echo
         if [ "x$user" = "x" ]; then
             emptyuser=1
             emptypass=1
