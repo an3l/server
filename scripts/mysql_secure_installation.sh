@@ -437,17 +437,6 @@ EOTEST
     return 0
 }
 
-reload_privilege_tables() {
-    do_query "FLUSH PRIVILEGES;"
-    if [ $? -eq 0 ]; then
-        echo " ... Success!"
-        return 0
-    else
-        echo " ... Failed!"
-        return 1
-    fi
-}
-
 interrupt() {
     echo
     echo "Aborting!"
@@ -608,28 +597,6 @@ if [ "$reply" = "n" ]; then
     echo " ... skipping."
 else
     remove_test_database
-fi
-echo
-
-
-#
-# Reload privilege tables
-#
-
-echo "Reloading the privilege tables will ensure that all changes made so far"
-echo "will take effect immediately."
-echo
-
-while true ; do
-    echo $echo_n "Reload privilege tables now? [Y/n] $echo_c"
-    read reply
-    validate_reply $reply && break
-done
-
-if [ "$reply" = "n" ]; then
-    echo " ... skipping."
-else
-    reload_privilege_tables
 fi
 echo
 
