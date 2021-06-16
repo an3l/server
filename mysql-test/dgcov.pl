@@ -162,7 +162,8 @@ sub gcov_one_file {
   }
 
   # now, read the generated file
-  open FH, '<', "$_.gcov" or die "open(<$_.gcov): $!";
+  return unless(-f "$`.gcov");
+  open FH, '<', "$`.gcov" or die "open(<$`.gcov): $!";
   my $fname;
   while (<FH>) {
     chomp;
@@ -170,7 +171,7 @@ sub gcov_one_file {
       next;
     }
     if (/^file:/) {
-      $fname=realpath($');
+      $fname=$root.$';
       next;
     }
     next if /^lcount:\d+,-\d+/; # whatever that means
