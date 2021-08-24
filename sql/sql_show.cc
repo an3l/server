@@ -69,6 +69,8 @@
 
 #include "lex_symbol.h"
 #define KEYWORD_SIZE 64
+#define IS_USER_TEMP_TABLE(A) ((A->tmp_table == TRANSACTIONAL_TMP_TABLE) || \
+                          (A->tmp_table == NON_TRANSACTIONAL_TMP_TABLE))
 
 extern SYMBOL symbols[];
 extern size_t symbols_length;
@@ -5161,6 +5163,9 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   uint table_open_method= tables->table_open_method;
   bool can_deadlock;
   MEM_ROOT tmp_mem_root;
+  Dynamic_array<LEX_CSTRING> system_tables(PSI_INSTRUMENT_MEM);
+  All_tmp_tables_list *temp_tables= NULL;
+  bool found_temp(0);
   DBUG_ENTER("get_all_tables");
 
   bzero(&tmp_mem_root, sizeof(tmp_mem_root));
@@ -5223,10 +5228,51 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   init_alloc_root(PSI_INSTRUMENT_ME, &tmp_mem_root, SHOW_ALLOC_BLOCK_SIZE,
                   SHOW_ALLOC_BLOCK_SIZE, MY_THREAD_SPECIFIC);
 
+  system_tables.push(INFORMATION_SCHEMA_NAME);
+  system_tables.push(PERFORMANCE_SCHEMA_DB_NAME);
+  system_tables.push(MYSQL_SCHEMA_NAME);
+  system_tables.push(SYS_SCHEMA_NAME);
+  system_tables.push(MTR_SCHEMA_NAME);
+
   for (size_t i=0; i < db_names.elements(); i++)
   {
     LEX_CSTRING *db_name= db_names.at(i);
     DBUG_ASSERT(db_name->length <= NAME_LEN);
+    // Only if there is IS.tables allow temporary tables to be shown
+    if (schema_table_idx == SCH_TABLES && !temp_tables)
+    {
+      for (size_t k=0; k < system_tables.elements(); k++)
+      {
+        if (db_name != &system_tables.at(k))
+        {
+          temp_tables= open_tables_state_backup.temporary_tables;
+          found_temp= 1;
+          // Scan for temporary tables
+          TMP_TABLE_SHARE *share_temp;
+          TABLE *table_temp;
+          LEX_CSTRING *table_name;
+          CHARSET_INFO *cs= system_charset_info;
+          bool temp_exists= temp_tables ? 1 : 0;
+          while (temp_tables&& (share_temp= temp_tables->pop_front()))
+          {
+            while ((table_temp= share_temp->all_tmp_tables.pop_front()))
+            {
+              if (IS_USER_TEMP_TABLE(share_temp))
+              {
+                table_name= &share_temp->table_name;
+                if (!fill_schema_table_from_frm(thd, table, schema_table,
+                                                db_name, table_name,
+                                                &open_tables_state_backup,
+                                                can_deadlock))
+                  continue;
+              }
+            }
+          }
+          
+          break;
+        }
+      }
+    }
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
     if (!(check_access(thd, SELECT_ACL, db_name->str,
                        &thd->col_access, NULL, 0, 1) ||
@@ -5243,9 +5289,9 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
       if (unlikely(res))
         goto err;
 
-      for (size_t i=0; i < table_names.elements(); i++)
+      for (size_t j=0; j < table_names.elements(); j++)
       {
-        LEX_CSTRING *table_name= table_names.at(i);
+        LEX_CSTRING *table_name= table_names.at(j);
         DBUG_ASSERT(table_name->length <= NAME_LEN);
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
