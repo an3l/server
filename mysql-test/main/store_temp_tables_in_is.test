@@ -1,0 +1,13 @@
+
+create temporary table t_temp(t int);
+create  table t(t int);
+insert into t_temp values (1),(2), (3);
+insert into t values (1),(2), (3);
+
+--vertical_results
+#select * from information_schema.tables where table_name="t";
+select * from  information_schema.tables where table_type='temporary';
+#select * from  information_schema.tables where table_name='t_temp';
+#drop table t_base;
+drop table t;
+

@@ -69,6 +69,8 @@
 
 #include "lex_symbol.h"
 #define KEYWORD_SIZE 64
+#define IS_USER_TEMP_TABLE(A) ((A->tmp_table == TRANSACTIONAL_TMP_TABLE) || \
+                          (A->tmp_table == NON_TRANSACTIONAL_TMP_TABLE))
 
 extern SYMBOL symbols[];
 extern size_t symbols_length;
@@ -4795,6 +4797,325 @@ static int fill_schema_table_names(THD *thd, TABLE_LIST *tables,
   return 0;
 }
 
+int fill_columns_for_i_s_table(THD *thd, TABLE_LIST *tables, TABLE *table, TABLE *show_table,
+                               const TABLE_SHARE *share, CHARSET_INFO *cs)
+{
+  handler *file= NULL;
+  MYSQL_TIME time;
+  char option_buff[512];
+  String str(option_buff,sizeof(option_buff), system_charset_info);
+  const char *tmp_buff;
+
+  int info_error= 0;
+    if (show_table)
+      file= show_table->db_stat ? show_table->file : 0;
+    handlerton *tmp_db_type= share->db_type();
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+    bool is_partitioned= FALSE;
+#endif
+
+    if (share->tmp_table == SYSTEM_TMP_TABLE)
+      table->field[3]->store(STRING_WITH_LEN("SYSTEM VIEW"), cs);
+    else if (share->table_type == TABLE_TYPE_SEQUENCE)
+      table->field[3]->store(STRING_WITH_LEN("SEQUENCE"), cs);
+    else
+    {
+      if (show_table)
+      {
+        DBUG_ASSERT(share->tmp_table == NO_TMP_TABLE);
+        if (share->versioned)
+          table->field[3]->store(STRING_WITH_LEN("SYSTEM VERSIONED"), cs);
+        else
+          table->field[3]->store(STRING_WITH_LEN("BASE TABLE"), cs);
+      }
+    }
+
+    for (uint i= 4; i < table->s->fields; i++)
+    {
+      if (i == 7 || (i > 12 && i < 17) || i == 18)
+        continue;
+      table->field[i]->set_notnull();
+    }
+
+    /* Collect table info from the table share */
+
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+    if (share->db_type() == partition_hton &&
+        share->partition_info_str_len)
+    {
+      tmp_db_type= plugin_hton(share->default_part_plugin);
+      is_partitioned= TRUE;
+    }
+#endif
+
+    tmp_buff= (char *) ha_resolve_storage_engine_name(tmp_db_type);
+    table->field[4]->store(tmp_buff, strlen(tmp_buff), cs);
+    table->field[5]->store((longlong) share->frm_version, TRUE);
+
+    str.length(0);
+
+    if (share->min_rows)
+    {
+      str.qs_append(STRING_WITH_LEN(" min_rows="));
+      str.qs_append(share->min_rows);
+    }
+
+    if (share->max_rows)
+    {
+      str.qs_append(STRING_WITH_LEN(" max_rows="));
+      str.qs_append(share->max_rows);
+    }
+
+    if (share->avg_row_length)
+    {
+      str.qs_append(STRING_WITH_LEN(" avg_row_length="));
+      str.qs_append(share->avg_row_length);
+    }
+
+    if (share->db_create_options & HA_OPTION_PACK_KEYS)
+      str.qs_append(STRING_WITH_LEN(" pack_keys=1"));
+
+    if (share->db_create_options & HA_OPTION_NO_PACK_KEYS)
+      str.qs_append(STRING_WITH_LEN(" pack_keys=0"));
+
+    if (share->db_create_options & HA_OPTION_STATS_PERSISTENT)
+      str.qs_append(STRING_WITH_LEN(" stats_persistent=1"));
+
+    if (share->db_create_options & HA_OPTION_NO_STATS_PERSISTENT)
+      str.qs_append(STRING_WITH_LEN(" stats_persistent=0"));
+
+    if (share->stats_auto_recalc == HA_STATS_AUTO_RECALC_ON)
+      str.qs_append(STRING_WITH_LEN(" stats_auto_recalc=1"));
+    else if (share->stats_auto_recalc == HA_STATS_AUTO_RECALC_OFF)
+      str.qs_append(STRING_WITH_LEN(" stats_auto_recalc=0"));
+
+    if (share->stats_sample_pages != 0)
+    {
+      str.qs_append(STRING_WITH_LEN(" stats_sample_pages="));
+      str.qs_append(share->stats_sample_pages);
+    }
+
+    /* We use CHECKSUM, instead of TABLE_CHECKSUM, for backward compatibility */
+    if (share->db_create_options & HA_OPTION_CHECKSUM)
+      str.qs_append(STRING_WITH_LEN(" checksum=1"));
+
+    if (share->page_checksum != HA_CHOICE_UNDEF)
+    {
+      str.qs_append(STRING_WITH_LEN(" page_checksum="));
+      str.qs_append(&ha_choice_values[(uint) share->page_checksum]);
+    }
+
+    if (share->db_create_options & HA_OPTION_DELAY_KEY_WRITE)
+      str.qs_append(STRING_WITH_LEN(" delay_key_write=1"));
+
+    if (share->row_type != ROW_TYPE_DEFAULT)
+    {
+      str.qs_append(STRING_WITH_LEN(" row_format="));
+      str.qs_append(&ha_row_type[(uint) share->row_type]);
+    }
+
+    if (share->key_block_size)
+    {
+      str.qs_append(STRING_WITH_LEN(" key_block_size="));
+      str.qs_append(share->key_block_size);
+    }
+
+#ifdef WITH_PARTITION_STORAGE_ENGINE
+    if (is_partitioned)
+      str.qs_append(STRING_WITH_LEN(" partitioned"));
+#endif
+
+    /*
+      Write transactional=0|1 for tables where the user has specified the
+      option or for tables that supports both transactional and non
+      transactional tables
+    */
+    if (share->transactional != HA_CHOICE_UNDEF ||
+        (share->db_type() &&
+         share->db_type()->flags & HTON_TRANSACTIONAL_AND_NON_TRANSACTIONAL &&
+         file))
+    {
+      uint choice= share->transactional;
+      if (choice == HA_CHOICE_UNDEF)
+        choice= ((file->ha_table_flags() &
+                  (HA_NO_TRANSACTIONS | HA_CRASH_SAFE)) ==
+                 HA_NO_TRANSACTIONS ?
+                 HA_CHOICE_NO : HA_CHOICE_YES);
+
+      str.qs_append(STRING_WITH_LEN(" transactional="));
+      str.qs_append(&ha_choice_values[choice]);
+    }
+    append_create_options(thd, &str, share->option_list, false, 0);
+
+    if (file)
+    {
+      HA_CREATE_INFO create_info;
+      create_info.init();
+      file->update_create_info(&create_info);
+      append_directory(thd, &str, &DATA_clex_str, create_info.data_file_name);
+      append_directory(thd, &str, &INDEX_clex_str, create_info.index_file_name);
+    }
+
+    if (str.length())
+      table->field[19]->store(str.ptr()+1, str.length()-1, cs);
+
+    LEX_CSTRING tmp_str;
+    if (share->table_charset)
+      tmp_str= share->table_charset->coll_name;
+    else
+      tmp_str= { STRING_WITH_LEN("default") };
+    table->field[17]->store(&tmp_str, cs);
+
+    if (share->comment.str)
+      table->field[20]->store(&share->comment, cs);
+
+    /* Collect table info from the storage engine  */
+
+    if (file)
+    {
+      /* If info() fails, then there's nothing else to do */
+      if (unlikely((info_error= file->info(HA_STATUS_VARIABLE |
+                                           HA_STATUS_TIME |
+                                           HA_STATUS_VARIABLE_EXTRA |
+                                           HA_STATUS_AUTO)) != 0))
+      {
+        file->print_error(info_error, MYF(0));
+        goto err;
+      }
+
+      enum row_type row_type = file->get_row_type();
+      switch (row_type) {
+      case ROW_TYPE_NOT_USED:
+      case ROW_TYPE_DEFAULT:
+        tmp_buff= ((share->db_options_in_use &
+                    HA_OPTION_COMPRESS_RECORD) ? "Compressed" :
+                   (share->db_options_in_use & HA_OPTION_PACK_RECORD) ?
+                   "Dynamic" : "Fixed");
+        break;
+      case ROW_TYPE_FIXED:
+        tmp_buff= "Fixed";
+        break;
+      case ROW_TYPE_DYNAMIC:
+        tmp_buff= "Dynamic";
+        break;
+      case ROW_TYPE_COMPRESSED:
+        tmp_buff= "Compressed";
+        break;
+      case ROW_TYPE_REDUNDANT:
+        tmp_buff= "Redundant";
+        break;
+      case ROW_TYPE_COMPACT:
+        tmp_buff= "Compact";
+        break;
+      case ROW_TYPE_PAGE:
+        tmp_buff= "Page";
+        break;
+      }
+
+      table->field[6]->store(tmp_buff, strlen(tmp_buff), cs);
+
+      if (!tables->schema_table)
+      {
+        table->field[7]->store((longlong) file->stats.records, TRUE);
+        table->field[7]->set_notnull();
+      }
+      table->field[8]->store((longlong) file->stats.mean_rec_length, TRUE);
+      table->field[9]->store((longlong) file->stats.data_file_length, TRUE);
+      if (file->stats.max_data_file_length)
+      {
+        table->field[10]->store((longlong) file->stats.max_data_file_length,
+                                TRUE);
+        table->field[10]->set_notnull();
+      }
+      table->field[11]->store((longlong) file->stats.index_file_length, TRUE);
+      if (file->stats.max_index_file_length)
+      {
+        table->field[21]->store((longlong) file->stats.max_index_file_length,
+                                TRUE);
+        table->field[21]->set_notnull();
+      }
+      table->field[12]->store((longlong) file->stats.delete_length, TRUE);
+      if (show_table->found_next_number_field)
+      {
+        table->field[13]->store((longlong) file->stats.auto_increment_value,
+                                TRUE);
+        table->field[13]->set_notnull();
+      }
+      if (file->stats.create_time)
+      {
+        thd->variables.time_zone->gmt_sec_to_TIME(&time,
+                                                  (my_time_t) file->stats.create_time);
+        table->field[14]->store_time(&time);
+        table->field[14]->set_notnull();
+      }
+      if (file->stats.update_time)
+      {
+        thd->variables.time_zone->gmt_sec_to_TIME(&time,
+                                                  (my_time_t) file->stats.update_time);
+        table->field[15]->store_time(&time);
+        table->field[15]->set_notnull();
+      }
+      if (file->stats.check_time)
+      {
+        thd->variables.time_zone->gmt_sec_to_TIME(&time,
+                                                  (my_time_t) file->stats.check_time);
+        table->field[16]->store_time(&time);
+        table->field[16]->set_notnull();
+      }
+      if ((file->ha_table_flags() &
+            (HA_HAS_OLD_CHECKSUM | HA_HAS_NEW_CHECKSUM)) &&
+           !file->stats.checksum_null)
+      {
+        table->field[18]->store((longlong) file->stats.checksum, TRUE);
+        table->field[18]->set_notnull();
+      }
+    }
+
+  err:
+  if (unlikely(info_error))
+  {
+    /*
+      If an error was encountered, push a warning, set the TABLE COMMENT
+      column with the error text, and clear the error so that the operation
+      can continue.
+    */
+    const char *error= thd->get_stmt_da()->message();
+    table->field[20]->store(error, strlen(error), cs);
+
+    push_warning(thd, Sql_condition::WARN_LEVEL_WARN,
+                 thd->get_stmt_da()->sql_errno(), error);
+    thd->clear_error();
+  }
+    return info_error;
+}
+/**
+ @brief           Fill IS.table with temporary tables
+
+ @details         The function does...
+
+ @param[in]       table                I_S table (TABLE)
+ @param[in]       db_name              db name of temporary table
+ @param[in]       table_name           table name of temporary table
+
+ @return          Operation status
+   @retval        0   - success
+   @retval        1   - failure
+*/
+void process_i_s_table_temporary_tables(THD *thd, TABLE * table, LEX_CSTRING *db_name,
+                                        TMP_TABLE_SHARE *share)
+{
+  CHARSET_INFO *cs= system_charset_info;
+  LEX_CSTRING table_name;
+  table->field[0]->store(STRING_WITH_LEN("def"), cs);
+  table->field[1]->store(db_name->str, db_name->length, cs);
+  table_name= share->table_name;
+  table->field[2]->store(table_name.str, table_name.length, cs);
+  table->field[3]->store(STRING_WITH_LEN("TEMPORARY"), cs);
+
+  // This should be the same as for base tables
+  fill_columns_for_i_s_table(thd, 0, table, 0, share, cs);
+  schema_table_store_record(thd, table);
+}
 
 /**
   @brief          Get open table method
@@ -5161,6 +5482,8 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   uint table_open_method= tables->table_open_method;
   bool can_deadlock;
   MEM_ROOT tmp_mem_root;
+  Dynamic_array<LEX_CSTRING> system_tables(PSI_INSTRUMENT_MEM);
+  All_tmp_tables_list *temp_tables= NULL;
   DBUG_ENTER("get_all_tables");
 
   bzero(&tmp_mem_root, sizeof(tmp_mem_root));
@@ -5223,10 +5546,43 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   init_alloc_root(PSI_INSTRUMENT_ME, &tmp_mem_root, SHOW_ALLOC_BLOCK_SIZE,
                   SHOW_ALLOC_BLOCK_SIZE, MY_THREAD_SPECIFIC);
 
+  system_tables.push(INFORMATION_SCHEMA_NAME);
+  system_tables.push(PERFORMANCE_SCHEMA_DB_NAME);
+  system_tables.push(MYSQL_SCHEMA_NAME);
+  system_tables.push(SYS_SCHEMA_NAME);
+  system_tables.push(MTR_SCHEMA_NAME);
+
   for (size_t i=0; i < db_names.elements(); i++)
   {
     LEX_CSTRING *db_name= db_names.at(i);
     DBUG_ASSERT(db_name->length <= NAME_LEN);
+    // Only if there is IS.tables allow temporary tables to be shown
+    if (schema_table_idx == SCH_TABLES && !temp_tables)
+    {
+      for (size_t k=0; k < system_tables.elements(); k++)
+      {
+        if (db_name != &system_tables.at(k))
+        {
+          temp_tables= open_tables_state_backup.temporary_tables;
+          // Scan for temporary tables
+          TMP_TABLE_SHARE *share_temp;
+          TABLE *table_temp;
+          while (temp_tables&& (share_temp= temp_tables->pop_front()))
+          {
+            while ((table_temp= share_temp->all_tmp_tables.pop_front()))
+            {
+              if (IS_USER_TEMP_TABLE(share_temp))
+              {
+                // Now we have the data and we should process_table() manually
+                process_i_s_table_temporary_tables(thd, table, db_name, share_temp);
+              }
+            }
+          }
+          
+          break;
+        }
+      }
+    }
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
     if (!(check_access(thd, SELECT_ACL, db_name->str,
                        &thd->col_access, NULL, 0, 1) ||
@@ -5243,9 +5599,9 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
       if (unlikely(res))
         goto err;
 
-      for (size_t i=0; i < table_names.elements(); i++)
+      for (size_t j=0; j < table_names.elements(); j++)
       {
-        LEX_CSTRING *table_name= table_names.at(i);
+        LEX_CSTRING *table_name= table_names.at(j);
         DBUG_ASSERT(table_name->length <= NAME_LEN);
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
@@ -5334,6 +5690,7 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
 err:
   thd->restore_backup_open_tables_state(&open_tables_state_backup);
   free_root(&tmp_mem_root, 0);
+  system_tables.free_memory();
 
   DBUG_RETURN(error);
 }
@@ -5445,8 +5802,6 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
 				    const LEX_CSTRING *db_name,
 				    const LEX_CSTRING *table_name)
 {
-  const char *tmp_buff;
-  MYSQL_TIME time;
   int info_error= 0;
   CHARSET_INFO *cs= system_charset_info;
   DBUG_ENTER("get_schema_tables_record");
@@ -5481,274 +5836,10 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
   }
   else
   {
-    char option_buff[512];
-    String str(option_buff,sizeof(option_buff), system_charset_info);
     TABLE *show_table= tables->table;
-    TABLE_SHARE *share= show_table->s;
-    handler *file= show_table->db_stat ? show_table->file : 0;
-    handlerton *tmp_db_type= share->db_type();
-#ifdef WITH_PARTITION_STORAGE_ENGINE
-    bool is_partitioned= FALSE;
-#endif
+    const TABLE_SHARE *share= show_table->s;
 
-    if (share->tmp_table == SYSTEM_TMP_TABLE)
-      table->field[3]->store(STRING_WITH_LEN("SYSTEM VIEW"), cs);
-    else if (share->table_type == TABLE_TYPE_SEQUENCE)
-      table->field[3]->store(STRING_WITH_LEN("SEQUENCE"), cs);
-    else
-    {
-      DBUG_ASSERT(share->tmp_table == NO_TMP_TABLE);
-      if (share->versioned)
-        table->field[3]->store(STRING_WITH_LEN("SYSTEM VERSIONED"), cs);
-      else
-        table->field[3]->store(STRING_WITH_LEN("BASE TABLE"), cs);
-    }
-
-    for (uint i= 4; i < table->s->fields; i++)
-    {
-      if (i == 7 || (i > 12 && i < 17) || i == 18)
-        continue;
-      table->field[i]->set_notnull();
-    }
-
-    /* Collect table info from the table share */
-
-#ifdef WITH_PARTITION_STORAGE_ENGINE
-    if (share->db_type() == partition_hton &&
-        share->partition_info_str_len)
-    {
-      tmp_db_type= plugin_hton(share->default_part_plugin);
-      is_partitioned= TRUE;
-    }
-#endif
-
-    tmp_buff= (char *) ha_resolve_storage_engine_name(tmp_db_type);
-    table->field[4]->store(tmp_buff, strlen(tmp_buff), cs);
-    table->field[5]->store((longlong) share->frm_version, TRUE);
-
-    str.length(0);
-
-    if (share->min_rows)
-    {
-      str.qs_append(STRING_WITH_LEN(" min_rows="));
-      str.qs_append(share->min_rows);
-    }
-
-    if (share->max_rows)
-    {
-      str.qs_append(STRING_WITH_LEN(" max_rows="));
-      str.qs_append(share->max_rows);
-    }
-
-    if (share->avg_row_length)
-    {
-      str.qs_append(STRING_WITH_LEN(" avg_row_length="));
-      str.qs_append(share->avg_row_length);
-    }
-
-    if (share->db_create_options & HA_OPTION_PACK_KEYS)
-      str.qs_append(STRING_WITH_LEN(" pack_keys=1"));
-
-    if (share->db_create_options & HA_OPTION_NO_PACK_KEYS)
-      str.qs_append(STRING_WITH_LEN(" pack_keys=0"));
-
-    if (share->db_create_options & HA_OPTION_STATS_PERSISTENT)
-      str.qs_append(STRING_WITH_LEN(" stats_persistent=1"));
-
-    if (share->db_create_options & HA_OPTION_NO_STATS_PERSISTENT)
-      str.qs_append(STRING_WITH_LEN(" stats_persistent=0"));
-
-    if (share->stats_auto_recalc == HA_STATS_AUTO_RECALC_ON)
-      str.qs_append(STRING_WITH_LEN(" stats_auto_recalc=1"));
-    else if (share->stats_auto_recalc == HA_STATS_AUTO_RECALC_OFF)
-      str.qs_append(STRING_WITH_LEN(" stats_auto_recalc=0"));
-
-    if (share->stats_sample_pages != 0)
-    {
-      str.qs_append(STRING_WITH_LEN(" stats_sample_pages="));
-      str.qs_append(share->stats_sample_pages);
-    }
-
-    /* We use CHECKSUM, instead of TABLE_CHECKSUM, for backward compatibility */
-    if (share->db_create_options & HA_OPTION_CHECKSUM)
-      str.qs_append(STRING_WITH_LEN(" checksum=1"));
-
-    if (share->page_checksum != HA_CHOICE_UNDEF)
-    {
-      str.qs_append(STRING_WITH_LEN(" page_checksum="));
-      str.qs_append(&ha_choice_values[(uint) share->page_checksum]);
-    }
-
-    if (share->db_create_options & HA_OPTION_DELAY_KEY_WRITE)
-      str.qs_append(STRING_WITH_LEN(" delay_key_write=1"));
-
-    if (share->row_type != ROW_TYPE_DEFAULT)
-    {
-      str.qs_append(STRING_WITH_LEN(" row_format="));
-      str.qs_append(&ha_row_type[(uint) share->row_type]);
-    }
-
-    if (share->key_block_size)
-    {
-      str.qs_append(STRING_WITH_LEN(" key_block_size="));
-      str.qs_append(share->key_block_size);
-    }
-
-#ifdef WITH_PARTITION_STORAGE_ENGINE
-    if (is_partitioned)
-      str.qs_append(STRING_WITH_LEN(" partitioned"));
-#endif
-
-    /*
-      Write transactional=0|1 for tables where the user has specified the
-      option or for tables that supports both transactional and non
-      transactional tables
-    */
-    if (share->transactional != HA_CHOICE_UNDEF ||
-        (share->db_type() &&
-         share->db_type()->flags & HTON_TRANSACTIONAL_AND_NON_TRANSACTIONAL &&
-         file))
-    {
-      uint choice= share->transactional;
-      if (choice == HA_CHOICE_UNDEF)
-        choice= ((file->ha_table_flags() &
-                  (HA_NO_TRANSACTIONS | HA_CRASH_SAFE)) ==
-                 HA_NO_TRANSACTIONS ?
-                 HA_CHOICE_NO : HA_CHOICE_YES);
-
-      str.qs_append(STRING_WITH_LEN(" transactional="));
-      str.qs_append(&ha_choice_values[choice]);
-    }
-    append_create_options(thd, &str, share->option_list, false, 0);
-
-    if (file)
-    {
-      HA_CREATE_INFO create_info;
-      create_info.init();
-      file->update_create_info(&create_info);
-      append_directory(thd, &str, &DATA_clex_str, create_info.data_file_name);
-      append_directory(thd, &str, &INDEX_clex_str, create_info.index_file_name);
-    }
-
-    if (str.length())
-      table->field[19]->store(str.ptr()+1, str.length()-1, cs);
-
-    LEX_CSTRING tmp_str;
-    if (share->table_charset)
-      tmp_str= share->table_charset->coll_name;
-    else
-      tmp_str= { STRING_WITH_LEN("default") };
-    table->field[17]->store(&tmp_str, cs);
-
-    if (share->comment.str)
-      table->field[20]->store(&share->comment, cs);
-
-    /* Collect table info from the storage engine  */
-
-    if (file)
-    {
-      /* If info() fails, then there's nothing else to do */
-      if (unlikely((info_error= file->info(HA_STATUS_VARIABLE |
-                                           HA_STATUS_TIME |
-                                           HA_STATUS_VARIABLE_EXTRA |
-                                           HA_STATUS_AUTO)) != 0))
-      {
-        file->print_error(info_error, MYF(0));
-        goto err;
-      }
-
-      enum row_type row_type = file->get_row_type();
-      switch (row_type) {
-      case ROW_TYPE_NOT_USED:
-      case ROW_TYPE_DEFAULT:
-        tmp_buff= ((share->db_options_in_use &
-                    HA_OPTION_COMPRESS_RECORD) ? "Compressed" :
-                   (share->db_options_in_use & HA_OPTION_PACK_RECORD) ?
-                   "Dynamic" : "Fixed");
-        break;
-      case ROW_TYPE_FIXED:
-        tmp_buff= "Fixed";
-        break;
-      case ROW_TYPE_DYNAMIC:
-        tmp_buff= "Dynamic";
-        break;
-      case ROW_TYPE_COMPRESSED:
-        tmp_buff= "Compressed";
-        break;
-      case ROW_TYPE_REDUNDANT:
-        tmp_buff= "Redundant";
-        break;
-      case ROW_TYPE_COMPACT:
-        tmp_buff= "Compact";
-        break;
-      case ROW_TYPE_PAGE:
-        tmp_buff= "Page";
-        break;
-      }
-
-      table->field[6]->store(tmp_buff, strlen(tmp_buff), cs);
-
-      if (!tables->schema_table)
-      {
-        table->field[7]->store((longlong) file->stats.records, TRUE);
-        table->field[7]->set_notnull();
-      }
-      table->field[8]->store((longlong) file->stats.mean_rec_length, TRUE);
-      table->field[9]->store((longlong) file->stats.data_file_length, TRUE);
-      if (file->stats.max_data_file_length)
-      {
-        table->field[10]->store((longlong) file->stats.max_data_file_length,
-                                TRUE);
-        table->field[10]->set_notnull();
-      }
-      table->field[11]->store((longlong) file->stats.index_file_length, TRUE);
-      if (file->stats.max_index_file_length)
-      {
-        table->field[21]->store((longlong) file->stats.max_index_file_length,
-                                TRUE);
-        table->field[21]->set_notnull();
-      }
-      table->field[12]->store((longlong) file->stats.delete_length, TRUE);
-      if (show_table->found_next_number_field)
-      {
-        table->field[13]->store((longlong) file->stats.auto_increment_value,
-                                TRUE);
-        table->field[13]->set_notnull();
-      }
-      if (file->stats.create_time)
-      {
-        thd->variables.time_zone->gmt_sec_to_TIME(&time,
-                                                  (my_time_t) file->stats.create_time);
-        table->field[14]->store_time(&time);
-        table->field[14]->set_notnull();
-      }
-      if (file->stats.update_time)
-      {
-        thd->variables.time_zone->gmt_sec_to_TIME(&time,
-                                                  (my_time_t) file->stats.update_time);
-        table->field[15]->store_time(&time);
-        table->field[15]->set_notnull();
-      }
-      if (file->stats.check_time)
-      {
-        thd->variables.time_zone->gmt_sec_to_TIME(&time,
-                                                  (my_time_t) file->stats.check_time);
-        table->field[16]->store_time(&time);
-        table->field[16]->set_notnull();
-      }
-      if ((file->ha_table_flags() &
-            (HA_HAS_OLD_CHECKSUM | HA_HAS_NEW_CHECKSUM)) &&
-           !file->stats.checksum_null)
-      {
-        table->field[18]->store((longlong) file->stats.checksum, TRUE);
-        table->field[18]->set_notnull();
-      }
-    }
-    /* If table is a temporary table */
-    LEX_CSTRING tmp= { STRING_WITH_LEN("N") };
-    if (show_table->s->tmp_table != NO_TMP_TABLE)
-      tmp.str= "Y";
-    table->field[22]->store(tmp.str, tmp.length, cs);
+    info_error= fill_columns_for_i_s_table(thd, tables, table, show_table, share, cs);
   }
 
 err:
@@ -9033,7 +9124,6 @@ ST_FIELD_INFO tables_fields_info[]=
                                          NOT_NULL, "Comment",    OPEN_FRM_ONLY),
   Column("MAX_INDEX_LENGTH",ULonglong(), NULLABLE, "Max_index_length",
                                                                  OPEN_FULL_TABLE),
-  Column("TEMPORARY",       Varchar(1),  NULLABLE, "Temporary",  OPEN_FRM_ONLY),
   CEnd()
 };
 
