@@ -1153,8 +1153,8 @@ alter table t1 add partition (partition p2 history);
 Warnings:
 Warning	4115	Maybe missing parameters: no rotation condition for multiple HISTORY partitions.
 show table status;
-Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
-t1	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	Got error 174 "Fatal error during initialization of handler" from storage engine Aria	NULL	NULL
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length
+t1	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	Got error 174 "Fatal error during initialization of handler" from storage engine Aria	NULL
 Warnings:
 Warning	1030	Got error 174 "Fatal error during initialization of handler" from storage engine Aria
 drop table t1;
