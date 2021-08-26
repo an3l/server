@@ -17,6 +17,7 @@ CALL sys.table_exists('test', 'v_t1', @exists);
 SELECT @exists;
 
 # Replace the base table with a temporary table
+--error ER_TABLE_EXISTS_ERROR
 CREATE TEMPORARY TABLE t1 (id INT PRIMARY KEY);
 CALL sys.table_exists('test', 't1', @exists);
 SELECT @exists;

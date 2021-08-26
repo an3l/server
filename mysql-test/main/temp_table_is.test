@@ -1,0 +1,84 @@
+--echo #
+--echo # MDEV-12459: The information_schema tables for getting temporary tables 
+--echo #             info is missing, at least for innodb, there is no 
+--echo #             INNODB_TEMP_TABLE_INFO
+--echo #
+
+# Save the initial number of concurrent sessions
+--source include/count_sessions.inc
+--source include/have_innodb.inc
+
+connect (con1,localhost,root,,test,,);
+
+connection default;
+
+--echo # Create first temporary table
+create temporary table test.t_temp(t int);
+insert into t_temp values (1),(2), (3);
+
+--echo # Show results
+--replace_column 15 # 16 #
+--vertical_results
+select * from  information_schema.tables where table_type='temporary';
+
+--echo # Create the base table with the same name (both should be visible)
+# Create the base table with the same name as temporary table.
+create table test.t_temp(t int);
+insert into t_temp values (-1),(-2);
+
+--echo # Show results
+--replace_column 15 # 16 #
+--vertical_results
+select * from  information_schema.tables where table_type='temporary';
+
+create database my_db;
+--echo # Create the temporary table with the same name in new DB
+create temporary table my_db.t_temp (t int);
+insert into my_db.t_temp values (-2),(-1);
+--echo # Show results
+--replace_column 15 # 16 #
+--vertical_results
+select * from  information_schema.tables where table_type='temporary';
+
+connection con1;
+
+--echo # Create the temporary table with the same name in new connection
+create temporary table test.t_temp(t int);
+insert into t_temp values (4),(5),(6), (7);
+--echo # Show results
+--replace_column 15 # 16 #
+--vertical_results
+select * from  information_schema.tables where table_type='temporary';
+
+connection default;
+
+--echo # Show results in default connection
+--replace_column 15 # 16 #
+--vertical_results
+select * from  information_schema.tables where table_type='temporary';
+
+--echo # Create a warning on `Create` statement if the new temporary table
+--echo # shadows base table - note there is no warning vice versa.
+create table test.my_t (t int);
+create temporary table test.my_t (t int);
+show warnings;
+
+--echo # Show results
+--replace_column 15 # 16 #
+--vertical_results
+select * from  information_schema.tables where table_type='temporary';
+
+# First we are removing temporary table and after base table
+drop table test.my_t;
+drop table test.my_t;
+
+disconnect con1;
+
+# First we are removing temporary table and after base table
+drop table test.t_temp;
+drop table test.t_temp;
+drop database my_db;
+
+# Wait till all disconnects are completed
+--source include/wait_until_count_sessions.inc
+

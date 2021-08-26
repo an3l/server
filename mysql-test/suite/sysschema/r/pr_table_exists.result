@@ -5,12 +5,13 @@ CREATE view v_t1 AS SELECT * FROM t1;
 CALL sys.table_exists('test', 't1', @exists);
 SELECT @exists;
 @exists
-BASE TABLE
+TEMPORARY
 CALL sys.table_exists('test', 'v_t1', @exists);
 SELECT @exists;
 @exists
-VIEW
+TEMPORARY
 CREATE TEMPORARY TABLE t1 (id INT PRIMARY KEY);
+ERROR 42S01: Table 't1' already exists
 CALL sys.table_exists('test', 't1', @exists);
 SELECT @exists;
 @exists

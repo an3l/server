@@ -3996,6 +3996,20 @@ lock_table_names(THD *thd, const DDL_options_st &options,
   {
     DBUG_PRINT("info", ("mdl_request.type: %d  open_type: %d",
                         table->mdl_request.type, table->open_type));
+    // Check if temporary table shadows base table
+      if (table->open_type == OT_TEMPORARY_ONLY && !table->sequence)
+      {
+        if(ha_table_exists(thd, &tables_start->db, &tables_start->table_name,
+                        NULL, NULL, &tables_start->db_type))
+        {
+          push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
+                              ER_TABLE_EXISTS_ERROR,
+                              ER_THD(thd, ER_TABLE_EXISTS_ERROR),
+                              tables_start->table_name.str);
+          DBUG_RETURN(FALSE);
+        }
+      }
+
     if (table->mdl_request.type < MDL_SHARED_UPGRADABLE ||
         table->mdl_request.type == MDL_SHARED_READ_ONLY ||
         table->open_type == OT_TEMPORARY_ONLY ||
