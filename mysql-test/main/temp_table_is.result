@@ -1,0 +1,286 @@
+#
+# MDEV-12459: The information_schema tables for getting temporary tables 
+#             info is missing, at least for innodb, there is no 
+#             INNODB_TEMP_TABLE_INFO
+#
+connect  con1,localhost,root,,test,,;
+connection default;
+# Create first temporary table
+create temporary table test.t_temp(t int);
+insert into t_temp values (1),(2), (3);
+# Show results
+select * from  information_schema.tables where table_type='temporary';
+TABLE_CATALOG	def
+TABLE_SCHEMA	test
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	3
+AVG_ROW_LENGTH	7
+DATA_LENGTH	21
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+# Create the base table with the same name (both should be visible)
+create table test.t_temp(t int);
+insert into t_temp values (-1),(-2);
+# Show results
+select * from  information_schema.tables where table_type='temporary';
+TABLE_CATALOG	def
+TABLE_SCHEMA	test
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	5
+AVG_ROW_LENGTH	7
+DATA_LENGTH	35
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+create database my_db;
+# Create the temporary table with the same name in new DB
+create temporary table my_db.t_temp (t int);
+insert into my_db.t_temp values (-2),(-1);
+# Show results
+select * from  information_schema.tables where table_type='temporary';
+TABLE_CATALOG	def
+TABLE_SCHEMA	my_db
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	2
+AVG_ROW_LENGTH	7
+DATA_LENGTH	14
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+TABLE_CATALOG	def
+TABLE_SCHEMA	test
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	5
+AVG_ROW_LENGTH	7
+DATA_LENGTH	35
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+connection con1;
+# Create the temporary table with the same name in new connection
+create temporary table test.t_temp(t int);
+Warnings:
+Level	Note
+Code	1050
+Message	Table 't_temp' already exists
+insert into t_temp values (4),(5),(6), (7);
+# Show results
+select * from  information_schema.tables where table_type='temporary';
+TABLE_CATALOG	def
+TABLE_SCHEMA	test
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	4
+AVG_ROW_LENGTH	7
+DATA_LENGTH	28
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+connection default;
+# Show results in default connection
+select * from  information_schema.tables where table_type='temporary';
+TABLE_CATALOG	def
+TABLE_SCHEMA	my_db
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	2
+AVG_ROW_LENGTH	7
+DATA_LENGTH	14
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+TABLE_CATALOG	def
+TABLE_SCHEMA	test
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	5
+AVG_ROW_LENGTH	7
+DATA_LENGTH	35
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+# Create a warning on `Create` statement if the new temporary table
+# shadows base table - note there is no warning vice versa.
+create table test.my_t (t int);
+create temporary table test.my_t (t int);
+Warnings:
+Level	Note
+Code	1050
+Message	Table 'my_t' already exists
+show warnings;
+Level	Note
+Code	1050
+Message	Table 'my_t' already exists
+# Show results
+select * from  information_schema.tables where table_type='temporary';
+TABLE_CATALOG	def
+TABLE_SCHEMA	test
+TABLE_NAME	my_t
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	0
+AVG_ROW_LENGTH	0
+DATA_LENGTH	0
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+TABLE_CATALOG	def
+TABLE_SCHEMA	my_db
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	2
+AVG_ROW_LENGTH	7
+DATA_LENGTH	14
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+TABLE_CATALOG	def
+TABLE_SCHEMA	test
+TABLE_NAME	t_temp
+TABLE_TYPE	TEMPORARY
+ENGINE	MyISAM
+VERSION	10
+ROW_FORMAT	Fixed
+TABLE_ROWS	5
+AVG_ROW_LENGTH	7
+DATA_LENGTH	35
+MAX_DATA_LENGTH	1970324836974591
+INDEX_LENGTH	1024
+DATA_FREE	0
+AUTO_INCREMENT	NULL
+CREATE_TIME	#
+UPDATE_TIME	#
+CHECK_TIME	NULL
+TABLE_COLLATION	latin1_swedish_ci
+CHECKSUM	NULL
+CREATE_OPTIONS	
+TABLE_COMMENT	
+MAX_INDEX_LENGTH	17179868160
+TEMPORARY	Y
+drop table test.my_t;
+drop table test.my_t;
+disconnect con1;
+drop table test.t_temp;
+drop table test.t_temp;
+drop database my_db;

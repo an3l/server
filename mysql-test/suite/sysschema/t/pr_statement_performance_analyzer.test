@@ -186,13 +186,16 @@ SELECT sys.format_statement(DIGEST_TEXT) AS query,
  ORDER BY SUBSTRING(query, 1, 6);
 SET @sys.statement_performance_analyzer.view = 'test.view_digests';
 --replace_result $query_insert QUERY_INSERT $query_select QUERY_SELECT $query_update QUERY_UPDATE $digest_insert DIGEST_INSERT $digest_update DIGEST_UPDATE $digest_select DIGEST_SELECT $o_upd_total_latency LATENCY $o_upd_avg_latency LATENCY $o_sel_total_latency LATENCY $o_sel_avg_latency LATENCY $o_ins_total_latency LATENCY $o_ins_avg_latency LATENCY
+--error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('overall', NULL, 'custom');
 --replace_result $query_insert QUERY_INSERT $query_select QUERY_SELECT $query_update QUERY_UPDATE $digest_insert DIGEST_INSERT $digest_update DIGEST_UPDATE $digest_select DIGEST_SELECT $d_upd_total_latency LATENCY $d_sel_total_latency LATENCY $d_ins_total_latency LATENCY
+--error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('delta', 'test.tmp_digests_ini', 'custom');
 
 # Verify that setting a limit works
 SET @sys.statement_performance_analyzer.limit = 2;
 --replace_result $query_insert QUERY_INSERT $query_select QUERY_SELECT $digest_insert DIGEST_INSERT $digest_select DIGEST_SELECT $o_ins_total_latency LATENCY $o_ins_avg_latency LATENCY $o_sel_total_latency LATENCY $o_sel_avg_latency LATENCY
+--error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('overall', NULL, 'custom');
 
 # Test for error conditions - some of the errors depend on the sql_mode so set it explicitly
@@ -234,26 +237,26 @@ CALL sys.statement_performance_analyzer('create_table', 'test.tmp_digests_ini', 
 CALL sys.statement_performance_analyzer('create_table', 'test.tmp_unsupported', NULL);
 # Verify that the sanity check for the input table e.g. for saving snapshots works
 ALTER TABLE test.tmp_unsupported ADD COLUMN myvar int DEFAULT 0;
--- error S45000
+-- error ER_WRONG_VALUE_COUNT_ON_ROW
 CALL sys.statement_performance_analyzer('save', 'test.tmp_unsupported', NULL);
 # Try to create a snapshot or overall output with the wrong in_table
--- error S45000
+-- error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('snapshot', 'test.new_table', NULL);
--- error S45000
+-- error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('overall', 'test.new_table', 'analysis');
 # Try to create a delta output or save a snapshot specifying a non-existing table.
--- error S45000
+-- error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('delta', 'test.new_table', 'analysis');
--- error S45000
+-- error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('save', 'test.new_table', NULL);
 # Verify custom views doesn't work without the user variable set
 SET @sys.statement_performance_analyzer.view = NULL;
 DELETE FROM sys.sys_config WHERE variable = 'statement_performance_analyzer.view';
--- error S45000
+-- error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('overall', NULL, 'custom');
 # Set the custom view to a regular table - should not work
 SET @sys.statement_performance_analyzer.view = 'test.tmp_unsupported';
--- error S45000
+-- error ER_SIGNAL_EXCEPTION
 CALL sys.statement_performance_analyzer('overall', NULL, 'custom');
 
 
