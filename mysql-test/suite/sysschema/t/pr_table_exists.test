@@ -66,4 +66,25 @@ SELECT @tbl_type;
 --echo # We cannot send quoted identifer to the procedure, no table will be found
 CALL sys.table_exists('test', '`ab``c`', @tbl_type);
 SELECT @tbl_type;
+--echo # Remove temporary table
 DROP TABLE `ab``c`;
+CALL sys.table_exists('test', 'ab`c', @tbl_type);
+SELECT @tbl_type;
+--echo # Remove base table
+DROP TABLE `ab``c`;
+--echo # MDEV-12459: The information_schema tables for getting temporary tables
+--echo #             info is missing, at least for innodb, there is no
+--echo #             INNODB_TEMP_TABLE_INFO
+--echo #
+
+# Verify that temporary table will raise an warning and will shadow the base table
+CREATE TABLE t1 (id INT PRIMARY KEY);
+# Verify the base table and view is supported
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+CREATE TEMPORARY TABLE t1 (id INT PRIMARY KEY);
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+
+DROP TEMPORARY TABLE t1;
+DROP TABLE t1;

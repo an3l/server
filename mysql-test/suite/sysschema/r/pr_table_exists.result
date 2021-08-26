@@ -60,6 +60,8 @@ TEMPORARY
 DROP TABLE `ab``c`;
 CREATE TABLE `ab``c` (t1_id int PRIMARY KEY, t1_val varchar(10));
 CREATE TEMPORARY TABLE `ab``c` (t1_id int PRIMARY KEY, t1_val varchar(10));
+Warnings:
+Note	1050	Table 'ab`c' already exists
 CALL sys.table_exists('test', 'ab`c', @tbl_type);
 SELECT @tbl_type;
 @tbl_type
@@ -69,4 +71,29 @@ CALL sys.table_exists('test', '`ab``c`', @tbl_type);
 SELECT @tbl_type;
 @tbl_type
 
+# Remove temporary table
 DROP TABLE `ab``c`;
+CALL sys.table_exists('test', 'ab`c', @tbl_type);
+SELECT @tbl_type;
+@tbl_type
+BASE TABLE
+# Remove base table
+DROP TABLE `ab``c`;
+# MDEV-12459: The information_schema tables for getting temporary tables
+#             info is missing, at least for innodb, there is no
+#             INNODB_TEMP_TABLE_INFO
+#
+CREATE TABLE t1 (id INT PRIMARY KEY);
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+BASE TABLE
+CREATE TEMPORARY TABLE t1 (id INT PRIMARY KEY);
+Warnings:
+Note	1050	Table 't1' already exists
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+TEMPORARY
+DROP TEMPORARY TABLE t1;
+DROP TABLE t1;
