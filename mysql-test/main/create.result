@@ -360,6 +360,8 @@ select @@warning_count;
 @@warning_count
 1
 create temporary table t3 like t2;
+Warnings:
+Note	1050	Table 't3' already exists
 show create table t3;
 Table	Create Table
 t3	CREATE TEMPORARY TABLE `t3` (
@@ -1319,6 +1321,8 @@ CREATE TEMPORARY TABLE t2 (a INT);
 CREATE VIEW t2 AS SELECT 1;
 CREATE TABLE t3 (a INT);
 CREATE TEMPORARY TABLE t3 SELECT 1;
+Warnings:
+Note	1050	Table 't3' already exists
 CREATE TEMPORARY TABLE t4 (a INT);
 CREATE TABLE t4 AS SELECT 1;
 DROP TEMPORARY TABLE t1, t2, t3, t4;
@@ -1517,6 +1521,8 @@ drop table t1;
 #
 create table t1 (a int) select 1 as a;
 create temporary table if not exists t1 select 2 as a;
+Warnings:
+Note	1050	Table 't1' already exists
 select * from t1;
 a
 2
@@ -1560,6 +1566,8 @@ select * from t2;
 a
 1
 create temporary table if not exists t1 (a int) select 3 as a;
+Warnings:
+Note	1050	Table 't1' already exists
 select * from t1;
 a
 3
@@ -1608,6 +1616,8 @@ select * from t2;
 a
 1
 create temporary table if not exists t1 (a int) select 3 as a;
+Warnings:
+Note	1050	Table 't1' already exists
 select * from t1;
 a
 3
@@ -1654,6 +1664,8 @@ select * from t1;
 a
 1
 create temporary table if not exists t1 (a int) select 3 as a;
+Warnings:
+Note	1050	Table 't1' already exists
 select * from t1;
 a
 3
@@ -1671,6 +1683,8 @@ drop view t1;
 #
 create table t1 (a int) select 1 as a;
 create temporary table if not exists t1 (a int) select * from t1;
+Warnings:
+Note	1050	Table 't1' already exists
 create temporary table if not exists t1 (a int) select * from t1;
 Warnings:
 Note	1050	Table 't1' already exists

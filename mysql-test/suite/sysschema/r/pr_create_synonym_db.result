@@ -60,6 +60,8 @@ create table a(a int);
 create table t (b int);
 create table b(a int);
 create temporary table b (a int);
+Warnings:
+Note	1050	Table 'b' already exists
 call sys.create_synonym_db('db','db_copy');
 ERROR HY000: Table`db`.`b`shadows base table. View cannot be created! Terminating!
 drop database db;
