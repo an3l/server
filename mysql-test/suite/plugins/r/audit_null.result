@@ -41,6 +41,8 @@ t2.a+1	t2_copy.a+2
 3	4
 drop view v1;
 create temporary table t2 (a date);
+Warnings:
+Note	1050	Table 't2' already exists
 insert t2 values ('2020-10-09');
 select * from t2;
 a
@@ -98,6 +100,7 @@ root[root] @ localhost []	mysql.column_stats : read
 root[root] @ localhost []	mysql.index_stats : read
 root[root] @ localhost []	>> drop view v1
 root[root] @ localhost []	>> create temporary table t2 (a date)
+root[root] @ localhost []	>> SHOW WARNINGS
 root[root] @ localhost []	>> insert t2 values ('2020-10-09')
 root[root] @ localhost []	>> select * from t2
 root[root] @ localhost []	>> alter table t2 add column b int
