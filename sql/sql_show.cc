@@ -69,6 +69,8 @@
 
 #include "lex_symbol.h"
 #define KEYWORD_SIZE 64
+#define IS_USER_TEMP_TABLE(A) ((A->tmp_table == TRANSACTIONAL_TMP_TABLE) || \
+                          (A->tmp_table == NON_TRANSACTIONAL_TMP_TABLE))
 
 extern SYMBOL symbols[];
 extern size_t symbols_length;
@@ -151,6 +153,8 @@ static int show_create_sequence(THD *thd, TABLE_LIST *table_list,
 static const LEX_CSTRING *view_algorithm(TABLE_LIST *table);
 
 bool get_lookup_field_values(THD *, COND *, TABLE_LIST *, LOOKUP_FIELD_VALUES *);
+void process_i_s_table_temporary_tables(THD *thd, TABLE * table, LEX_CSTRING *db_name,
+                                        LEX_CSTRING *table_name, TABLE *tmp_tbl);
 
 /**
   Try to lock a mutex, but give up after a short while to not cause deadlocks
@@ -5119,6 +5123,7 @@ public:
   }
 };
 
+
 /**
   @brief          Fill I_S tables whose data are retrieved
                   from frm files and storage engine
@@ -5161,6 +5166,10 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   uint table_open_method= tables->table_open_method;
   bool can_deadlock;
   MEM_ROOT tmp_mem_root;
+  Dynamic_array<LEX_CSTRING> system_tables(PSI_INSTRUMENT_MEM);
+  All_tmp_tables_list *temp_tables= NULL;
+  // Scan for temporary tables
+  TMP_TABLE_SHARE *share_temp;
   DBUG_ENTER("get_all_tables");
 
   bzero(&tmp_mem_root, sizeof(tmp_mem_root));
@@ -5223,6 +5232,12 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   init_alloc_root(PSI_INSTRUMENT_ME, &tmp_mem_root, SHOW_ALLOC_BLOCK_SIZE,
                   SHOW_ALLOC_BLOCK_SIZE, MY_THREAD_SPECIFIC);
 
+  system_tables.push(INFORMATION_SCHEMA_NAME);
+  system_tables.push(PERFORMANCE_SCHEMA_DB_NAME);
+  system_tables.push(MYSQL_SCHEMA_NAME);
+  system_tables.push(SYS_SCHEMA_NAME);
+  system_tables.push(MTR_SCHEMA_NAME);
+
   for (size_t i=0; i < db_names.elements(); i++)
   {
     LEX_CSTRING *db_name= db_names.at(i);
@@ -5234,6 +5249,35 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
         sctx->master_access & (DB_ACLS | SHOW_DB_ACL) ||
         acl_get(sctx->host, sctx->ip, sctx->priv_user, db_name->str, 0))
 #endif
+
+    // Only if there is IS.tables allow temporary tables to be shown
+    if (schema_table_idx == SCH_TABLES && !temp_tables)
+    {
+      for (size_t k=0; k < system_tables.elements(); k++)
+      {
+        if (db_name != &system_tables.at(k))
+        {
+          temp_tables= open_tables_state_backup.temporary_tables;
+          while (temp_tables && (share_temp= temp_tables->pop_front()))
+          {
+            while (TABLE *tbl= share_temp->all_tmp_tables.pop_front())
+            {
+              if (IS_USER_TEMP_TABLE(share_temp))
+              {
+                // Now we have the data and we should process_table() manually
+                process_i_s_table_temporary_tables(thd, table, db_name,
+                                                   &share_temp->table_name, tbl);
+              }
+              closefrm(tbl);
+              my_free(tbl);
+            }
+            free_table_share(share_temp);
+            my_free(share_temp);
+          }
+          break;
+        }
+      }
+    }
     {
       Dynamic_array<LEX_CSTRING*> table_names(PSI_INSTRUMENT_MEM);
       int res= make_table_name_list(thd, &table_names, lex,
@@ -5243,9 +5287,9 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
       if (unlikely(res))
         goto err;
 
-      for (size_t i=0; i < table_names.elements(); i++)
+      for (size_t j=0; j < table_names.elements(); j++)
       {
-        LEX_CSTRING *table_name= table_names.at(i);
+        LEX_CSTRING *table_name= table_names.at(j);
         DBUG_ASSERT(table_name->length <= NAME_LEN);
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
@@ -5495,6 +5539,8 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
       table->field[3]->store(STRING_WITH_LEN("SYSTEM VIEW"), cs);
     else if (share->table_type == TABLE_TYPE_SEQUENCE)
       table->field[3]->store(STRING_WITH_LEN("SEQUENCE"), cs);
+    else if (IS_USER_TEMP_TABLE(share))
+      table->field[3]->store(STRING_WITH_LEN("TEMPORARY"), cs);
     else
     {
       DBUG_ASSERT(share->tmp_table == NO_TMP_TABLE);
@@ -5744,11 +5790,6 @@ static int get_schema_tables_record(THD *thd, TABLE_LIST *tables,
         table->field[18]->set_notnull();
       }
     }
-    /* If table is a temporary table */
-    LEX_CSTRING tmp= { STRING_WITH_LEN("N") };
-    if (show_table->s->tmp_table != NO_TMP_TABLE)
-      tmp.str= "Y";
-    table->field[22]->store(tmp.str, tmp.length, cs);
   }
 
 err:
@@ -5768,6 +5809,28 @@ err:
   }
 
   DBUG_RETURN(schema_table_store_record(thd, table));
+}
+
+
+/**
+ @brief           Fill IS.table with temporary tables
+ @details         The function does...
+ @param[in]       table                I_S table (TABLE)
+ @param[in]       db_name              db name of temporary table
+ @param[in]       table_name           table name of temporary table
+ @return          Operation status
+   @retval        0   - success
+   @retval        1   - failure
+*/
+void process_i_s_table_temporary_tables(THD *thd, TABLE * table, LEX_CSTRING *db_name,
+                                        LEX_CSTRING *table_name, TABLE *tmp_tbl)
+{
+  TABLE_LIST table_list;
+  bzero((char*) &table_list, sizeof(TABLE_LIST));
+  table_list.table= tmp_tbl;
+
+  get_schema_tables_record(thd, &table_list, table,
+                           0, db_name, table_name);
 }
 
 
@@ -9032,7 +9095,6 @@ ST_FIELD_INFO tables_fields_info[]=
                                          NOT_NULL, "Comment",    OPEN_FRM_ONLY),
   Column("MAX_INDEX_LENGTH",ULonglong(), NULLABLE, "Max_index_length",
                                                                  OPEN_FULL_TABLE),
-  Column("TEMPORARY",       Varchar(1),  NULLABLE, "Temporary",  OPEN_FRM_ONLY),
   CEnd()
 };
 
