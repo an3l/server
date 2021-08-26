@@ -5258,21 +5258,22 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
         if (db_name != &system_tables.at(k))
         {
           temp_tables= open_tables_state_backup.temporary_tables;
-          while (temp_tables && (share_temp= temp_tables->pop_front()))
+          if (temp_tables)
           {
-            while (TABLE *tbl= share_temp->all_tmp_tables.pop_front())
+            All_tmp_tables_list::Iterator it(*open_tables_state_backup.temporary_tables);
+            while ((share_temp= it++))
             {
-              if (IS_USER_TEMP_TABLE(share_temp))
+              All_share_tables_list::Iterator it2(share_temp->all_tmp_tables);
+              while (TABLE *tbl= it2++)
               {
-                // Now we have the data and we should process_table() manually
-                process_i_s_table_temporary_tables(thd, table, db_name,
-                                                   &share_temp->table_name, tbl);
+                if (IS_USER_TEMP_TABLE(share_temp))
+                {
+                  // Now we have the data and we should process_table() manually
+                  process_i_s_table_temporary_tables(thd, table, db_name,
+                                                    &share_temp->table_name, tbl);
+                }
               }
-              closefrm(tbl);
-              my_free(tbl);
             }
-            free_table_share(share_temp);
-            my_free(share_temp);
           }
           break;
         }
