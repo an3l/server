@@ -1,3 +1,6 @@
+#
+#
+#
 create temporary table t_temp(t int);
 insert into t_temp values (1),(2), (3);
 select * from  information_schema.tables where table_type='temporary';
@@ -15,8 +18,8 @@ MAX_DATA_LENGTH	1970324836974591
 INDEX_LENGTH	1024
 DATA_FREE	0
 AUTO_INCREMENT	NULL
-CREATE_TIME	2021-08-26 16:47:15
-UPDATE_TIME	2021-08-26 16:47:15
+CREATE_TIME	#
+UPDATE_TIME	#
 CHECK_TIME	NULL
 TABLE_COLLATION	latin1_swedish_ci
 CHECKSUM	NULL

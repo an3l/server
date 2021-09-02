@@ -1,5 +1,10 @@
+--echo #
+--echo #
+--echo #
+
 create temporary table t_temp(t int);
 insert into t_temp values (1),(2), (3);
 
+--replace_column 15 # 16 #
 --vertical_results
 select * from  information_schema.tables where table_type='temporary';
