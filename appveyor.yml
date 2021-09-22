@@ -14,7 +14,6 @@ build_script:
   # Build minimal configuration
   - mkdir _build
   - cd _build
-  - set BUILD_TYPE=MinSizeRel
   - set GENERATOR=-GNinja
   - call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
   - cmake -E time cmake %GENERATOR% .. -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DMYSQL_MAINTAINER_MODE=ERR -DFAST_BUILD=1 -DBISON_EXECUTABLE=C:\cygwin64\bin\bison -DPLUGIN_PERFSCHEMA=NO -DPLUGIN_FEEDBACK=NO
@@ -28,3 +27,10 @@ test_script:
   - perl mysql-test-run.pl --force --max-test-fail=10 --retry=2 -parallel=%parallel% --testcase-timeout=3 --suite=main  --skip-test-list=%APPVEYOR_BUILD_FOLDER%\win\appveyor_skip_tests.txt --mysqld=--loose-innodb-flush-log-at-trx-commit=2
 
 image: Visual Studio 2019
+
+# fetch repository as zip archive
+shallow_clone: true
+
+# environment variables
+environment:
+  BUILD_TYPE: MinSizeRel
