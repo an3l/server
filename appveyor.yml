@@ -5,7 +5,7 @@ clone_depth: 1
 build_script:
   # dump some system info
   - echo  processor='%PROCESSOR_IDENTIFIER%' , processor count= %NUMBER_OF_PROCESSORS%
-  - cd $(APPVEYOR_BUILD_FOLDER)
+  - cd %APPVEYOR_BUILD_FOLDER%
   - echo build_folder=$(APPVEYOR_BUILD_FOLDER)
   # Disable unneeded submodules for the faster build
   - git config submodule.storage/columnstore/columnstore.update none
@@ -29,8 +29,6 @@ test_script:
 
 image: Visual Studio 2019
 
-# fetch repository as zip archive
-shallow_clone: true
 
 # environment variables
 environment:
