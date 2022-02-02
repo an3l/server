@@ -41,8 +41,8 @@ SELECT @@character_set_client, @@character_set_connection, @@character_set_resul
 utf8mb3	utf8mb3	utf8mb3
 CREATE VIEW v2 AS SELECT 1;
 SHOW TABLE STATUS;
-Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
-v2	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	VIEW	NULL	NULL
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length
+v2	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	NULL	VIEW	NULL
 DROP VIEW v2;
 SET @@character_set_client= @old_character_set_client;
 SET @@character_set_connection= @old_character_set_connection;

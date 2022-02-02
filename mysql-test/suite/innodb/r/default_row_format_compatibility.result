@@ -11,8 +11,8 @@ SELECT @@innodb_file_per_table;
 1
 CREATE TABLE tab(a INT) ENGINE=InnoDB;
 SHOW TABLE STATUS LIKE 'tab';
-Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
-tab	InnoDB	#	Compact	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL			0	N
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length
+tab	InnoDB	#	Compact	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL			0
 INSERT INTO tab VALUES(1);
 INSERT INTO tab VALUES(2);
 SELECT * FROM tab;
@@ -34,8 +34,8 @@ SELECT @@innodb_default_row_format;
 compact
 CREATE TABLE tab(a INT) ENGINE=InnoDB;
 SHOW TABLE STATUS LIKE 'tab';
-Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
-tab	InnoDB	#	Compact	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL			0	N
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length
+tab	InnoDB	#	Compact	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL			0
 ALTER TABLE tab DISCARD TABLESPACE;
 call mtr.add_suppression("InnoDB: Tried to read .* bytes at offset 0");
 ALTER TABLE tab IMPORT TABLESPACE;
@@ -53,8 +53,8 @@ SELECT @@innodb_default_row_format;
 dynamic
 CREATE TABLE tab(a INT PRIMARY KEY, b VARCHAR(5000), KEY idx1(b(3070))) ENGINE= InnoDB;
 SHOW TABLE STATUS LIKE 'tab';
-Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
-tab	InnoDB	#	Dynamic	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL			0	N
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length
+tab	InnoDB	#	Dynamic	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL			0
 INSERT INTO tab(a,b) VALUES(1,'Check with max column size');
 SELECT * FROM tab;
 a	b
@@ -73,16 +73,16 @@ SELECT @@innodb_default_row_format;
 dynamic
 CREATE TABLE tab(a INT PRIMARY KEY, b VARCHAR(5000), KEY idx1(b(767))) ENGINE= InnoDB;
 SHOW TABLE STATUS LIKE 'tab';
-Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
-tab	InnoDB	#	Dynamic	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL			0	N
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length
+tab	InnoDB	#	Dynamic	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL			0
 INSERT INTO tab(a,b) VALUES(1,'Check with max column size');
 SELECT * FROM tab;
 a	b
 1	Check with max column size
 ALTER TABLE tab ROW_FORMAT=COMPACT;
 SHOW TABLE STATUS LIKE 'tab';
-Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
-tab	InnoDB	#	Compact	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL	row_format=COMPACT		0	N
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length
+tab	InnoDB	#	Compact	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL	row_format=COMPACT		0
 SELECT * FROM tab;
 a	b
 1	Check with max column size
@@ -99,7 +99,7 @@ a	b
 ALTER TABLE tab ROW_FORMAT=Dynamic;
 SET GLOBAL innodb_read_only_compressed=@save_innodb_read_only_compressed;
 SHOW TABLE STATUS LIKE 'tab';
-Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
-tab	InnoDB	#	Dynamic	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL	row_format=DYNAMIC		0	N
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length
+tab	InnoDB	#	Dynamic	#	#	#	#	#	#	NULL	#	NULL	NULL	latin1_swedish_ci	NULL	row_format=DYNAMIC		0
 DROP TABLE tab;
 SET GLOBAL innodb_default_row_format =  @row_format;
