@@ -34,7 +34,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -59,7 +58,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -84,7 +82,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -109,7 +106,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -134,7 +130,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -159,7 +154,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -184,7 +178,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -209,7 +202,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -234,7 +226,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -259,7 +250,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -284,7 +274,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -309,7 +298,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -334,7 +322,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -359,7 +346,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -384,7 +370,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -409,7 +394,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -434,7 +418,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -459,7 +442,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -484,7 +466,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -509,7 +490,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -534,7 +514,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -559,7 +538,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -584,7 +562,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -609,7 +586,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -634,7 +610,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -659,7 +634,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -684,7 +658,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -709,7 +682,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -734,7 +706,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -759,7 +730,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -784,7 +754,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -809,7 +778,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -834,7 +802,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -859,7 +826,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -884,7 +850,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -909,7 +874,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -934,7 +898,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -959,7 +922,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -984,7 +946,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1009,7 +970,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1034,7 +994,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1059,7 +1018,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1084,7 +1042,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1109,7 +1066,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 DROP   USER testuser1@localhost;
@@ -1150,7 +1106,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1175,7 +1130,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1200,7 +1154,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1225,7 +1178,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1250,7 +1202,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1275,7 +1226,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1300,7 +1250,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1325,7 +1274,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1350,7 +1298,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1375,7 +1322,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1400,7 +1346,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1425,7 +1370,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1450,7 +1394,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1475,7 +1418,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1500,7 +1442,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1525,7 +1466,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1550,7 +1490,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1575,7 +1514,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1600,7 +1538,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1625,7 +1562,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1650,7 +1586,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1675,7 +1610,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1700,7 +1634,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1725,7 +1658,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1750,7 +1682,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1775,7 +1706,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1800,7 +1730,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1825,7 +1754,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1850,7 +1778,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1875,7 +1802,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1900,7 +1826,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1925,7 +1850,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1950,7 +1874,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1975,7 +1898,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2000,7 +1922,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2025,7 +1946,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2050,7 +1970,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2075,7 +1994,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2100,7 +2018,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2125,7 +2042,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2150,7 +2066,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2175,7 +2090,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2200,7 +2114,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -2225,7 +2138,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
-TEMPORARY	Y
 user_comment	
 Separator	-----------------------------------------------------
 connection default;

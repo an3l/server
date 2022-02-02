@@ -32,7 +32,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 # Create the base table with the same name (both should be visible)
 create table test.t_temp(t int);
 insert into t_temp values (-1),(-2);
@@ -60,7 +59,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 create database my_db;
 # Create the temporary table with the same name in new DB
 create temporary table my_db.t_temp (t int);
@@ -89,7 +87,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 TABLE_CATALOG	def
 TABLE_SCHEMA	test
 TABLE_NAME	t_temp
@@ -112,7 +109,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 connection con1;
 # Create the temporary table with the same name in new connection
 create temporary table test.t_temp(t int);
@@ -145,7 +141,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 connection default;
 # Show results in default connection
 select * from  information_schema.tables where table_type='temporary';
@@ -171,7 +166,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 TABLE_CATALOG	def
 TABLE_SCHEMA	test
 TABLE_NAME	t_temp
@@ -194,7 +188,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 # Create a warning on `Create` statement if the new temporary table
 # shadows base table - note there is no warning vice versa.
 create table test.my_t (t int);
@@ -231,7 +224,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 TABLE_CATALOG	def
 TABLE_SCHEMA	my_db
 TABLE_NAME	t_temp
@@ -254,7 +246,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 TABLE_CATALOG	def
 TABLE_SCHEMA	test
 TABLE_NAME	t_temp
@@ -277,7 +268,6 @@ CHECKSUM	NULL
 CREATE_OPTIONS	
 TABLE_COMMENT	
 MAX_INDEX_LENGTH	17179868160
-TEMPORARY	Y
 drop table test.my_t;
 drop table test.my_t;
 disconnect con1;
