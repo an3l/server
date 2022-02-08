@@ -152,8 +152,10 @@ static int show_create_sequence(THD *thd, TABLE_LIST *table_list,
 static const LEX_CSTRING *view_algorithm(TABLE_LIST *table);
 
 bool get_lookup_field_values(THD *, COND *, TABLE_LIST *, LOOKUP_FIELD_VALUES *);
-void process_i_s_table_temporary_tables(THD *thd, TABLE * table, TABLE *tmp_tbl);
 
+static int get_schema_tables_record(THD *thd, TABLE_LIST *tables, TABLE *table,
+                                    bool res, const LEX_CSTRING *db_name,
+                                    const LEX_CSTRING *table_name);
 /**
   Try to lock a mutex, but give up after a short while to not cause deadlocks
 
@@ -5173,6 +5175,7 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   bool can_deadlock;
   MEM_ROOT tmp_mem_root;
   TMP_TABLE_SHARE *share_temp;
+  TABLE_LIST table_list_temp;
   DBUG_ENTER("get_all_tables");
 
   bzero(&tmp_mem_root, sizeof(tmp_mem_root));
@@ -5236,7 +5239,7 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
                   SHOW_ALLOC_BLOCK_SIZE, MY_THREAD_SPECIFIC);
 
   /* Handling session temporary tables from the backup state*/
-  if (schema_table_idx == SCH_TABLES)
+  if (schema_table_idx == SCH_TABLES || schema_table_idx == SCH_COLUMNS)
   {
     if (open_tables_state_backup.temporary_tables)
     {
@@ -5248,7 +5251,26 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
         {
           if (IS_USER_TEMP_TABLE(share_temp))
           {
-            process_i_s_table_temporary_tables(thd, table, tmp_tbl);
+            switch (schema_table_idx)
+            {
+            case SCH_TABLES:
+              bzero((char*) &table_list_temp, sizeof(TABLE_LIST));
+              table_list_temp.table= tmp_tbl;
+
+              get_schema_tables_record(thd, &table_list_temp, table,
+                                      0, &tmp_tbl->s->db, &tmp_tbl->s->table_name);
+              break;
+            case SCH_COLUMNS:
+              bzero((char*) &table_list_temp, sizeof(TABLE_LIST));
+              table_list_temp.table= tmp_tbl;
+
+              get_schema_tables_record(thd, &table_list_temp, table,
+                                      0, &tmp_tbl->s->db, &tmp_tbl->s->table_name);
+              break;
+
+            default:
+              break;
+            }
           }
         }
       }
@@ -5797,27 +5819,6 @@ err:
   }
 
   DBUG_RETURN(schema_table_store_record(thd, table));
-}
-
-
-/**
- @brief           Fill IS.table with temporary tables
- @details         The function does...
- @param[in]       table                I_S table (TABLE)
- @param[in]       db_name              db name of temporary table
- @param[in]       table_name           table name of temporary table
- @return          Operation status
-   @retval        0   - success
-   @retval        1   - failure
-*/
-void process_i_s_table_temporary_tables(THD *thd, TABLE * table, TABLE *tmp_tbl)
-{
-  TABLE_LIST table_list;
-  bzero((char*) &table_list, sizeof(TABLE_LIST));
-  table_list.table= tmp_tbl;
-
-  get_schema_tables_record(thd, &table_list, table,
-                           0, &tmp_tbl->s->db, &tmp_tbl->s->table_name);
 }
 
 
