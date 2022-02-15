@@ -38,6 +38,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -62,6 +63,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -86,6 +88,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 SHOW TABLES FROM test1;
@@ -131,6 +134,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -155,6 +159,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -179,6 +184,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 SHOW TABLES FROM test1;
