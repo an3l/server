@@ -5235,22 +5235,17 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   init_alloc_root(PSI_INSTRUMENT_ME, &tmp_mem_root, SHOW_ALLOC_BLOCK_SIZE,
                   SHOW_ALLOC_BLOCK_SIZE, MY_THREAD_SPECIFIC);
 
-  /* Handling session temporary tables from the backup state*/
-  if (schema_table_idx == SCH_TABLES)
+  /* Handling session temporary tables from the backup state */
+  if (schema_table_idx == SCH_TABLES && open_tables_state_backup.temporary_tables)
   {
-    if (open_tables_state_backup.temporary_tables)
+    All_tmp_tables_list::Iterator it(*open_tables_state_backup.temporary_tables);
+    while ((share_temp= it++))
     {
-      All_tmp_tables_list::Iterator it(*open_tables_state_backup.temporary_tables);
-      while ((share_temp= it++))
+      All_share_tables_list::Iterator it2(share_temp->all_tmp_tables);
+      while (TABLE *tmp_tbl= it2++)
       {
-        All_share_tables_list::Iterator it2(share_temp->all_tmp_tables);
-        while (TABLE *tmp_tbl= it2++)
-        {
-          if (IS_USER_TEMP_TABLE(share_temp))
-          {
-            process_i_s_table_temporary_tables(thd, table, tmp_tbl);
-          }
-        }
+        if (IS_USER_TEMP_TABLE(share_temp))
+          process_i_s_table_temporary_tables(thd, table, tmp_tbl);
       }
     }
   }
@@ -9081,7 +9076,7 @@ ST_FIELD_INFO tables_fields_info[]=
                                          NOT_NULL, "Comment",    OPEN_FRM_ONLY),
   Column("MAX_INDEX_LENGTH",ULonglong(), NULLABLE, "Max_index_length",
                                                                  OPEN_FULL_TABLE),
-  Column("TEMPORARY", Varchar(1), NULLABLE, "Temporary", OPEN_FRM_ONLY),
+  Column("TEMPORARY",       Varchar(1),  NULLABLE, "Temporary",  OPEN_FRM_ONLY),
   CEnd()
 };
 

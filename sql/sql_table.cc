@@ -11956,6 +11956,18 @@ bool Sql_cmd_create_table_like::execute(THD *thd)
          ON then send session state notification in OK packet */
       if (create_info.options & HA_LEX_CREATE_TMP_TABLE)
       {
+      // Check if temporary table shadows base table
+        if (create_table->open_type == OT_TEMPORARY_ONLY && !create_table->sequence)
+        {
+          if(ha_table_exists(thd, &create_table->db, &create_table->table_name,
+                          NULL, NULL, &create_table->db_type))
+          {
+            push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
+                                ER_TABLE_EXISTS_ERROR,
+                                ER_THD(thd, ER_TABLE_EXISTS_ERROR),
+                                create_table->table_name.str);
+          }
+        }
         thd->session_tracker.state_change.mark_as_changed(thd);
       }
       my_ok(thd);

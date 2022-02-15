@@ -17,9 +17,8 @@ create temporary table test.t_temp(t int);
 insert into t_temp values (1),(2), (3);
 
 --echo # Show results
---replace_column 15 # 16 #
 --vertical_results
-select * from  information_schema.tables where table_type='temporary';
+select table_schema, table_name, temporary from  information_schema.tables where table_type='temporary';
 
 --echo # Create the base table with the same name (both should be visible)
 # Create the base table with the same name as temporary table.
@@ -27,18 +26,16 @@ create table test.t_temp(t int);
 insert into t_temp values (-1),(-2);
 
 --echo # Show results
---replace_column 15 # 16 #
 --vertical_results
-select * from  information_schema.tables where table_type='temporary';
+select table_schema, table_name, temporary from  information_schema.tables where table_type='temporary';
 
 create database my_db;
 --echo # Create the temporary table with the same name in new DB
 create temporary table my_db.t_temp (t int);
 insert into my_db.t_temp values (-2),(-1);
 --echo # Show results
---replace_column 15 # 16 #
 --vertical_results
-select * from  information_schema.tables where table_type='temporary';
+select table_schema, table_name, temporary from  information_schema.tables where table_type='temporary';
 
 connection con1;
 
@@ -46,16 +43,14 @@ connection con1;
 create temporary table test.t_temp(t int);
 insert into t_temp values (4),(5),(6), (7);
 --echo # Show results
---replace_column 15 # 16 #
 --vertical_results
-select * from  information_schema.tables where table_type='temporary';
+select table_schema, table_name, temporary from  information_schema.tables where table_type='temporary';
 
 connection default;
 
 --echo # Show results in default connection
---replace_column 15 # 16 #
 --vertical_results
-select * from  information_schema.tables where table_type='temporary';
+select table_schema, table_name, temporary from  information_schema.tables where table_type='temporary';
 
 --echo # Create a warning on `Create` statement if the new temporary table
 --echo # shadows base table - note there is no warning vice versa.
@@ -64,9 +59,8 @@ create temporary table test.my_t (t int);
 show warnings;
 
 --echo # Show results
---replace_column 15 # 16 #
 --vertical_results
-select * from  information_schema.tables where table_type='temporary';
+select table_schema, table_name, temporary from  information_schema.tables where table_type='temporary';
 
 # First we are removing temporary table and after base table
 drop table test.my_t;
