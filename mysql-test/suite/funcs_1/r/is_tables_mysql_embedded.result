@@ -32,6 +32,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Column privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -56,6 +57,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Statistics on Columns
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -80,6 +82,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Database privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -104,6 +107,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Events
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -128,6 +132,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	User defined functions
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -152,6 +157,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	General log
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -176,6 +182,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Users and global privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -200,6 +207,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Replication slave GTID position
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -224,6 +232,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	help categories
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -248,6 +257,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	help keywords
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -272,6 +282,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	keyword-topic relation
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -296,6 +307,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	help topics
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -320,6 +332,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Statistics on Indexes
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -344,6 +357,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -368,6 +382,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -392,6 +407,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	MySQL plugins
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -416,6 +432,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Stored Procedures
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -440,6 +457,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Procedure privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -464,6 +482,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	User proxy privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -488,6 +507,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Granted roles
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -512,6 +532,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	MySQL Foreign Servers table
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -536,6 +557,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Slow log
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -560,6 +582,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Table privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -584,6 +607,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Statistics on Tables
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -608,6 +632,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Time zones
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -632,6 +657,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Leap seconds information for time zones
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -656,6 +682,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Time zone names
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -680,6 +707,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Time zone transitions
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -704,6 +732,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Time zone transition types
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -728,6 +757,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -752,6 +782,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	NULL
 user_comment	VIEW
 Separator	-----------------------------------------------------
 DROP   USER testuser1@localhost;
@@ -790,6 +821,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Column privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -814,6 +846,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Statistics on Columns
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -838,6 +871,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Database privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -862,6 +896,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Events
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -886,6 +921,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	User defined functions
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -910,6 +946,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	General log
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -934,6 +971,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Users and global privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -958,6 +996,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Replication slave GTID position
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -982,6 +1021,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	help categories
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1006,6 +1046,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	help keywords
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1030,6 +1071,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	keyword-topic relation
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1054,6 +1096,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	help topics
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1078,6 +1121,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Statistics on Indexes
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1102,6 +1146,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1126,6 +1171,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1150,6 +1196,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	MySQL plugins
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1174,6 +1221,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Stored Procedures
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1198,6 +1246,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Procedure privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1222,6 +1271,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	User proxy privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1246,6 +1296,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Granted roles
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1270,6 +1321,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	MySQL Foreign Servers table
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1294,6 +1346,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Slow log
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1318,6 +1371,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Table privileges
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1342,6 +1396,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Statistics on Tables
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1366,6 +1421,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Time zones
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1390,6 +1446,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Leap seconds information for time zones
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1414,6 +1471,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Time zone names
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1438,6 +1496,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Time zone transitions
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1462,6 +1521,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	Time zone transition types
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1486,6 +1546,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	N
 user_comment	
 Separator	-----------------------------------------------------
 TABLE_CATALOG	def
@@ -1510,6 +1571,7 @@ CHECKSUM	NULL
 CREATE_OPTIONS	#CO#
 TABLE_COMMENT	#TC#
 MAX_INDEX_LENGTH	#MIL#
+TEMPORARY	NULL
 user_comment	VIEW
 Separator	-----------------------------------------------------
 connection default;
