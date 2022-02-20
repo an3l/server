@@ -3,8 +3,6 @@
 #
 create table t1 (a int);
 create temporary table t1 AS SELECT 1;
-Warnings:
-Note	1050	Table 't1' already exists
 create temporary table t1 AS SELECT 1;
 ERROR 42S01: Table 't1' already exists
 create temporary table t1 (a int);
@@ -45,8 +43,6 @@ a	b
 5	f
 6	g
 create TEMPORARY TABLE t2 engine=heap select * from t1;
-Warnings:
-Note	1050	Table 't2' already exists
 create TEMPORARY TABLE IF NOT EXISTS t2 (a int) engine=heap;
 Warnings:
 Note	1050	Table 't2' already exists
@@ -69,8 +65,6 @@ c	d
 3	b
 drop table t2;
 create temporary table t1 select *,2 as "e" from t1;
-Warnings:
-Note	1050	Table 't1' already exists
 select * from t1;
 c	d	e
 1		2
