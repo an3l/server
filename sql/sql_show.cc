@@ -9081,7 +9081,7 @@ ST_FIELD_INFO tables_fields_info[]=
                                          NOT_NULL, "Comment",    OPEN_FRM_ONLY),
   Column("MAX_INDEX_LENGTH",ULonglong(), NULLABLE, "Max_index_length",
                                                                  OPEN_FULL_TABLE),
-  Column("TEMPORARY", Varchar(1), NULLABLE, "Temporary", OPEN_FRM_ONLY),
+  Column("TEMPORARY",       Varchar(1),  NULLABLE, "Temporary",  OPEN_FRM_ONLY),
   CEnd()
 };
 
