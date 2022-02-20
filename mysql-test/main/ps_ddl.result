@@ -511,8 +511,6 @@ call p_verify_reprepare_count(0);
 SUCCESS
 
 create temporary table t1 AS SELECT 1;
-Warnings:
-Note	1050	Table 't1' already exists
 execute stmt;
 count(*)
 1
@@ -597,8 +595,6 @@ deallocate prepare stmt;
 #            temporary table disappears
 create table t1 (a int);
 create temporary table t1 as select 1 as a;
-Warnings:
-Note	1050	Table 't1' already exists
 prepare stmt from "select count(*) from t1";
 execute stmt;
 count(*)
@@ -2041,18 +2037,13 @@ create table t1 (a int);
 insert into t1 (a) values (1);
 prepare stmt from "create temporary table if not exists t2 as select * from t1";
 execute stmt;
-Warnings:
-Note	1050	Table 't2' already exists
 drop table t2;
 execute stmt;
-Warnings:
-Note	1050	Table 't2' already exists
 call p_verify_reprepare_count(0);
 SUCCESS
 
 execute stmt;
 Warnings:
-Note	1050	Table 't2' already exists
 Note	1050	Table 't2' already exists
 call p_verify_reprepare_count(1);
 SUCCESS
@@ -2062,7 +2053,6 @@ a
 1
 execute stmt;
 Warnings:
-Note	1050	Table 't2' already exists
 Note	1050	Table 't2' already exists
 call p_verify_reprepare_count(0);
 SUCCESS
@@ -2077,7 +2067,6 @@ Note	1050	Table 't2' already exists
 execute stmt;
 Warnings:
 Note	1050	Table 't2' already exists
-Note	1050	Table 't2' already exists
 select * from t2;
 a
 call p_verify_reprepare_count(1);
@@ -2088,13 +2077,11 @@ create table t1 (x int);
 execute stmt;
 Warnings:
 Note	1050	Table 't2' already exists
-Note	1050	Table 't2' already exists
 call p_verify_reprepare_count(1);
 SUCCESS
 
 execute stmt;
 Warnings:
-Note	1050	Table 't2' already exists
 Note	1050	Table 't2' already exists
 call p_verify_reprepare_count(0);
 SUCCESS

@@ -22,11 +22,8 @@ show tables;
 Tables_in_test
 t
 create temporary table t(t int);
-Warnings:
-Note	1050	Table 't' already exists
 show warnings;
 Level	Code	Message
-Note	1050	Table 't' already exists
 show create table t;
 Table	Create Table
 t	CREATE TEMPORARY TABLE `t` (
