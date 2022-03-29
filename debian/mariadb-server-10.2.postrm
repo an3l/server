@@ -11,6 +11,20 @@ MYADMIN="/usr/bin/mysqladmin --defaults-file=/etc/mysql/debian.cnf"
 # do it himself. No database directories should be removed while the server
 # is running!
 stop_server() {
+  set -- $(pgrep -x "mysqld|mariadbd")
+  host_pid=0
+  for mysqld_pid in "$@"; do
+    # If num of columns is 2 that means it is a host PID, if 2+ it is a container PID
+    num_columns=$(cat /proc/$mysqld_pid/status |grep NSpid|wc -w)
+    if [ $num_columns -eq 2 ]; then
+      echo "I am host PID"
+      host_pid=$mysqld_pid
+    else
+      echo "I am container PID/ what to do?"
+    fi
+  done
+  # Make sure that if processes doesn't exist that finish with function
+  if ! $host_pid ; then return; fi
   set +e
   if [ -x /usr/sbin/invoke-rc.d ]; then
     invoke-rc.d mysql stop
