@@ -5875,14 +5875,14 @@ err:
 
 /**
  @brief           Fill IS.table with temporary tables
+ @param[in]       thd                  thread handle
  @param[in]       table                I_S table (TABLE)
- @param[in]       db_name              db name of temporary table
- @param[in]       table_name           table name of temporary table
+ @param[in]       tmp_tbl              temporary table
  @return          Operation status
    @retval        0   - success
    @retval        1   - failure
 */
-void process_i_s_table_temporary_tables(THD *thd, TABLE * table, TABLE *tmp_tbl)
+void process_i_s_table_temporary_tables(THD *thd, TABLE *table, TABLE *tmp_tbl)
 {
   TABLE_LIST table_list;
   bzero((char*) &table_list, sizeof(TABLE_LIST));

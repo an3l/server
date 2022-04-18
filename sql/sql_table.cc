@@ -4344,23 +4344,28 @@ int create_table_impl(THD *thd,
     ddl_log_state_create= 0;
     ddl_log_state_rm= 0;
 
-    if (ha_table_exists(thd, &orig_db, &orig_table_name, NULL, NULL, NULL))
+    if (create_table_mode != C_ALTER_TABLE_FRM_ONLY &&
+        create_table_mode != C_ALTER_TABLE)
     {
+      if (ha_table_exists(thd, &orig_db, &orig_table_name, NULL, NULL, NULL))
+      {
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
-      TABLE_LIST table_acl_check;
-      bzero((char*) &table_acl_check, sizeof(table_acl_check));
-      table_acl_check.db= orig_db;
-      table_acl_check.table_name= orig_table_name;
-      if (!check_table_access(thd, TABLE_ACLS, &table_acl_check, true, 1, true))
-        warning_given= 1;
+        TABLE_LIST table_acl_check;
+        bzero((char*) &table_acl_check, sizeof(table_acl_check));
+        table_acl_check.db= orig_db;
+        table_acl_check.table_name= orig_table_name;
+        if (!check_table_access(thd, TABLE_ACLS, &table_acl_check, true, 1, true))
+          warning_given= 1;
 #else
-      warning_given=1;
+        warning_given=1;
 #endif /* NO_EMBEDDED_ACCESS_CHECKS */
-      if (warning_given)
+
+        if (warning_given)
           push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
                               ER_TABLE_EXISTS_ERROR,
                               ER_THD(thd, ER_TABLE_EXISTS_ERROR),
                               orig_table_name.str);
+      }
     }
   }
 
