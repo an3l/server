@@ -14,3 +14,5 @@
 -- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
 SET @@session.sql_mode = @old_sql_mode;
+SET @@default_tmp_storage_engine = @@GLOBAL.default_tmp_storage_engine;
+select @@default_tmp_storage_engine;

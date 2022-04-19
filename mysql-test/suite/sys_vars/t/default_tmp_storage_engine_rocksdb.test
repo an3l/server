@@ -84,3 +84,12 @@ SHOW CREATE TABLE t1;
 DROP TABLE t1, t;
 
 SET GLOBAL default_tmp_storage_engine=NULL;
+
+--echo #
+--echo # MDEV-28344: sys.ps_setup_save and dependent procedures fail
+--echo #             with ER_ILLEGAL_HA_CREATE_OPTION
+--error ER_ILLEGAL_HA_CREATE_OPTION
+SET default_tmp_storage_engine = performance_schema;
+
+# Test sysschema
+call sys.ps_setup_save(0);
