@@ -10,7 +10,8 @@
 -- source include/not_embedded.inc
 # Create a couple of tables and a view
 CREATE TABLE t1 (t1_id int PRIMARY KEY, t1_val varchar(10));
-CREATE TABLE t2 (t2_id int PRIMARY KEY, t1_id int, t2_val int, INDEX (t1_id));
+CREATE TABLE 
+ (t2_id int PRIMARY KEY, t1_id int, t2_val int, INDEX (t1_id));
 CREATE TABLE `is` (t1_id int PRIMARY KEY, t1_val varchar(10));
 CREATE TABLE `ab``c` (t1_id int PRIMARY KEY, t1_val varchar(10));
 CREATE SQL SECURITY INVOKER VIEW myview AS SELECT * FROM t1 NATURAL JOIN t2;
@@ -50,3 +51,23 @@ DROP TABLE test.t1;
 DROP TABLE test.t2;
 DROP TABLE `is`;
 DROP TABLE `ab``c`;
+
+--echo #
+--echo # MDEV-28342: sys.create_synonym_db fails
+--echo #             when a temporary table masks a base table
+--echo #
+
+create database db;
+use db;
+create table a(a int);
+create table t (b int);
+create table b(a int);
+create temporary table b (a int);
+--error ER_SIGNAL_EXCEPTION
+call sys.create_synonym_db('db','db_copy');
+
+use db_copy;
+show tables;
+
+drop database db;
+drop database db_copy;

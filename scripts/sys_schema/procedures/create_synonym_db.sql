@@ -97,6 +97,8 @@ BEGIN
     DECLARE v_db_err_msg TEXT;
     DECLARE v_table VARCHAR(64);
     DECLARE v_views_created INT DEFAULT 0;
+    DECLARE v_temp_table TEXT;
+    DECLARE v_error BOOLEAN DEFAULT FALSE;
 
     DECLARE db_doesnt_exist CONDITION FOR SQLSTATE '42000';
     DECLARE db_name_exists CONDITION FOR SQLSTATE 'HY000';
@@ -107,6 +109,8 @@ BEGIN
          WHERE TABLE_SCHEMA = in_db_name;
 
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = TRUE;
+    DECLARE CONTINUE HANDLER FOR 1050 SET v_error = TRUE;
+    DECLARE CONTINUE HANDLER FOR 1146 SET v_error = TRUE;
 
     -- Check if the source database exists
     SELECT SCHEMA_NAME INTO v_db_name_check
@@ -144,6 +148,27 @@ BEGIN
             LEAVE c_table_names;
         END IF;
 
+        SET @test_temporary_exists = CONCAT(
+            'CREATE TEMPORARY TABLE ',
+            sys.quote_identifier(in_db_name),
+            '`.`',
+            sys.quote_identifier(v_table),
+            '(id INT PRIMARY KEY)');
+        PREPARE test_temporary_exists FROM @test_temporary_exists;
+        EXECUTE test_temporary_exists;
+        DEALLOCATE PREPARE test_temporary_exists;
+        IF (NOT v_error) THEN
+            SET v_temp_table = CONCAT(
+                'Table',
+                sys.quote_identifier(in_db_name),
+                '.',
+                sys.quote_identifier(v_table),
+                'shadows base table. View cannot be created! Terminating!');
+            SIGNAL SQLSTATE 'HY000'
+                SET MESSAGE_TEXT = v_temp_table;
+            LEAVE c_table_names;
+        END IF;
+
         SET @create_view_stmt = CONCAT(
             'CREATE SQL SECURITY INVOKER VIEW ',
             sys.quote_identifier(in_synonym),
@@ -167,7 +192,6 @@ BEGIN
         IF(v_views_created != 1, 's', ''), ' in the ',
         sys.quote_identifier(in_synonym), ' database'
     ) AS summary;
-
 END$$
 
 DELIMITER ;
