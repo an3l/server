@@ -151,8 +151,10 @@ static int show_create_sequence(THD *thd, TABLE_LIST *table_list,
 
 static const LEX_CSTRING *view_algorithm(TABLE_LIST *table);
 
-bool get_lookup_field_values(THD *, COND *, TABLE_LIST *, LOOKUP_FIELD_VALUES *);
-void process_i_s_table_temporary_tables(THD *thd, TABLE * table, TABLE *tmp_tbl);
+bool get_lookup_field_values(THD *, COND *, TABLE_LIST *,
+                             LOOKUP_FIELD_VALUES *);
+void process_i_s_table_temporary_tables(THD *thd, TABLE * table,
+                                        TABLE *tmp_tbl);
 
 /**
   Try to lock a mutex, but give up after a short while to not cause deadlocks
@@ -5303,13 +5305,37 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   {
     All_tmp_tables_list::Iterator it(*open_tables_state_backup.temporary_tables);
     TMP_TABLE_SHARE *share_temp;
+    const char *wild= thd->lex->wild ? thd->lex->wild->ptr() : NullS;
     while ((share_temp= it++))
     {
       All_share_tables_list::Iterator it2(share_temp->all_tmp_tables);
       while (TABLE *tmp_tbl= it2++)
       {
         if (IS_USER_TEMP_TABLE(share_temp))
-          process_i_s_table_temporary_tables(thd, table, tmp_tbl);
+        {
+          for (size_t i=0; i < db_names.elements(); i++)
+          {
+            LEX_CSTRING *db_name= db_names.at(i);
+            LEX_CSTRING *table_name= &share_temp->table_name;
+
+            if (!my_strcasecmp(system_charset_info, db_name->str,
+                               share_temp->db.str))
+            {
+              restore_record(table, s->default_values);
+              table->field[schema_table->idx_field1]->
+                store(db_name->str, db_name->length, system_charset_info);
+              table->field[schema_table->idx_field2]->
+                store(table_name->str, table_name->length,
+                      system_charset_info);
+              if ((!partial_cond || partial_cond->val_int()) &&
+                  (!wild || !wild_compare(table_name->str, wild, 0)))
+              {
+                process_i_s_table_temporary_tables(thd, table, tmp_tbl);
+                break;
+              }
+            }
+          }
+        }
       }
     }
   }
