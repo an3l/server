@@ -108,3 +108,38 @@ Message	Table 't' already exists
 alter table t add c int;
 drop temporary table t;
 drop table t;
+#
+# MDEV-28334: SHOW TABLE STATUS shows all temporary tables
+#             ignoring database and conditions
+#
+create temporary table test.tmp_in_test (a int);
+create table test.base_in_test (t int);
+create table test.tmp_in_test (t int);
+create temporary table test.tmp_innodb_in_test (a int) engine=InnoDB;
+create database mysqltest;
+use mysqltest;
+show table status;
+show table status in mysqltest;
+show table status in test;
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
+tmp_innodb_in_test	InnoDB	10	Dynamic	0	0	16384	0	0	6291456	NULL	#	#	#	latin1_swedish_ci	NULL			0	Y
+tmp_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	Y
+base_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	N
+tmp_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	N
+show table status from test;
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
+tmp_innodb_in_test	InnoDB	10	Dynamic	0	0	16384	0	0	6291456	NULL	#	#	#	latin1_swedish_ci	NULL			0	Y
+tmp_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	Y
+base_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	N
+tmp_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	N
+# check that InnoDB temporary table 
+# has a NULL value for `Create time` column (MDEV-28333)
+select create_time from information_schema.tables where table_name='tmp_innodb_in_test';
+create_time
+NULL
+show table status like 'nonexisting';
+Name	Engine	Version	Row_format	Rows	Avg_row_length	Data_length	Max_data_length	Index_length	Data_free	Auto_increment	Create_time	Update_time	Check_time	Collation	Checksum	Create_options	Comment	Max_index_length	Temporary
+drop database mysqltest;
+drop table test.base_in_test;
+drop table test.tmp_in_test;
+drop table test.tmp_in_test;
