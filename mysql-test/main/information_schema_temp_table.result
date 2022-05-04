@@ -132,7 +132,7 @@ tmp_innodb_in_test	InnoDB	10	Dynamic	0	0	16384	0	0	6291456	NULL	#	#	#	latin1_swe
 tmp_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	Y
 base_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	N
 tmp_in_test	MyISAM	10	Fixed	0	0	0	1970324836974591	1024	0	NULL	#	#	#	latin1_swedish_ci	NULL			17179868160	N
-# check that InnoDB temporary table 
+# check that InnoDB temporary table
 # has a NULL value for `Create time` column (MDEV-28333)
 select create_time from information_schema.tables where table_name='tmp_innodb_in_test';
 create_time

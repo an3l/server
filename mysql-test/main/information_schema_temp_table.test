@@ -103,8 +103,6 @@ alter table t add c int;
 # Cleanup
 drop temporary table t;
 drop table t;
-<<<<<<< HEAD
-=======
 
 --echo #
 --echo # MDEV-28334: SHOW TABLE STATUS shows all temporary tables
@@ -152,4 +150,3 @@ drop table test.base_in_test;
 # We need first to drop temporary table that shadows the base table
 drop table test.tmp_in_test;
 drop table test.tmp_in_test;
->>>>>>> cd7ca2995ba (MDEV-28334: SHOW TABLE STATUS shows all temporary tables ignoring database and conditions)
