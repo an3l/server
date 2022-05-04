@@ -61,3 +61,65 @@ SELECT @exists;
 TEMPORARY
 DROP TEMPORARY TABLE t1;
 DROP TABLE t1;
+#
+# MDEV-28335: TABLE_TYPE for temporary sequences 
+#             is the same as for permanent ones
+# 
+CREATE TEMPORARY SEQUENCE t1;
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+SEQUENCE
+CREATE TABLE t1 (id INT PRIMARY KEY);
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+TEMPORARY
+CREATE TEMPORARY TABLE t1 (id INT PRIMARY KEY);
+ERROR 42S01: Table 't1' already exists
+DROP TABLE t1;
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+BASE TABLE
+CREATE SEQUENCE t1;
+ERROR 42S01: Table 't1' already exists
+CREATE TEMPORARY SEQUENCE t1;
+Warnings:
+Note	1050	Table 't1' already exists
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+TEMPORARY
+DROP TABLE t1;
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+BASE TABLE
+DROP TABLE t1;
+CREATE SEQUENCE t1;
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+SEQUENCE
+CREATE TEMPORARY TABLE t1(t int);
+Warnings:
+Note	1050	Table 't1' already exists
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+TEMPORARY
+DROP TABLE t1;
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+SEQUENCE
+CREATE TEMPORARY SEQUENCE t1;
+Warnings:
+Note	1050	Table 't1' already exists
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+@exists
+TEMPORARY
+DROP TABLE t1;
+DROP TABLE t1;

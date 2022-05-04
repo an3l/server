@@ -64,3 +64,62 @@ SELECT @exists;
 
 DROP TEMPORARY TABLE t1;
 DROP TABLE t1;
+
+--echo #
+--echo # MDEV-28335: TABLE_TYPE for temporary sequences 
+--echo #             is the same as for permanent ones
+--echo # 
+
+CREATE TEMPORARY SEQUENCE t1;
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+# Verify that returned type is temporary again
+CREATE TABLE t1 (id INT PRIMARY KEY);
+CALL sys.table_exists('test', 't1', @exists);
+# Before was a sequence, now should be temporary
+SELECT @exists;
+# It is not possible to create temporary table
+--error ER_TABLE_EXISTS_ERROR
+CREATE TEMPORARY TABLE t1 (id INT PRIMARY KEY);
+# This will drop temporary sequence
+DROP TABLE t1;
+CALL sys.table_exists('test', 't1', @exists);
+# This will lead to base table
+SELECT @exists;
+# It is not possible to create a sequence over the base table
+--error ER_TABLE_EXISTS_ERROR
+CREATE SEQUENCE t1;
+# Let's test with temporary sequence instead
+CREATE TEMPORARY SEQUENCE t1;
+CALL sys.table_exists('test', 't1', @exists);
+# Will return temporary as expected
+SELECT @exists;
+# Again droping the temporary sequence
+DROP TABLE t1;
+# Will lead to the base table
+CALL sys.table_exists('test', 't1', @exists);
+SELECT @exists;
+# Drop base table
+DROP TABLE t1;
+CREATE SEQUENCE t1;
+CALL sys.table_exists('test', 't1', @exists);
+# Should be a sequence
+SELECT @exists;
+# Create an temporary table
+CREATE TEMPORARY TABLE t1(t int);
+CALL sys.table_exists('test', 't1', @exists);
+# Should shadow an sequence with temporary
+SELECT @exists;
+# Drop temporary table
+DROP TABLE t1;
+CALL sys.table_exists('test', 't1', @exists);
+# Should again show the sequence
+SELECT @exists;
+CREATE TEMPORARY SEQUENCE t1;
+CALL sys.table_exists('test', 't1', @exists);
+# Should shadow an sequence with temporary
+SELECT @exists;
+# Drop temporary sequence
+DROP TABLE t1;
+# Drop an sequence
+DROP TABLE t1;
