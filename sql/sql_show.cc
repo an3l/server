@@ -4800,6 +4800,11 @@ end:
   @param[in]      table                    TABLE struct for I_S table
   @param[in]      db_name                  database name
   @param[in]      table_name               table name
+  @param[in]      check_temp               check for temporary tables
+                                           (option added because in the case when
+                                           temporary table has the same name of
+                                           base table we don't want to have 2 records
+                                           with the same table_type)
 
   @return         Operation status
     @retval       0           success
@@ -4808,7 +4813,8 @@ end:
 
 static int fill_schema_table_names(THD *thd, TABLE_LIST *tables,
                                    LEX_CSTRING *db_name,
-                                   LEX_CSTRING *table_name)
+                                   LEX_CSTRING *table_name,
+                                   bool check_temp=false)
 {
   TABLE *table= tables->table;
   if (db_name == &INFORMATION_SCHEMA_NAME)
@@ -4823,7 +4829,7 @@ static int fill_schema_table_names(THD *thd, TABLE_LIST *tables,
     bool is_sequence;
 
     if (ha_table_exists(thd, db_name, table_name, NULL, NULL,
-                        &hton, &is_sequence))
+                        &hton, &is_sequence) && !check_temp)
     {
       if (hton == view_pseudo_hton)
         table->field[3]->store(STRING_WITH_LEN("VIEW"), cs);
@@ -4833,7 +4839,12 @@ static int fill_schema_table_names(THD *thd, TABLE_LIST *tables,
         table->field[3]->store(STRING_WITH_LEN("BASE TABLE"), cs);
     }
     else
-      table->field[3]->store(STRING_WITH_LEN("ERROR"), cs);
+    {
+      if (table->s && IS_USER_TEMP_TABLE(table->s))
+        table->field[3]->store(STRING_WITH_LEN("TEMPORARY TABLE"), cs);
+      else
+        table->field[3]->store(STRING_WITH_LEN("ERROR"), cs);
+    }
 
     if (unlikely(thd->is_error() &&
                  thd->get_stmt_da()->sql_errno() == ER_NO_SUCH_TABLE))
@@ -5300,8 +5311,11 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
   init_alloc_root(PSI_INSTRUMENT_ME, &tmp_mem_root, SHOW_ALLOC_BLOCK_SIZE,
                   SHOW_ALLOC_BLOCK_SIZE, MY_THREAD_SPECIFIC);
 
-  /* Handling session temporary tables from the backup state */
-  if (schema_table_idx == SCH_TABLES && open_tables_state_backup.temporary_tables)
+  /* Handling session temporary tables from the backup state for table IS.tables
+     and SHOW TABLES commands.
+  */
+  if ((schema_table_idx == SCH_TABLES || schema_table_idx == SCH_TABLE_NAMES) && \
+      open_tables_state_backup.temporary_tables)
   {
     All_tmp_tables_list::Iterator it(*open_tables_state_backup.temporary_tables);
     TMP_TABLE_SHARE *share_temp;
@@ -5330,7 +5344,11 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
               if ((!partial_cond || partial_cond->val_int()) &&
                   (!wild || !wild_compare(table_name->str, wild, 0)))
               {
-                process_i_s_table_temporary_tables(thd, table, tmp_tbl);
+                if (schema_table_idx == SCH_TABLE_NAMES)
+                  fill_schema_table_names(thd, tables, &tmp_tbl->s->db,
+                                          &tmp_tbl->s->table_name, true);
+                else
+                  process_i_s_table_temporary_tables(thd, table, tmp_tbl);
                 break;
               }
             }
@@ -5913,7 +5931,6 @@ void process_i_s_table_temporary_tables(THD *thd, TABLE *table, TABLE *tmp_tbl)
   TABLE_LIST table_list;
   bzero((char*) &table_list, sizeof(TABLE_LIST));
   table_list.table= tmp_tbl;
-
   get_schema_tables_record(thd, &table_list, table,
                            0, &tmp_tbl->s->db, &tmp_tbl->s->table_name);
 }
