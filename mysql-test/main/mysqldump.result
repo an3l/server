@@ -5484,6 +5484,8 @@ Warnings:
 Warning	1105	Event scheduler is switched off, use SET GLOBAL event_scheduler=ON to enable it.
 SHOW TABLES FROM bug25717383;
 Tables_in_bug25717383
+temp
+one
 tab
 one
 view
@@ -5505,6 +5507,8 @@ proc
 one
 SHOW TABLES FROM bug25717383;
 Tables_in_bug25717383
+temp
+one
 tab
 one
 view
