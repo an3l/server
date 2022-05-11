@@ -8,6 +8,7 @@ Warnings:
 Note	1050	Table 't2' already exists
 SHOW TABLES;
 Tables_in_test
+t2
 t1
 t2
 connection slave;
@@ -32,6 +33,7 @@ Warnings:
 Note	1050	Table 't2' already exists
 SHOW TABLES;
 Tables_in_test
+t2
 t1
 t2
 connection slave;
