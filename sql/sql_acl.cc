@@ -6497,11 +6497,15 @@ int mysql_table_grant(THD *thd, TABLE_LIST *table_list,
       if (table_list->grant.want_privilege)
       {
         char command[128];
+        String str;
         get_privilege_desc(command, sizeof(command),
                            table_list->grant.want_privilege);
+        str.append(table_list->get_db_name());
+        str.append('.');
+        str.append(table_list->alias.str);
         my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0),
                  command, thd->security_ctx->priv_user,
-                 thd->security_ctx->host_or_ip, table_list->alias.str);
+                 thd->security_ctx->host_or_ip, str.ptr());
         DBUG_RETURN(-1);
       }
     }
@@ -7762,11 +7766,15 @@ err:
     get_privilege_desc(command, sizeof(command), want_access);
     status_var_increment(thd->status_var.access_denied_errors);
 
+    String str;
+    str.append(tl->get_db_name());
+    str.append('.');
+    str.append(tl->get_table_name());
     my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0),
              command,
              sctx->priv_user,
              sctx->host_or_ip,
-             tl ? tl->get_table_name() : "unknown");
+             tl ? str.ptr() : "unknown");
   }
   DBUG_RETURN(TRUE);
 }
@@ -8034,9 +8042,15 @@ err:
     privilege to see all columns.
   */
   if (using_column_privileges)
+  {
+    String str;
+    str.append(db_name);
+    str.append('.');
+    str.append(table_name);
     my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0),
              command, sctx->priv_user,
-             sctx->host_or_ip, table_name);
+             sctx->host_or_ip, str.ptr());
+  }
   else
     my_error(ER_COLUMNACCESS_DENIED_ERROR, MYF(0),
              command,

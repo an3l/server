@@ -300,9 +300,13 @@ bool create_view_precheck(THD *thd, TABLE_LIST *tables, TABLE_LIST *view,
       */
       if (check_some_access(thd, VIEW_ANY_ACL, tbl))
       {
+        String str;
+        str.append(tbl->get_db_name());
+        str.append('.');
+        str.append(tbl->get_table_name());
         my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0),
                  "ANY", thd->security_ctx->priv_user,
-                 thd->security_ctx->priv_host, tbl->table_name.str);
+                 thd->security_ctx->priv_host, str.ptr());
         goto err;
       }
       /*

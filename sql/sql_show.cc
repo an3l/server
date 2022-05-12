@@ -1168,11 +1168,15 @@ public:
   {
     if (!m_view_access_denied_message_ptr)
     {
+      String str;
+      str.append(m_top_view->get_db_name());    
+      str.append('.');
+      str.append(m_top_view->get_table_name());
       m_view_access_denied_message_ptr= m_view_access_denied_message;
       my_snprintf(m_view_access_denied_message, MYSQL_ERRMSG_SIZE,
                   ER_THD(thd, ER_TABLEACCESS_DENIED_ERROR), "SHOW VIEW",
                   m_sctx->priv_user,
-                  m_sctx->host_or_ip, m_top_view->get_table_name());
+                  m_sctx->host_or_ip, str.ptr());
     }
     return m_view_access_denied_message_ptr;
   }
@@ -1261,10 +1265,14 @@ mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
   {
     if (check_table_access(thd, SELECT_ACL, table_list, FALSE, 1, FALSE))
     {
+      String str;
+      str.append(table_list->get_db_name());
+      str.append('.');
+      str.append(table_list->alias.str);
       DBUG_PRINT("debug", ("check_table_access failed"));
       my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0),
               "SHOW", thd->security_ctx->priv_user,
-              thd->security_ctx->host_or_ip, table_list->alias.str);
+              thd->security_ctx->host_or_ip, str.ptr());
       goto exit;
     }
     DBUG_PRINT("debug", ("check_table_access succeeded"));
@@ -1291,9 +1299,13 @@ mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
     if (check_some_access(thd, SHOW_CREATE_TABLE_ACLS, table_list) ||
         (table_list->grant.privilege & SHOW_CREATE_TABLE_ACLS) == 0)
     {
+      String str;
+      str.append(table_list->db.str);
+      str.append('.');
+      str.append(table_list->alias.str);
       my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0),
               "SHOW", thd->security_ctx->priv_user,
-              thd->security_ctx->host_or_ip, table_list->alias.str);
+              thd->security_ctx->host_or_ip, str.ptr());
       goto exit;
     }
   }

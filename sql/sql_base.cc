@@ -8102,18 +8102,23 @@ insert_fields(THD *thd, Name_resolution_context *context, const char *db_name,
         DBUG_ASSERT(item->type() == Item::FIELD_ITEM);
         Item_field *fld= (Item_field*) item;
         const char *field_table_name= field_iterator.get_table_name();
+        const char *field_db_name= field_iterator.get_db_name();
 
         if (!tables->schema_table && 
             !(fld->have_privileges=
               (get_column_grant(thd, field_iterator.grant(),
-                                field_iterator.get_db_name(),
+                                field_db_name,
                                 field_table_name, fld->field_name.str) &
                VIEW_ANY_ACL)))
         {
+          String str;
+          str.append(field_db_name);
+          str.append('.');
+          str.append(field_table_name);
           my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0), "ANY",
                    thd->security_ctx->priv_user,
                    thd->security_ctx->host_or_ip,
-                   field_table_name);
+                   str.ptr());
           DBUG_RETURN(TRUE);
         }
       }

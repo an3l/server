@@ -1834,10 +1834,13 @@ sp_head::execute_trigger(THD *thd,
   {
     char priv_desc[128];
     get_privilege_desc(priv_desc, sizeof(priv_desc), TRIGGER_ACL);
-
+    String str;
+    str.append(db_name->str);
+    str.append('.');
+    str.append(table_name->str);
     my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0), priv_desc,
              thd->security_ctx->priv_user, thd->security_ctx->host_or_ip,
-             table_name->str);
+             str.ptr());
 
     m_security_ctx.restore_security_context(thd, save_ctx);
     DBUG_RETURN(TRUE);

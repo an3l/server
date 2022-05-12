@@ -4294,7 +4294,7 @@ mysql_execute_command(THD *thd)
         effecting all columns in the table).
         SHOW CREATE VIEW require the SHOW_VIEW and SELECT ACLs on the table
         level.
-        NOTE: SHOW_VIEW ACL is checked when the view is created.
+        NOTE: SHOW_VIEW ACL is checked when the view is created for pre 5.0.1.
       */
 
       DBUG_PRINT("debug", ("lex->only_view: %d, table: %s.%s",
@@ -7236,6 +7236,7 @@ bool check_fk_parent_table_access(THD *thd,
       if (check_some_access(thd, privileges, &parent_table) ||
           parent_table.grant.want_privilege)
       {
+        String str;
         if (is_qualified_table_name)
         {
           const size_t qualified_table_name_len= NAME_LEN + 1 + NAME_LEN + 1;
@@ -7245,12 +7246,14 @@ bool check_fk_parent_table_access(THD *thd,
                       db_name.str, table_name.str);
           table_name.str= qualified_table_name;
         }
-
+        str.append(db_name.str);
+        str.append('.');
+        str.append(table_name.str);
         my_error(ER_TABLEACCESS_DENIED_ERROR, MYF(0),
                  "REFERENCES",
                  thd->security_ctx->priv_user,
                  thd->security_ctx->host_or_ip,
-                 table_name.str);
+                 str.ptr());
 
         return true;
       }
