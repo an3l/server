@@ -135,4 +135,54 @@ SHOW GRANTS FOR 'test-user';
 DROP ROLE `r``o'l"e`;
 DROP USER 'test-user';
 
+--echo #
+--echo # MDEV-28455: CREATE TEMPORARY TABLES privilege
+--echo #            is insufficient for SHOW COLUMNS
+--echo #
+
+create database db;
+create user foo@localhost;
+create user bar@localhost;
+create user buz@localhost;
+grant create temporary tables on db.* to foo@localhost;
+grant create temporary tables on db.* to bar@localhost;
+
+--connect (con1,localhost,foo,,db)
+create temporary table tmp (a int, key(a));
+show index in tmp;
+show columns in tmp;
+show full columns in tmp;
+--echo # we don't expect to show temporary tables in information_schema.columns
+select * from information_schema.columns where table_schema='db';
+
+--connect (con2,localhost,bar,,db)
+# User doesn't have `select` privilege on table
+--error ER_TABLEACCESS_DENIED_ERROR
+show full columns in tmp;
+
+--connection default
+grant select on db.* to bar@localhost;
+
+--disconnect con2
+
+--connect (con2,localhost,bar,,db)
+# Table doesn't exist for this session
+show grants for current_user;
+--error ER_NO_SUCH_TABLE
+show full columns in tmp;
+
+--connect (con3,localhost,buz,,)
+--error ER_TABLEACCESS_DENIED_ERROR
+show columns in db.tmp;
+
+--connection default
+--disconnect con1
+--disconnect con2
+--disconnect con3
+# Cleanup
+drop database db;
+drop user foo@localhost;
+drop user bar@localhost;
+drop user buz@localhost;
+
 --echo # End of 10.3 tests
