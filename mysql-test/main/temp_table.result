@@ -60,8 +60,6 @@ a	b
 5	f
 6	g
 alter table t2 add primary key (a,b);
-Warnings:
-Note	1050	Table 't2' already exists
 drop table t1,t2;
 select * from t1;
 c	d

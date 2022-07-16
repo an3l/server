@@ -20,7 +20,6 @@ test.t1	check	status	OK
 ALTER TABLE t1 CHANGE COLUMN IF EXISTS x x INT;
 Warnings:
 Note	1054	Unknown column 'x' in 't1'
-Note	1050	Table 't1' already exists
 ALTER TABLE t1;
 DROP TEMPORARY TABLE t1;
 DROP TABLE t1;
