@@ -5417,6 +5417,7 @@ bool Sys_var_rpl_filter::set_filter_value(const char *value, Master_info *mi)
   /* Proctect against other threads */
   mysql_mutex_lock(&LOCK_active_mi);
   switch (opt_id) {
+  case OPT_REPLICATE_REWRITE_DB:
   case OPT_REPLICATE_DO_DB:
     status= rpl_filter->set_do_db(value);
     break;
@@ -5466,6 +5467,7 @@ Sys_var_rpl_filter::global_value_ptr(THD *thd,
 
   mysql_mutex_lock(&LOCK_active_mi);
   switch (opt_id) {
+  case OPT_REPLICATE_REWRITE_DB:
   case OPT_REPLICATE_DO_DB:
     rpl_filter->get_do_db(&tmp);
     break;
@@ -5504,6 +5506,11 @@ static Sys_var_rpl_filter Sys_replicate_do_db(
        "mentioned tables in the query. For row-based replication, the "
        "actual names of table(s) being updated are checked.",
        PRIV_SET_SYSTEM_GLOBAL_VAR_REPLICATE_DO_DB);
+
+static Sys_var_rpl_filter Sys_replicate_rewrite_db(
+       "replicate_rewrite_db", ,
+       "To be defined ... ",
+       PRIV_SET_SYSTEM_GLOBAL_VAR_REPLICATE_REWRITE_DB);
 
 static Sys_var_rpl_filter Sys_replicate_do_table(
        "replicate_do_table", OPT_REPLICATE_DO_TABLE,
