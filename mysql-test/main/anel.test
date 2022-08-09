@@ -1,0 +1,8 @@
+SET @save_replicate_rewrite_db = @@GLOBAL.replicate_rewrite_db;
+SELECT @save_replicate_rewrite_db;
+
+SET @@GLOBAL.replicate_rewrite_db = @save_replicate_rewrite_db;
+SELECT @@GLOBAL.replicate_rewrite_db;
+
+--echo # Cleanup
+SET @@GLOBAL.replicate_rewrite_db = @save_replicate_rewrite_db;
