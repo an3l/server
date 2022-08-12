@@ -5418,6 +5418,7 @@ bool Sys_var_rpl_filter::set_filter_value(const char *value, Master_info *mi)
   mysql_mutex_lock(&LOCK_active_mi);
   switch (opt_id) {
   case OPT_REPLICATE_REWRITE_DB:
+    status= rpl_filter->set_rewrite_db(value)
   case OPT_REPLICATE_DO_DB:
     status= rpl_filter->set_do_db(value);
     break;
@@ -5468,6 +5469,7 @@ Sys_var_rpl_filter::global_value_ptr(THD *thd,
   mysql_mutex_lock(&LOCK_active_mi);
   switch (opt_id) {
   case OPT_REPLICATE_REWRITE_DB:
+    rpl_filter->get_rewrite_db(&tmp)
   case OPT_REPLICATE_DO_DB:
     rpl_filter->get_do_db(&tmp);
     break;

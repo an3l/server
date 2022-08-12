@@ -521,6 +521,40 @@ Rpl_filter::add_wild_table_rule(DYNAMIC_ARRAY* a, const char* table_spec)
 
 
 int
+Rpl_filter::add_string_pair_list(I_List<i_string_pair> *list, const char* my_spec)
+{
+  char* from_db, *to_db, *ptr, *spec, *end;
+  uchar n_space= 0;
+  spec= my_spec
+   // Trim leading space
+  while(my_isspace(system_charset_info, (unsigned char)*spec)) spec++;
+  
+  end = spec + strlen(spec) - 1;
+  while(end > spec && my_isspace(system_charset_info, (unsigned char)*end)) end--;
+
+  // parse string in format "a->b"
+  ptr= (char *)strpbrk(spec, "-");
+  while (my_isspace(system_charset_info, *ptr))
+  {
+    ptr++;
+    n_space++;
+  }
+
+  length= ptr-spec-n_space;
+  from_db = (char *) malloc(length);
+
+  ptr= (char *)strrchr((const char*)ptr, '>'); // latest ">"
+  ptr++;
+  while (my_isspace(system_charset_info, *ptr))
+  {
+    ptr++;
+  }
+
+  add_db_rewrite(from_db, to_db)
+}
+
+
+int
 Rpl_filter::add_string_list(I_List<i_string> *list, const char* spec)
 {
   char *str;
@@ -542,6 +576,14 @@ Rpl_filter::add_string_list(I_List<i_string> *list, const char* spec)
 
 
 int
+Rpl_filter::add_rewrite_db(const char* table_spec)
+{
+  DBUG_ENTER("Rpl_filter::add_do_db");
+  DBUG_RETURN(add_string_pair_list(&rewrite_db, table_spec));
+}
+
+
+int
 Rpl_filter::add_do_db(const char* table_spec)
 {
   DBUG_ENTER("Rpl_filter::add_do_db");
@@ -554,6 +596,14 @@ Rpl_filter::add_ignore_db(const char* table_spec)
 {
   DBUG_ENTER("Rpl_filter::add_ignore_db");
   DBUG_RETURN(add_string_list(&ignore_db, table_spec));
+}
+
+
+int
+Rpl_filter::set_rewrite_db(const char* db_spec)
+{
+  free_string_list(&do_db);
+  return parse_filter_rule(db_spec, &Rpl_filter::add_rewrite_db);
 }
 
 
@@ -749,6 +799,34 @@ Rpl_filter::rewrite_db_is_empty()
 }
 
 
+I_List<i_string_pair>*
+Rpl_filter::get_rewrite_db()
+{
+  return &rewrite_db;
+}
+
+
+void
+Rpl_filter::db_rewrite_rule_ent_list_to_str(String* str, I_List<i_string_pair>* list)
+{
+  I_List_iterator<i_string_pair> it(*list);
+  i_string_pair* s;
+
+  str->length(0);
+
+  while ((s= it++))
+  {
+    str->append(s->key, strlen(s->key));
+    str->append('->');
+    str->append(s->val, strlen(s->val));
+  }
+
+  // Remove last ','
+  if (!str->is_empty())
+    str->chop();
+}
+
+
 const char*
 Rpl_filter::get_rewrite_db(const char* db, size_t *new_len)
 {
@@ -812,6 +890,13 @@ Rpl_filter::db_rule_ent_list_to_str(String* str, I_List<i_string>* list)
   // Remove last ','
   if (!str->is_empty())
     str->chop();
+}
+
+
+void
+Rpl_filter::get_rewrite_db(String* str)
+{
+  db_rewrite_rule_ent_list_to_str(str, get_rewrite_db());
 }
 
 
