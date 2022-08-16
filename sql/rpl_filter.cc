@@ -524,29 +524,25 @@ int
 Rpl_filter::add_string_pair_list(I_List<i_string_pair> *list, const char* my_spec)
 {
   char* from_db, *to_db, *ptr, *spec, *end;
-  uchar n_space= 0;
-  spec= my_spec
+  int length;
+  spec= (char *)my_spec;
    // Trim leading space
   while(my_isspace(system_charset_info, (unsigned char)*spec)) spec++;
 
   // parse string in format "a->b"
   ptr= (char *)strpbrk(spec, "-");
-  while (my_isspace(system_charset_info, *ptr))
-  {
-    ptr++;
-    n_space++;
-  }
-
-  length= ptr-spec-n_space;
-  from_db= (char *) malloc(length);
+  while (my_isspace(system_charset_info, *--ptr))
+    ptr--;
+  ptr++;
+  length= ptr-spec;
+  from_db= (char *) my_malloc(key_memory_rpl_filter, length, MYF(0));
   memcpy(from_db, spec, length);
+  from_db[length]='\0';
   ptr= (char *)strrchr((const char*)ptr, '>'); // latest ">"
   ptr++;
-  while (my_isspace(system_charset_info, *ptr))
-  {
+  while (my_isspace(system_charset_info, *++ptr))
     ptr++;
-  }
-
+  ptr--;
   end = ptr + strlen(ptr) - 1;
   // Trim trailing space
   while(end > ptr && isspace((unsigned char)*end)) end--;
@@ -556,9 +552,13 @@ Rpl_filter::add_string_pair_list(I_List<i_string_pair> *list, const char* my_spe
   {
     length= strlen(ptr) - strlen(end) + 1;
   }
-  to_db= (char *) malloc(length);
+  to_db= (char *) my_malloc(key_memory_rpl_filter, length, MYF(0));
   memcpy(to_db, ptr, length);
+  to_db[length]='\0';
   add_db_rewrite(from_db, to_db);
+  my_free(from_db);
+  my_free(to_db);
+  return false;
 }
 
 
@@ -586,7 +586,7 @@ Rpl_filter::add_string_list(I_List<i_string> *list, const char* spec)
 int
 Rpl_filter::add_rewrite_db(const char* table_spec)
 {
-  DBUG_ENTER("Rpl_filter::add_do_db");
+  DBUG_ENTER("Rpl_filter::add_rewrite_db");
   DBUG_RETURN(add_string_pair_list(&rewrite_db, table_spec));
 }
 
@@ -610,7 +610,7 @@ Rpl_filter::add_ignore_db(const char* table_spec)
 int
 Rpl_filter::set_rewrite_db(const char* db_spec)
 {
-  free_string_list(&do_db);
+  free_list(&rewrite_db);
   return parse_filter_rule(db_spec, &Rpl_filter::add_rewrite_db);
 }
 
@@ -825,7 +825,8 @@ Rpl_filter::db_rewrite_rule_ent_list_to_str(String* str, I_List<i_string_pair>* 
   while ((s= it++))
   {
     str->append(s->key, strlen(s->key));
-    str->append('->');
+    str->append('-');
+    str->append('>');
     str->append(s->val, strlen(s->val));
   }
 
