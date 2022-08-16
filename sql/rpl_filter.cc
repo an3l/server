@@ -528,9 +528,6 @@ Rpl_filter::add_string_pair_list(I_List<i_string_pair> *list, const char* my_spe
   spec= my_spec
    // Trim leading space
   while(my_isspace(system_charset_info, (unsigned char)*spec)) spec++;
-  
-  end = spec + strlen(spec) - 1;
-  while(end > spec && my_isspace(system_charset_info, (unsigned char)*end)) end--;
 
   // parse string in format "a->b"
   ptr= (char *)strpbrk(spec, "-");
@@ -541,8 +538,8 @@ Rpl_filter::add_string_pair_list(I_List<i_string_pair> *list, const char* my_spe
   }
 
   length= ptr-spec-n_space;
-  from_db = (char *) malloc(length);
-
+  from_db= (char *) malloc(length);
+  memcpy(from_db, spec, length);
   ptr= (char *)strrchr((const char*)ptr, '>'); // latest ">"
   ptr++;
   while (my_isspace(system_charset_info, *ptr))
@@ -550,7 +547,18 @@ Rpl_filter::add_string_pair_list(I_List<i_string_pair> *list, const char* my_spe
     ptr++;
   }
 
-  add_db_rewrite(from_db, to_db)
+  end = ptr + strlen(ptr) - 1;
+  // Trim trailing space
+  while(end > ptr && isspace((unsigned char)*end)) end--;
+  length= spec+strlen(spec)-ptr;
+
+  if (strlen(end) > 1)
+  {
+    length= strlen(ptr) - strlen(end) + 1;
+  }
+  to_db= (char *) malloc(length);
+  memcpy(to_db, ptr, length);
+  add_db_rewrite(from_db, to_db);
 }
 
 

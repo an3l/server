@@ -38,7 +38,11 @@ SET @@GLOBAL.replicate_rewrite_db="";
 SET @@GLOBAL.replicate_rewrite_db=null;
 SET @@GLOBAL.replicate_rewrite_db=DEFAULT;
 
-SET @@GLOBAL.replicate_rewrite_db="db1,,,,,db3";
+SET @@GLOBAL.replicate_rewrite_db="db1->db3";
+SELECT @@GLOBAL.replicate_rewrite_db;
+SET @@GLOBAL.replicate_rewrite_db="db1  ->db3";
+SELECT @@GLOBAL.replicate_rewrite_db;
+SET @@GLOBAL.replicate_rewrite_db="  db1  ->db3  ";
 SELECT @@GLOBAL.replicate_rewrite_db;
 SELECT * FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES WHERE VARIABLE_NAME='replicate_rewrite_db';
 select * from information_schema.session_variables where variable_name='replicate_rewrite_db';
