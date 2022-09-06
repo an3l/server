@@ -8069,7 +8069,11 @@ mysqld_get_one_option(const struct my_option *opt, const char *argument,
   case (int)OPT_REPLICATE_REWRITE_DB:
   {
     /* See also OPT_REWRITE_DB handling in client/mysqlbinlog.cc */
-    cur_rpl_filter->add_rewrite_db(argument);
+    if (cur_rpl_filter->add_rewrite_db(argument))
+    {
+      sql_print_error("Bad syntax in replicate-rewrite-db");
+      return 1;
+    }
     break;
   }
   case (int)OPT_SLAVE_PARALLEL_MODE:

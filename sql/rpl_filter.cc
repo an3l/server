@@ -851,18 +851,16 @@ Rpl_filter::db_rewrite_rule_ent_list_to_str(String* str, I_List<i_string_pair>* 
 
   str->length(0);
 
+  const char *delimiter= ",";
+  size_t delim_len= 0;
   while ((s= it++))
   {
+    str->append(delimiter, delim_len);
     str->append(s->key, strlen(s->key));
-    str->append('-');
-    str->append('>');
+    str->append(STRING_WITH_LEN("->"));
     str->append(s->val, strlen(s->val));
-    str->append(',');
+    delim_len= 1;
   }
-
-  // Remove last ','
-  if (!str->is_empty())
-    str->chop();
 }
 
 

@@ -2394,7 +2394,11 @@ get_one_option(const struct my_option *opt, const char *argument, const char *fi
   case OPT_REWRITE_DB:    // db_from->db_to
   {
     /* See also handling of OPT_REPLICATE_REWRITE_DB in sql/mysqld.cc */
-    binlog_filter->add_rewrite_db(argument);
+    if (binlog_filter->add_rewrite_db(argument))
+    {
+      sql_print_error("Bad syntax in replicate-rewrite-db");
+      return 1;
+    }
     break;
   }
   case OPT_PRINT_ROW_COUNT:

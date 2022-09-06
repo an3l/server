@@ -5516,8 +5516,9 @@ static Sys_var_rpl_filter Sys_replicate_do_db(
 
 static Sys_var_rpl_filter Sys_replicate_rewrite_db(
        "replicate_rewrite_db", OPT_REPLICATE_REWRITE_DB,
-       "Updates to a database with a different name than the original. Example: "
-       "replicate-rewrite-db=master_db_name->slave_db_name.",
+       "Tells the slave to replicate binlog events "
+       "into a different database than their original target on the master."
+       "Example: replicate-rewrite-db=master_db_name->slave_db_name.",
        PRIV_SET_SYSTEM_GLOBAL_VAR_REPLICATE_REWRITE_DB);
 
 static Sys_var_rpl_filter Sys_replicate_do_table(
