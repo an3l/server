@@ -5440,7 +5440,7 @@ static char *parse_alias_name(char *line, char **out, bool *is_valid)
   bool single_quoted= false, double_quoted= false, quoted= false;
   size_t len;
 
-  *is_valid= false;
+  *is_valid= true;
   beg= pos= line;
 
   if (*pos == '\'')
@@ -5456,20 +5456,25 @@ static char *parse_alias_name(char *line, char **out, bool *is_valid)
     beg= pos;
   }
 
-  while ((my_isalpha(charset_info, *pos))           ||
-         (quoted && my_isspace(charset_info, *pos)) ||
-         *pos == '-'                                ||
+  while (my_isprint(charset_info, *pos)              ||
+         my_isspace(charset_info, *pos)              ||
+         *pos == '-'                                 ||
          *pos == '_')
+  {
+    // Trailing spaces in quotes are not allowed
+    if (quoted && my_isspace(charset_info, *pos))
+    {
+      *is_valid= false;
+      return pos;
+    }
     pos++;
+  }
 
   if (*pos)
   {
     /* Terminal characters. */
     switch (*pos) {
-    case '=':                                     /* fallthrough */
-    case ' ':                                     /* fallthrough */
-    case '\t':
-      if (!quoted) *is_valid= true;
+    case '=':
       end= pos;
       break;
     case '\'':
@@ -5513,8 +5518,14 @@ static char *parse_alias_name(char *line, char **out, bool *is_valid)
     end= pos;
   }
 
-  len= end - beg; assert(len > 0);
+  len= end - beg;
+  DBUG_ASSERT(len > 0);
   name= (char *) my_malloc(len + 1, MYF(MY_WME));
+  if (!name)
+  {
+    fprintf(stderr, "Couldn't allocate memory for alias name!\n");
+    exit(1);
+  }
   memcpy(name, beg, len);
   name[len]= 0;
   *out= name;
@@ -5628,14 +5639,19 @@ static char *handle_next_alias(char *line, bool *error)
 
   /* Parse the alias name. */
   pos= parse_alias_name(line, &name, &is_valid);
+  name_len= strlen(name);
 
+  /* Invalid alias name */
   if (!is_valid)
   {
     tee_fprintf(stdout, "alias: '%s': invalid alias name\n", name);
     my_free(name);
     *error= true;
+    return pos;
   }
-  else
+
+  /* Check existance of value */
+  if (*pos == '=')
   {
     /* TODO: A non-alphanumeric alias name is invalid. */
 
@@ -5643,35 +5659,40 @@ static char *handle_next_alias(char *line, bool *error)
       We have a valid alias name. Lets check if there is a value being
       assigned to it. (Note: there mustn't be spaces around '='.)
     */
-    name_len= strlen(name);
+    pos++;
+    pos= parse_alias_value(pos, &value, &is_valid);
 
-    if (*pos == '=')
+    if (!is_valid)
     {
-      pos ++;
-      pos= parse_alias_value(pos, &value, &is_valid);
+      tee_fprintf(stdout, "alias: '%s': invalid alias value\n", value);
+      my_free(value);
+    }
+    else
+    {
+      /*
+        We now have a valid name and value, let add/update the
+        aliases hash.
+      */
 
-      if (!is_valid)
+      if ((record= my_hash_search(&aliases, (const uchar *) name, name_len)))
       {
-        tee_fprintf(stdout, "alias: '%s': invalid alias value\n", value);
-        my_free(value);
+        my_hash_delete(&aliases, record);
       }
-      else
-      {
-        /*
-          We now have a valid name and value, let add/update the
-          aliases hash.
-        */
-
-        if ((record= my_hash_search(&aliases, (const uchar *) name, name_len)))
-        {
-          my_hash_delete(&aliases, record);
-        }
-        alias= (ALIAS *) my_malloc(sizeof(ALIAS), MYF(MY_WME));
-        alias->name= name;
-        alias->name_len= name_len;
-        alias->value= value;
-        my_hash_insert(&aliases, (uchar *) alias);
-      }
+      alias= (ALIAS *) my_malloc(sizeof(ALIAS), MYF(MY_WME));
+      alias->name= name;
+      alias->name_len= name_len;
+      alias->value= value;
+      my_hash_insert(&aliases, (uchar *) alias);
+    }
+  }
+  else
+  {
+    // No value, handle key name
+    if (!is_valid)
+    {
+      tee_fprintf(stdout, "alias: '%s': invalid alias name\n", name);
+      my_free(name);
+      *error= true;
     }
     else
     {
