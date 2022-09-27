@@ -1,0 +1,30 @@
+--echo # 
+--echo #
+--echo #
+
+--echo # Handle empty name and alias chaining
+# Empty alias name, return not found
+--exec $MYSQL -e "alias =;"
+--exec $MYSQL -e "alias ='select ';"
+
+# multiple occurence of not found
+--exec $MYSQL -e "alias = =;" 
+--exec $MYSQL -e "alias =a; alias;"
+--exec $MYSQL -e "alias =a=b; alias;"
+
+# Chaining with valid alias, should work for the last one (!not good)
+--exec $MYSQL -e "alias =a=b c='select 1'; alias;"
+
+--echo # Handle non existing alias
+# Should return not found
+--exec $MYSQL -e "alias abc";
+--exec $MYSQL -e "alias abc abc";
+
+
+--echo # Handle chaining of valid alias
+# Handle chaining of names
+--exec $MYSQL -e "alias c='select 1'; alias; alias c; alias c c; alias c c c; alias c c c unknown"
+
+
+# Handle alias NAME=VALUE
+--exec $MYSQL -e "alias my_select='select 1'; alias; my_select; alias your_select="select 2"; alias; your_select;"

@@ -1294,9 +1294,6 @@ int main(int argc,char *argv[])
   put_info(buff,INFO_INFO);
   status.exit_status= read_and_execute(!status.batch);
 
-  /* Free alias hash. */
-  deinit_alias();
-
   if (opt_outfile)
     end_tee();
   mysql_end(0);
@@ -1355,6 +1352,7 @@ sig_handler mysql_end(int sig)
   my_free(current_prompt);
   while (embedded_server_arg_count > 1)
     my_free(embedded_server_args[--embedded_server_arg_count]);
+  deinit_alias();
   mysql_server_end();
   free_defaults(defaults_argv);
   my_end(my_end_arg);
@@ -3239,7 +3237,7 @@ typedef struct {
   Execute command
   Returns: 0  if ok
           -1 if not fatal error
-	  1  if fatal error
+           1  if fatal error
 */
 
 
@@ -3328,7 +3326,6 @@ com_go(String *buffer,char *line __attribute__((unused)))
 #endif
 
   buffer->length(0);
-  aliased_buffer.length(0);
 
   if (error)
     goto end;
@@ -5440,86 +5437,61 @@ static void alias_free(void *v)
 static char *parse_alias_name(char *line, char **out, bool *is_valid)
 {
   char *beg, *end, *pos, *name;
-  bool single_quoted= false, double_quoted= false, quoted= false;
+  bool quoted= false;
   size_t len;
 
-  *is_valid= false;
+  *is_valid= true;
   beg= pos= line;
 
-  if (*pos == '\'')
+  /* Handle empty NAME and return alias not found */
+  if (*pos == '=')
   {
-    quoted= single_quoted= true;
-    pos ++;
-    beg= pos;
-  }
-  else if (*pos == '\"')
-  {
-    quoted= double_quoted= true;
-    pos ++;
-    beg= pos;
+    *is_valid= false;
+    *out= NULL;
+    return pos;
   }
 
-  while ((my_isalpha(charset_info, *pos))           ||
-         (quoted && my_isspace(charset_info, *pos)) ||
-         *pos == '-'                                ||
+  if (*pos == '\'' || *pos == '\"')
+  {
+    quoted= true;
+    pos++;
+  }
+
+  while (my_isprint(charset_info, *pos)              ||
+         my_isspace(charset_info, *pos)              ||
+         *pos == '-'                                 ||
          *pos == '_')
   {
-    pos ++;
-  }
-
-  if (*pos)
-  {
-    /* Terminal characters. */
-    switch (*pos) {
-    case '=':                                     /* fallthrough */
-    case ' ':                                     /* fallthrough */
-    case '\t':
-      if (!quoted) *is_valid= true;
-      end= pos;
-      break;
-    case '\'':
-      if (single_quoted && (my_isspace(charset_info, *(pos + 1)) ||
-                            (*(pos + 1) == '=')                  ||
-                            (*(pos + 1) == 0)))
-      {
-        *is_valid= true;
-        end= pos;
-        pos ++;
-        break;
-      }
-      while (!my_isspace(charset_info, *pos)) pos ++;
-      end= pos;
-      break;
-    case '\"':
-      if (double_quoted && (my_isspace(charset_info, *(pos + 1)) ||
-                            (*(pos + 1) == '=')                  ||
-                            (*(pos + 1) == 0)))
-      {
-        *is_valid= true;
-        end= pos;
-        pos ++;
-        break;
-      }
+    /* Trailing spaces in quotes are not allowed */
+    if (quoted && my_isspace(charset_info, *pos))
+    {
       *is_valid= false;
-      while (!my_isspace(charset_info, *pos)) pos ++;
-      end= pos;
-      break;
-    default:
-      /* Its an invalid entry. Lets move until we find a space. */
-      *is_valid= false;
-      while (!my_isspace(charset_info, *pos)) pos ++;
-      end= pos;
+      return pos;
     }
-  }
-  else
-  {
-    /* We have reached the end. */
-    if (!quoted) *is_valid= true;
+    if (quoted && (*pos == '\'' || *pos == '\"') && \
+        ((*(pos + 1) == '=') || (*(pos + 1) == 0)))
+    {
+      end= pos;
+      pos++;
+      break;
+    }
+    if (*pos == '=' || my_isspace(charset_info, *pos))
+    {
+      end= pos;
+      break;
+    }
+    pos++;
     end= pos;
   }
 
-  len= end - beg; assert(len > 0);
+  len= end - beg;
+  DBUG_ASSERT(len > 0);
   name= (char *) my_malloc(len + 1, MYF(MY_WME));
+  if (!name)
+  {
+    fprintf(stderr, "Couldn't allocate memory for alias name!\n");
+    exit(1);
+  }
   memcpy(name, beg, len);
   name[len]= 0;
   *out= name;
@@ -5621,6 +5593,46 @@ static char *parse_alias_value(char *line, char **out, bool *is_valid)
   return pos;
 }
 
+
+static void handle_alias_error(char **pos, const char *delimiter,
+                               const char *fmt_messsage, const char *name)
+{
+  char *tmp;
+  size_t len;
+  char *alias_er= pos[0];
+  const char *quotes= "\"\'";
+  size_t i = 0, j = 0;
+  // Remove quotes from error string
+  while (alias_er[i]) {
+      if (!strchr(quotes, alias_er[i]))
+          alias_er[j++] = alias_er[i];
+      i++;
+  }
+
+  alias_er[j] = 0;
+
+  /* Check if new alias exist, find delimiter*/
+  if (!(tmp = (char *)strstr(alias_er, delimiter)))
+  {
+    if (!name)
+      tee_fprintf(stdout, fmt_messsage, alias_er);
+    else
+      tee_fprintf(stdout, fmt_messsage, name);
+    **pos= '\0';
+  }
+  else
+  {
+    len= tmp - alias_er;
+    pos[0][len]= '\0';
+    if (name && len == 0)
+      tee_fprintf(stdout, fmt_messsage, name);
+    else
+      tee_fprintf(stdout, fmt_messsage, *pos);
+    *pos=*pos + len + 1;
+  }
+}
+
+
 static char *handle_next_alias(char *line, bool *error)
 {
   ALIAS *alias;
@@ -5629,15 +5641,34 @@ static char *handle_next_alias(char *line, bool *error)
   size_t name_len;
   uchar *record;
 
-  /* Parse the alias name. */
-  pos= parse_alias_name(line, &name, &is_valid);
+  *error= true;
 
-  if (!is_valid)
-  {
-    tee_fprintf(stdout, "alias: '%s': invalid alias name\n", name);
-    *error= true;
-  }
+  /* Parse the alias name. */
+  if (!my_isspace(charset_info, *line))
+    pos= parse_alias_name(line, &name, &is_valid);
   else
+    return ++line;
+
+  /* Early check for raising the error */
+  if (!name || !is_valid)
+  {
+    if (!name)
+    {
+      handle_alias_error(&pos, " ", "alias: '%s': not found\n", NULL);
+      return pos;
+    }
+
+    if (!is_valid && (*pos == 0 || my_isspace(charset_info, *pos)))
+    {
+      handle_alias_error(&pos, " ", "alias: '%s': invalid alias name\n", name);
+      my_free(name);
+      return pos;
+    }
+  }
+
+  name_len= strlen(name);
+  /* Check existance of value */
+  if (*pos == '=')
   {
     /* TODO: A non-alphanumeric alias name is invalid. */
 
@@ -5645,34 +5676,39 @@ static char *handle_next_alias(char *line, bool *error)
       We have a valid alias name. Lets check if there is a value being
       assigned to it. (Note: there mustn't be spaces around '='.)
     */
-    name_len= strlen(name);
+    pos++;
+    pos= parse_alias_value(pos, &value, &is_valid);
 
-    if (*pos == '=')
+    if (!is_valid)
     {
-      pos ++;
-      pos= parse_alias_value(pos, &value, &is_valid);
+      tee_fprintf(stdout, "alias: '%s': invalid alias value\n", value);
+      my_free(value);
+    }
+    else
+    {
+      /*
+        We now have a valid name and value, let add/update the
+        aliases hash.
+      */
 
-      if (!is_valid)
-      {
-        tee_fprintf(stdout, "alias: '%s': invalid alias name\n", name);
-      }
-      else
-      {
-        /*
-          We now have a valid name and value, let add/update the
-          aliases hash.
-        */
+      if ((record= my_hash_search(&aliases, (const uchar *) name, name_len)))
+        my_hash_delete(&aliases, record);
 
-        if ((record= my_hash_search(&aliases, (const uchar *) name, name_len)))
-        {
-          my_hash_delete(&aliases, record);
-        }
-        alias= (ALIAS *) my_malloc(sizeof(ALIAS), MYF(MY_WME));
-        alias->name= name;
-        alias->name_len= name_len;
-        alias->value= value;
-        my_hash_insert(&aliases, (uchar *) alias);
-      }
+      alias= (ALIAS *) my_malloc(sizeof(ALIAS), MYF(MY_WME));
+      alias->name= name;
+      alias->name_len= name_len;
+      alias->value= value;
+      my_hash_insert(&aliases, (uchar *) alias);
+      *error= false;
+    }
+  }
+  else
+  {
+    /* Handle NAME only (next char empty or space) */
+    if (!is_valid)
+    {
+      handle_alias_error(&pos, " ", "alias: '%s': invalid alias name\n", name);
+      my_free(name);
     }
     else
     {
@@ -5682,13 +5718,14 @@ static char *handle_next_alias(char *line, bool *error)
       if (alias)
       {
         tee_fprintf(stdout, "alias  %s = '%s'\n", alias->name, alias->value);
+        *error= false;
       }
       else
       {
-        tee_fprintf(stdout, "alias: '%s': not found\n", name);
+        handle_alias_error(&pos, " ", "alias: '%s': not found\n", name);
+        my_free(name);
       }
     }
-    *error= false;
   }
   return pos;
 }
@@ -5739,6 +5776,8 @@ static int init_alias()
                     alias_free, MYF(0)))
   {
     put_info("Couldn't initialize hash to store aliases.", INFO_ERROR);
+    free_defaults(defaults_argv);
+    my_end(0);
     exit(1);
   }
 
@@ -5761,17 +5800,21 @@ static int init_alias()
   if (mariadbrc_file == 0)
   {
     put_info("out-of-memory!", INFO_ERROR);
+    free_defaults(defaults_argv);
+    my_end(0);
     exit(1);
   }
 
   /* Check if mariadbrc file exists. */
-  if (!my_stat(mariadbrc_file, &stat_arg, MYF(MY_WME)))
+  if (!my_stat(mariadbrc_file, &stat_arg, MYF(ME_JUST_WARNING)))
     goto cleanup;                               /* Do nothing */
 
   if (!(file= my_fopen(mariadbrc_file, O_RDONLY, MYF(MY_WME))))
   {
     put_info("Failed to open .mariadbrc file: ", INFO_ERROR);
     put_info(strerror(errno), INFO_ERROR, errno);
+    free_defaults(defaults_argv);
+    my_end(0);
     exit(1);
   }
 
@@ -5784,6 +5827,8 @@ static int init_alias()
 
       put_info("Failed to read from .mariadbrc file: ", INFO_ERROR);
       put_info(strerror(errno), INFO_ERROR, errno);
+      free_defaults(defaults_argv);
+      my_end(0);
       exit(1);
     }
 
@@ -5812,7 +5857,11 @@ static int init_alias()
         ptr= handle_next_alias(ptr, &error);
 
         if (error)
+        {
+          free_defaults(defaults_argv);
+          my_end(0);
           exit(1);
+        }
 
         /* Bypass the spaces. */
         while (*ptr && my_isspace(charset_info, *ptr)) ptr ++;
@@ -5832,7 +5881,11 @@ static int init_alias()
         ptr= handle_next_unalias(ptr, &error);
 
         if (error)
+        {
+          free_defaults(defaults_argv);
+          my_end(0);
           exit(1);
+        }
 
         /* Bypass the spaces. */
         while (*ptr && my_isspace(charset_info, *ptr)) ptr ++;
@@ -5862,26 +5915,26 @@ static int deinit_alias()
 static int com_alias(String *buffer __attribute__((unused)),
                      char *line)
 {
-  char *ptr= line;
+  char *ptr;
   bool unused;
 
   /* Move past "alias" and spaces. */
-  if ((ptr= strchr(line, ' ')))
+  if (!(ptr= strstr(line, "alias")))
   {
-    while (*ptr && my_isspace(charset_info, *ptr))
-      ptr ++;
+    // Bad syntax, missing "alias" keyword
+    return 1;
   }
+  ptr+= 5;
+  while (*ptr && my_isspace(charset_info, *ptr)) ptr++;
 
   if ((!ptr) || (*ptr == 0))
   {
     /* Only alias command specified, print all aliases and return. */
     ALIAS *alias;
-    ulong i= 0;
+    size_t i= 0;
 
     while ((alias= (ALIAS *) my_hash_element(&aliases, i++)))
-    {
       tee_fprintf(stdout, "alias %s = '%s'\n", alias->name, alias->value);
-    }
     return 0;
   }
 
@@ -5891,8 +5944,9 @@ static int com_alias(String *buffer __attribute__((unused)),
     ptr= handle_next_alias(ptr, &unused);
 
     /* Bypass the spaces. */
-    while (*ptr && my_isspace(charset_info, *ptr)) ptr ++;
+    while (*ptr && my_isspace(charset_info, *ptr)) ptr++;
   }
+
   return 0;
 }
 
