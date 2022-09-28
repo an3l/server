@@ -1,0 +1,12 @@
+--echo # 
+--echo #
+--echo #
+
+# Handle empty name and alias chaining
+--exec $MYSQL -e "alias; alias =; alias; alias =a; alias; alias =a=b; alias; alias =a=b c='select 1'; alias;"
+
+# Handle chaining of names
+--exec $MYSQL -e "alias c='select 1'; alias; alias c; alias c c; alias c c c; alias c c c unknown"
+
+# Handle alias NAME=VALUE
+--exec $MYSQL -e "alias my_select='select 1'; alias; my_select; alias your_select="select 2"; alias; your_select;"
