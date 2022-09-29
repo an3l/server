@@ -5646,23 +5646,25 @@ static char *handle_next_alias(char *line, bool *error)
   else
     return ++line;
 
-  /* Handle empty name */
-  if (!name)
+  /* Early check for raising the error */
+  if (!name || !is_valid)
   {
-    handle_alias_error_and_return_new_alias(&pos, " ",
-                                            "alias: '%s': not found\n",
-                                            NULL);
-    return pos;
-  }
+    if (!name && (*pos == 0 || my_isspace(charset_info, *pos) || *pos == '='))
+    {
+      handle_alias_error_and_return_new_alias(&pos, " ",
+                                              "alias: '%s': not found\n",
+                                              NULL);
+      return pos;
+    }
 
-  /* Invalid alias name */
-  if (!is_valid)
-  {
-    handle_alias_error_and_return_new_alias(&pos, " ",
-                                            "alias: '%s': invalid alias name\n",
-                                            name);
-    my_free(name);
-    return pos;
+    if (!is_valid && (*pos == 0 || my_isspace(charset_info, *pos)))
+    {
+      handle_alias_error_and_return_new_alias(&pos, " ",
+                                              "alias: '%s': invalid alias name\n",
+                                              name);
+      my_free(name);
+      return pos;
+    }
   }
 
   name_len= strlen(name);
