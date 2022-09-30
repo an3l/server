@@ -1389,6 +1389,31 @@ bool Protocol::store(I_List<i_string>* str_list)
   return store((char*) tmp.ptr(), len,  tmp.charset());
 }
 
+
+/**
+  Send a set of strings as a string of key-value pairs with ',' in between.
+*/
+
+bool Protocol::store(I_List<i_string_pair>* str_list)
+{
+  char buf[256];
+  String tmp(buf, sizeof(buf), &my_charset_bin);
+  uint32 len;
+  I_List_iterator<i_string_pair> it(*str_list);
+  i_string* s;
+
+  tmp.length(0);
+  while ((s=it++))
+  {
+    tmp.append(s->ptr, strlen(s->ptr));
+    tmp.append(',');
+  }
+  if ((len= tmp.length()))
+    len--;					// Remove last ','
+  return store((char*) tmp.ptr(), len,  tmp.charset());
+}
+
+
 /****************************************************************************
   Functions to handle the simple (default) protocol where everything is
   This protocol is the one that is used by default between the MySQL server
