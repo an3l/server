@@ -5481,6 +5481,7 @@ static char *parse_alias_name(char *line, char **out, bool *is_valid)
       break;
     }
     pos++;
+    end= pos;
   }
 
   len= end - beg;
@@ -5593,34 +5594,36 @@ static char *parse_alias_value(char *line, char **out, bool *is_valid)
 }
 
 
-static void handle_alias_error_and_return_new_alias(char **pos,
-                                                    const char *delimiter,
-                                                    const char *fmt_messsage,
-                                                    const char *name)
+static void handle_alias_error(char **pos, const char *delimiter,
+                               const char *fmt_messsage, const char *name)
 {
   char *tmp;
   size_t len;
-  if (!name)
-  {
-    tee_fprintf(stdout, fmt_messsage, *pos);
-    **pos= '\0';
-    return;
+  char *alias_er= pos[0];
+  const char *quotes= "\"\'";
+  size_t i = 0, j = 0;
+  // Remove quotes from error string
+  while (alias_er[i]) {
+      if (!strchr(quotes, alias_er[i]))
+          alias_er[j++] = alias_er[i];
+      i++;
   }
 
-  
-  /* Check if new alias exist */
-  if (!(tmp = (char *)strstr(*pos, delimiter)))
+  alias_er[j] = 0;
+
+  /* Check if new alias exist, find delimiter*/
+  if (!(tmp = (char *)strstr(alias_er, delimiter)))
   {
     if (!name)
-      tee_fprintf(stdout, fmt_messsage, *pos);
+      tee_fprintf(stdout, fmt_messsage, alias_er);
     else
       tee_fprintf(stdout, fmt_messsage, name);
     **pos= '\0';
   }
   else
   {
-    len= tmp - *pos;
-    pos[0][len]='\0';
+    len= tmp - alias_er;
+    pos[0][len]= '\0';
     if (name && len == 0)
       tee_fprintf(stdout, fmt_messsage, name);
     else
@@ -5649,19 +5652,15 @@ static char *handle_next_alias(char *line, bool *error)
   /* Early check for raising the error */
   if (!name || !is_valid)
   {
-    if (!name && (*pos == 0 || my_isspace(charset_info, *pos) || *pos == '='))
+    if (!name)
     {
-      handle_alias_error_and_return_new_alias(&pos, " ",
-                                              "alias: '%s': not found\n",
-                                              NULL);
+      handle_alias_error(&pos, " ", "alias: '%s': not found\n", NULL);
       return pos;
     }
 
     if (!is_valid && (*pos == 0 || my_isspace(charset_info, *pos)))
     {
-      handle_alias_error_and_return_new_alias(&pos, " ",
-                                              "alias: '%s': invalid alias name\n",
-                                              name);
+      handle_alias_error(&pos, " ", "alias: '%s': invalid alias name\n", name);
       my_free(name);
       return pos;
     }
@@ -5708,9 +5707,7 @@ static char *handle_next_alias(char *line, bool *error)
     /* Handle NAME only (next char empty or space) */
     if (!is_valid)
     {
-      handle_alias_error_and_return_new_alias(&pos, " ",
-                                              "alias: '%s': invalid alias name\n",
-                                              name);
+      handle_alias_error(&pos, " ", "alias: '%s': invalid alias name\n", name);
       my_free(name);
     }
     else
@@ -5725,9 +5722,7 @@ static char *handle_next_alias(char *line, bool *error)
       }
       else
       {
-        handle_alias_error_and_return_new_alias(&pos, " ",
-                                        "alias: '%s': not found\n",
-                                        name);
+        handle_alias_error(&pos, " ", "alias: '%s': not found\n", name);
         my_free(name);
       }
     }
