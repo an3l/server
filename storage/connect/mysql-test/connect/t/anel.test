@@ -1,0 +1,13 @@
+--echo #
+--echo # MDEV-29687 ODBC tables do not quote identifier names correctly
+--echo # 
+--source include/have_debug.inc
+set @old_debug= @@debug_dbug;
+SET debug_dbug="d:i:o,/tmp/maria.debug:t";
+select @@debug_dbug;
+
+# CREATE TABLE pg_in_maria ENGINE=CONNECT TABNAME='schema1.space_in_column_name' CHARSET=utf8 DATA_CHARSET=utf8 TABLE_TYPE=ODBC CONNECTION='DSN=ConnectEnginePostgresql;UID=mtr;PWD=mtr' QUOTED=3 QCHAR='``';
+CREATE TABLE pg_in_maria ENGINE=CONNECT TABNAME='schema1.space_in_column_name' CHARSET=utf8 DATA_CHARSET=utf8 TABLE_TYPE=ODBC CONNECTION='DSN=ConnectEnginePostgresql;UID=mtr;PWD=mtr' QUOTED=3 QCHAR='`';
+SELECT * from pg_in_maria;
+DROP TABLE pg_in_maria;
+set debug_dbug=@old_debug;
