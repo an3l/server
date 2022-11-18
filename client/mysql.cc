@@ -5454,20 +5454,12 @@ static char *parse_alias_name(char *line, char **out, bool *is_valid)
   if (*pos == '\'' || *pos == '\"')
   {
     quoted= true;
+    DBUG_ASSERT(*(pos+1) != '=');
     pos++;
   }
-
-  while (my_isprint(charset_info, *pos)              ||
-         my_isspace(charset_info, *pos)              ||
-         *pos == '-'                                 ||
-         *pos == '_')
+  /* Space cannot be in alias name since is parsed before */
+  while (my_isalnum(charset_info, *pos) || *pos == '-' || *pos == '_')
   {
-    /* Trailing spaces in quotes are not allowed */
-    if (quoted && my_isspace(charset_info, *pos))
-    {
-      *is_valid= false;
-      return pos;
-    }
     if (quoted && (*pos == '\'' || *pos == '\"') && \
         ((*(pos + 1) == '=') || (*(pos + 1) == 0)))
     {
@@ -5475,13 +5467,19 @@ static char *parse_alias_name(char *line, char **out, bool *is_valid)
       pos++;
       break;
     }
-    if (*pos == '=' || my_isspace(charset_info, *pos))
+    if (*pos == '=')
     {
       end= pos;
       break;
     }
     pos++;
     end= pos;
+    // handle single quote names
+    if (!*pos && quoted)
+    {
+      *is_valid= false;
+      return pos;
+    }
   }
 
   len= end - beg;
@@ -5633,7 +5631,7 @@ static void handle_alias_error(char **pos, const char *delimiter,
 }
 
 
-static char *handle_next_alias(char *line, bool *error)
+static int handle_next_alias(char *line)
 {
   ALIAS *alias;
   char *name, *value, *pos;
@@ -5641,30 +5639,23 @@ static char *handle_next_alias(char *line, bool *error)
   size_t name_len;
   uchar *record;
 
-  *error= true;
-
   /* Parse the alias name. */
   if (!my_isspace(charset_info, *line))
     pos= parse_alias_name(line, &name, &is_valid);
-  else
-    return ++line;
 
   /* Early check for raising the error */
-  if (!name || !is_valid)
+  if (!name)
   {
-    if (!name)
-    {
-      handle_alias_error(&pos, " ", "alias: '%s': not found\n", NULL);
-      return pos;
-    }
-
-    if (!is_valid && (*pos == 0 || my_isspace(charset_info, *pos)))
-    {
-      handle_alias_error(&pos, " ", "alias: '%s': invalid alias name\n", name);
-      my_free(name);
-      return pos;
-    }
+    handle_alias_error(&pos, " ", "alias: '%s': not found\n", NULL);
+    return 0;
   }
+
+  if (!is_valid && *pos == 0)
+  {
+    handle_alias_error(&pos, " ", "alias: '%s': invalid alias name\n", line);
+    return 1;
+  }
+
 
   name_len= strlen(name);
   /* Check existance of value */
@@ -5699,7 +5690,6 @@ static char *handle_next_alias(char *line, bool *error)
       alias->name_len= name_len;
       alias->value= value;
       my_hash_insert(&aliases, (uchar *) alias);
-      *error= false;
     }
   }
   else
@@ -5718,7 +5708,6 @@ static char *handle_next_alias(char *line, bool *error)
       if (alias)
       {
         tee_fprintf(stdout, "alias  %s = '%s'\n", alias->name, alias->value);
-        *error= false;
       }
       else
       {
@@ -5727,7 +5716,7 @@ static char *handle_next_alias(char *line, bool *error)
       }
     }
   }
-  return pos;
+  return 0;
 }
 
 static char *handle_next_unalias(char *line, bool *error)
@@ -5854,7 +5843,7 @@ static int init_alias()
       /* There are more arguments to handle. */
       while (*ptr)
       {
-        ptr= handle_next_alias(ptr, &error);
+ //       ptr= handle_next_alias(ptr);
 
         if (error)
         {
@@ -5916,8 +5905,7 @@ static int com_alias(String *buffer __attribute__((unused)),
                      char *line)
 {
   char *ptr;
-  bool unused;
-
+  char *my_alias;
   /* Move past "alias" and spaces. */
   if (!(ptr= strstr(line, "alias")))
   {
@@ -5938,13 +5926,16 @@ static int com_alias(String *buffer __attribute__((unused)),
     return 0;
   }
 
-  /* There are more arguments to handle. */
-  while (*ptr)
+  /* There are more arguments to handle.
+     Aliases are divided by space delimiter.
+  */
+  my_alias= strtok(ptr, " ");
+  while (my_alias != NULL)
   {
-    ptr= handle_next_alias(ptr, &unused);
-
-    /* Bypass the spaces. */
-    while (*ptr && my_isspace(charset_info, *ptr)) ptr++;
+    if(handle_next_alias(my_alias))
+      return 0;
+    // tee_fprintf(stdout, "hi: %s \n", my_alias);
+    my_alias= strtok(NULL, " ");
   }
 
   return 0;

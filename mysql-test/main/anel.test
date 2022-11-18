@@ -4,11 +4,13 @@
 
 --echo # Handle empty name and alias chaining
 # Empty alias name, return not found
---exec $MYSQL -e "alias =;"
+--exec $MYSQL -e "alias"             # Tested (ok)
+--exec $MYSQL -e "alias 'a '='b';"   # Tested (ok)
+--exec $MYSQL -e "alias a ='b';"     # Tested (ok)
+--exec $MYSQL -e "alias =;"          # Tested (ok)
+--exec $MYSQL -e "alias = =;"        # Tested (ok)
 --exec $MYSQL -e "alias ='select ';"
-
-# multiple occurence of not found
---exec $MYSQL -e "alias = =;" 
+--exec $MYSQL -e "alias 'a'='b';"    # Tested ()<
 --exec $MYSQL -e "alias =a; alias;"
 --exec $MYSQL -e "alias =a=b; alias;"
 
