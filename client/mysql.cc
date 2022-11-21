@@ -3279,13 +3279,9 @@ com_go(String *buffer,char *line __attribute__((unused)))
   }
 
   if ((alias_end= strchr((char *)(buffer->ptr()), ' ')))
-  {
     alias_len= alias_end - buffer->ptr();
-  }
   else
-  {
     alias_len= buffer->length();
-  }
 
   if (verbose)
     (void) com_print(buffer,0);
@@ -3297,13 +3293,14 @@ com_go(String *buffer,char *line __attribute__((unused)))
   {
     aliased_buffer.copy(alias_element->value, strlen(alias_element->value),
                         charset_info);
+    aliased_buffer.append(alias_end, buffer->length() - alias_len);
   }
-
-  aliased_buffer.append(alias_end, buffer->length() - alias_len);
 
   if (skip_updates &&
       (buffer->length() < 4 ||
-       my_strnncoll(charset_info, (const uchar*)aliased_buffer.ptr(), 4,
+       my_strnncoll(charset_info,
+                    alias_element ? (const uchar*)aliased_buffer.ptr() :
+                    (const uchar*)buffer->ptr(), 4,
                     (const uchar*)"SET ",4)))
   {
     (void) put_info("Ignoring query to other database",INFO_INFO);
@@ -3312,9 +3309,12 @@ com_go(String *buffer,char *line __attribute__((unused)))
 
   timer= microsecond_interval_timer();
   executing_query= 1;
-  error= mysql_real_query_for_lazy(aliased_buffer.ptr(),
-                                   aliased_buffer.length());
-  report_progress_end();
+  if(aliased_buffer.ptr())
+    error= mysql_real_query_for_lazy(aliased_buffer.ptr(),
+                                     aliased_buffer.length());
+  else
+    error= mysql_real_query_for_lazy(buffer->ptr(),buffer->length());
+report_progress_end();
 
 #ifdef HAVE_READLINE
   if (status.add_to_history) 
@@ -3357,9 +3357,9 @@ com_go(String *buffer,char *line __attribute__((unused)))
     /* Every branch must truncate buff. */
     if (result)
     {
-      if (!mysql_num_rows(result) && ! quick && !column_types_flag)
+      if (!mysql_num_rows(result) && !quick && !column_types_flag)
       {
-	strmov(buff, "Empty set");
+        strmov(buff, "Empty set");
         if (opt_xml)
         { 
           /*
@@ -5502,7 +5502,7 @@ static char *parse_alias_name(char *line, char **out, bool *is_valid)
     default:
       /* Its an invalid entry. Lets move until we find a space. */
       *is_valid= false;
-      while (!my_isspace(charset_info, *pos)) pos ++;
+      while (!my_isspace(charset_info, *pos)) pos++;
       end= pos;
     }
   }
@@ -5513,8 +5513,19 @@ static char *parse_alias_name(char *line, char **out, bool *is_valid)
     end= pos;
   }
 
-  len= end - beg; assert(len > 0);
+  len= end - beg;
+  if (len == 0)
+  {
+    *is_valid= false;
+    *out= NULL;
+    return pos;
+  }
   name= (char *) my_malloc(len + 1, MYF(MY_WME));
+  if (!name)
+  {
+    fprintf(stderr, "Couldn't allocate memory for alias name!\n");
+    exit(1);
+  }
   memcpy(name, beg, len);
   name[len]= 0;
   *out= name;
@@ -5533,22 +5544,20 @@ static char *parse_alias_value(char *line, char **out, bool *is_valid)
   if (*pos == '\'')
   {
     quoted= single_quoted= true;
-    pos ++;
+    pos++;
     beg= pos;
   }
   else if (*pos == '\"')
   {
     quoted= double_quoted= true;
-    pos ++;
+    pos++;
     beg= pos;
   }
 
   while (*pos && my_isprint(charset_info, *pos))
   {
     if (!quoted && (*pos == ' ' || *pos == '\t'))
-    {
       break;
-    }
     else if (single_quoted && *pos == '\'' && *(pos - 1) != '\\')
     {
       quoted= false;
@@ -5559,7 +5568,7 @@ static char *parse_alias_value(char *line, char **out, bool *is_valid)
       quoted= false;
       break;
     }
-    pos ++;
+    pos++;
   }
 
   if (*pos)
@@ -5577,10 +5586,10 @@ static char *parse_alias_value(char *line, char **out, bool *is_valid)
       {
         *is_valid= true;
         end= pos;
-        pos ++;
+        pos++;
         break;
       }
-      while (!my_isspace(charset_info, *pos)) pos ++;
+      while (!my_isspace(charset_info, *pos)) pos++;
       end= pos;
       break;
     case '\"':
@@ -5589,15 +5598,15 @@ static char *parse_alias_value(char *line, char **out, bool *is_valid)
       {
         *is_valid= true;
         end= pos;
-        pos ++;
+        pos++;
         break;
       }
-      while (!my_isspace(charset_info, *pos)) pos ++;
+      while (!my_isspace(charset_info, *pos)) pos++;
       end= pos;
       break;
     default:
       /* Its an invalid entry. Lets move until we find a space. */
-      while (!my_isspace(charset_info, *pos)) pos ++;
+      while (!my_isspace(charset_info, *pos)) pos++;
       end= pos;
     }
   }
@@ -5610,6 +5619,11 @@ static char *parse_alias_value(char *line, char **out, bool *is_valid)
 
   len= end - beg;
   value= (char *) my_malloc(len + 1, MYF(MY_WME));
+  if (!value)
+  {
+    fprintf(stderr, "Couldn't allocate memory for alias value!\n");
+    exit(1);
+  }
   memcpy(value, beg, len);
   value[len]= 0;
   *out= value;
@@ -5631,8 +5645,14 @@ static char *handle_next_alias(char *line, bool *error)
 
   if (!is_valid)
   {
-    tee_fprintf(stdout, "alias: '%s': invalid alias name\n", name);
-    my_free(name);
+    if (!name)
+      tee_fprintf(stdout, "alias: '%s': not found\n", pos);
+    else
+    {
+      tee_fprintf(stdout, "alias: '%s': invalid alias name\n", name);
+      my_free(name);
+    }
+
     *error= true;
   }
   else
@@ -5899,6 +5919,11 @@ static int com_alias(String *buffer __attribute__((unused)),
     return 0;
   }
 
+    if (*ptr == '=')
+    {
+      tee_fprintf(stdout, "alias: '%s': not found\n", ptr);
+      return 0;
+    }
   /* There are more arguments to handle. */
   while (*ptr)
   {
