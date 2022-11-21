@@ -2374,9 +2374,7 @@ static bool add_line(String &buffer, char *line, size_t line_length,
           buffer.append(line, (uint) (out-line));
           out= line;
         }
-        
-        if ((*com->func)(&buffer,pos-1) > 0)
-          DBUG_RETURN(1);                       // Quit
+
         if (com->takes_params)
         {
           if (ss_comment)
@@ -2392,7 +2390,7 @@ static bool add_line(String &buffer, char *line, size_t line_length,
           }
           else
           {
-            for (pos++ ;
+            for (pos++;
                  *pos && (*pos != *delimiter ||
                           !is_prefix(pos + 1, delimiter + 1)) ; pos++)
               ;	// Remove parameters
@@ -2400,8 +2398,13 @@ static bool add_line(String &buffer, char *line, size_t line_length,
               pos--;
             else 
               pos+= delimiter_length - 1; // Point at last delim char
+            
+            buffer.append(line, (uint32) (pos-line));
           }
         }
+        if ((*com->func)(&buffer, buffer.c_ptr()) > 0)
+          DBUG_RETURN(1);                       // Quit
+        buffer.length(0);
       }
       else
       {
