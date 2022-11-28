@@ -3244,7 +3244,7 @@ com_charset(String *buffer __attribute__((unused)), char *line)
 
 typedef struct {
   char *name;
-  int name_len;
+  size_t name_len;
   char *value;
 } ALIAS;
 
@@ -3268,7 +3268,7 @@ com_go(String *buffer,char *line __attribute__((unused)))
   uint		error= 0;
   int           err= 0;
   char          *alias_end= 0;
-  int           alias_len;
+  intptr_t       alias_len;
 
   interrupted_query= 0;
   if (!status.batch)
@@ -3295,9 +3295,9 @@ com_go(String *buffer,char *line __attribute__((unused)))
   }
 
   if ((alias_end= strchr((char *)(buffer->ptr()), ' ')))
-    alias_len= alias_end - buffer->ptr();
+    alias_len= (intptr_t)alias_end - (intptr_t)buffer->ptr();
   else
-    alias_len= buffer->length();
+    alias_len= (intptr_t)buffer->length();
 
   if (verbose)
     (void) com_print(buffer,0);
@@ -5436,7 +5436,7 @@ static int com_prompt(String *buffer __attribute__((unused)),
 static uchar *get_alias_key(const uchar *var, size_t *len,
                             my_bool __attribute__((unused)) t)
 {
-  register char *key;
+  char *key;
   key= ((ALIAS *)var)->name;
   *len= ((ALIAS *)var)->name_len;
   return (uchar *) key;
