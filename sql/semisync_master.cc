@@ -1374,7 +1374,7 @@ void Repl_semi_sync_master::set_export_stats()
 {
   lock();
 
-  rpl_semi_sync_master_status           = m_state;
+  rpl_semi_sync_master_status           = is_on();
   rpl_semi_sync_master_avg_trx_wait_time=
     ((rpl_semi_sync_master_trx_wait_num) ?
      (ulong)((double)rpl_semi_sync_master_trx_wait_time /

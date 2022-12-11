@@ -361,6 +361,14 @@ public:
 
 };
 
+
+enum rpl_semi_sync_master_wait_point_t {
+  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_BINLOG_SYNC,
+  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_STORAGE_COMMIT,
+  SEMI_SYNC_MASTER_WAIT_POINT_NONE,
+};
+
+
 /**
    The extension class for the master of semi-synchronous replication
 */
@@ -438,7 +446,7 @@ class Repl_semi_sync_master
 
   /* Is semi-sync replication on? */
   bool is_on() {
-    return (m_state);
+    return (m_state && wait_point() != SEMI_SYNC_MASTER_WAIT_POINT_NONE);
   }
 
   void set_master_enabled(bool enabled) {
@@ -573,7 +581,7 @@ class Repl_semi_sync_master
 
   /* Reserve space in the replication event packet header:
    *  . slave semi-sync off: 1 byte - (0)
-   *  . slave semi-sync on:  3 byte - (0, 0xef, 0/1}
+   *  . slave semi-sync on:  3 byte - (0, 0xef, 0/1)
    *
    * Input:
    *  packet   - (IN)  the header buffer
@@ -663,12 +671,6 @@ class Repl_semi_sync_master
 
   /* Export the current status */
   void store_status(Protocol *protocol);
-};
-
-enum rpl_semi_sync_master_wait_point_t {
-  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_BINLOG_SYNC,
-  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_STORAGE_COMMIT,
-  SEMI_SYNC_MASTER_WAIT_POINT_NONE,
 };
 
 extern Repl_semi_sync_master repl_semisync_master;
