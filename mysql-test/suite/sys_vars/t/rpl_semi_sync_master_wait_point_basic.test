@@ -23,6 +23,12 @@ show session variables like 'rpl_semi_sync_master_wait_point';
 select * from information_schema.global_variables where variable_name='rpl_semi_sync_master_wait_point';
 select * from information_schema.session_variables where variable_name='rpl_semi_sync_master_wait_point';
 
+set global rpl_semi_sync_master_wait_point=None;
+show global variables like 'rpl_semi_sync_master_wait_point';
+show session variables like 'rpl_semi_sync_master_wait_point';
+select * from information_schema.global_variables where variable_name='rpl_semi_sync_master_wait_point';
+select * from information_schema.session_variables where variable_name='rpl_semi_sync_master_wait_point';
+
 #
 # incorrect types
 #

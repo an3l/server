@@ -3570,7 +3570,7 @@ static Sys_var_on_access_global<Sys_var_enum,
 Sys_semisync_master_wait_point(
        "rpl_semi_sync_master_wait_point",
        "Should transaction wait for semi-sync ack after having synced binlog, "
-       "or after having committed in storage engine.",
+       "or after having committed in storage engine, or none just for reporting.",
        GLOBAL_VAR(rpl_semi_sync_master_wait_point), CMD_LINE(REQUIRED_ARG),
        repl_semisync_wait_point, DEFAULT(1),
        NO_MUTEX_GUARD, NOT_IN_BINLOG,ON_CHECK(0),
