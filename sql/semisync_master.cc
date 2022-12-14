@@ -317,8 +317,8 @@ void Active_tranx::clear_active_tranx_nodes(const char *log_file_name,
 
 /*******************************************************************************
  *
- * <Repl_semi_sync_master> class: the basic code layer for syncsync master.
- * <Repl_semi_sync_slave>  class: the basic code layer for syncsync slave.
+ * <Repl_semi_sync_master> class: the basic code layer for semisync master.
+ * <Repl_semi_sync_slave>  class: the basic code layer for semisync slave.
  *
  * The most important functions during semi-syn replication listed:
  *
