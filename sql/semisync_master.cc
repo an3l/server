@@ -606,7 +606,6 @@ int Repl_semi_sync_master::report_reply_binlog(uint32 server_id,
   int   cmp;
   bool  can_release_threads = false;
   bool  need_copy_send_pos = true;
-
   DBUG_ENTER("Repl_semi_sync_master::report_reply_binlog");
 
   if (!(get_master_enabled()))
@@ -622,6 +621,8 @@ int Repl_semi_sync_master::report_reply_binlog(uint32 server_id,
     /* We check to see whether we can switch semi-sync ON. */
     try_switch_on(server_id, log_file_name, log_file_pos);
 
+
+  add_to_wait_none_info(server_id, log_file_name, log_file_pos);
   /* The position should increase monotonically, if there is only one
    * thread sending the binlog to the slave.
    * In reality, to improve the transaction availability, we allow multiple
@@ -773,13 +774,54 @@ int Repl_semi_sync_master::report_binlog_update(THD* thd, const char *log_file,
   return 0;
 }
 
+int Repl_semi_sync_master::add_to_wait_none_info(uint32 server_id,
+                                                  const char *log_file_name,
+                                                  my_off_t log_file_pos)
+{
+  DBUG_ENTER("Repl_semi_sync_master::add_to_wait_none_info");
+  Wait_none_info *slave_wait_none_info;
+  Wait_none_info_ilist_iterator it(wait_none_info);
+  if (wait_none_info.is_empty())
+  {
+    if(!(slave_wait_none_info= new Wait_none_info))
+      DBUG_RETURN(1);
+    strncpy(slave_wait_none_info->log_file, log_file_name, FN_REFLEN);
+    slave_wait_none_info->server_id= server_id;
+    slave_wait_none_info->log_pos= log_file_pos;
+    wait_none_info.push_back(slave_wait_none_info);
+  }
+  else
+  {
+    while(Wait_none_info *wi= it++)
+    {
+      if(wi->server_id == server_id)
+      {
+        wi->server_id= server_id;
+        wi->log_pos= log_file_pos;
+        continue;
+      }
+      else
+      {
+        if(!(slave_wait_none_info= new Wait_none_info))
+          DBUG_RETURN(1);
+        strncpy(slave_wait_none_info->log_file, log_file_name, FN_REFLEN);
+        slave_wait_none_info->server_id= server_id;
+        slave_wait_none_info->log_pos= log_file_pos;
+        wait_none_info.push_back(slave_wait_none_info);
+      }
+    }
+  }
+  DBUG_RETURN(0);
+}
+
 int Repl_semi_sync_master::dump_start(THD* thd,
                                    const char *log_file,
                                    my_off_t log_pos)
 {
   if (!thd->semi_sync_slave)
     return 0;
-
+  if(!wait_none_info.is_empty())
+    remove_wait_none_info(thd->variables.server_id);
   if (ack_receiver.add_slave(thd))
   {
     sql_print_error("Failed to register slave to semi-sync ACK receiver "
@@ -810,7 +852,6 @@ void Repl_semi_sync_master::dump_end(THD* thd)
   remove_slave();
   ack_receiver.remove_slave(thd);
 
-  return;
 }
 
 int Repl_semi_sync_master::commit_trx(const char* trx_wait_binlog_name,

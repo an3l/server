@@ -28,6 +28,25 @@ extern PSI_mutex_key key_LOCK_binlog;
 extern PSI_cond_key key_COND_binlog_send;
 #endif
 
+// TODO change Trans_binlog_info to ilink?
+class Wait_none_info: public ilink{
+  public:
+  uint32 server_id;
+  my_off_t log_pos;
+  char log_file[FN_REFLEN];
+};
+
+typedef I_List<Wait_none_info> Wait_none_info_ilist;
+typedef I_List_iterator<Wait_none_info> Wait_none_info_ilist_iterator;
+
+
+enum rpl_semi_sync_master_wait_point_t {
+  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_BINLOG_SYNC,
+  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_STORAGE_COMMIT,
+  SEMI_SYNC_MASTER_WAIT_POINT_NONE
+};
+
+
 struct Tranx_node {
   char              log_name[FN_REFLEN];
   my_off_t          log_pos;
@@ -454,7 +473,10 @@ class Repl_semi_sync_master
 
  public:
   Repl_semi_sync_master();
-  ~Repl_semi_sync_master() {}
+  ~Repl_semi_sync_master() {};
+
+  /*Structure list containing the needed information for semisync None wait condition */
+  Wait_none_info_ilist wait_none_info;
 
   void cleanup();
 
@@ -659,12 +681,23 @@ class Repl_semi_sync_master
     thd->is_awaiting_semisync_ack= _is_awaiting_semisync_ack;
   }
 
-  mysql_mutex_t LOCK_rpl_semi_sync_master_enabled;
-};
+  /*
+    Removes the allocated objects for list called at the end of dump_end()
+  */
+  void remove_wait_none_info(uint32 server_id)
+  {
+    Wait_none_info_ilist_iterator it(wait_none_info);
+    while(Wait_none_info *wi= it++)
+    {
+      if(wi->server_id == server_id)
+        delete wi;
+    }
+  }
 
-enum rpl_semi_sync_master_wait_point_t {
-  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_BINLOG_SYNC,
-  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_STORAGE_COMMIT,
+  int add_to_wait_none_info(uint32 server_id, const char *log_file_name,
+                             my_off_t log_file_pos);
+
+  mysql_mutex_t LOCK_rpl_semi_sync_master_enabled;
 };
 
 extern Repl_semi_sync_master repl_semisync_master;

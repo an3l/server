@@ -259,6 +259,7 @@ void Ack_receiver::run()
 
     set_stage_info(stage_reading_semi_sync_ack);
     Slave_ilist_iterator it(m_slaves);
+    repl_semisync_master.wait_none_info.empty();
     while ((slave= it++))
     {
       if (listener.is_socket_active(slave))
@@ -286,6 +287,7 @@ void Ack_receiver::run()
 end:
   sql_print_information("Stopping ack receiver thread");
   m_status= ST_DOWN;
+  //repl_semisync_master.remove_wait_none_info();
   delete thd;
   mysql_cond_broadcast(&m_cond);
   mysql_mutex_unlock(&m_mutex);
