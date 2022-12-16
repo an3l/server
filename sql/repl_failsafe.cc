@@ -37,7 +37,7 @@
 #include "rpl_filter.h"
 #include "log_event.h"
 #include <mysql.h>
-
+#include "semisync_master.h"            // Wait_non_info
 
 struct Slave_info
 {
@@ -179,7 +179,13 @@ static my_bool show_slave_hosts_callback(THD *thd, Protocol *protocol)
 {
   my_bool res= FALSE;
   mysql_mutex_lock(&thd->LOCK_thd_data);
-  if (auto si= thd->slave_info)
+  const char *log_file;
+  my_off_t log_pos;
+  String gtid[GTID_MAX_STR_LENGTH];
+  const char buf[4]= "OFF";
+  const String tmp(buf, sizeof(buf), &my_charset_bin);
+
+  if (const Slave_info *si= thd->slave_info)
   {
     protocol->prepare_for_resend();
     protocol->store(si->server_id);
@@ -191,6 +197,27 @@ static my_bool show_slave_hosts_callback(THD *thd, Protocol *protocol)
     }
     protocol->store((uint32) si->port);
     protocol->store(si->master_id);
+    // Print report for semisync with None wait point
+    if (rpl_semi_sync_master_enabled &&
+        repl_semisync_master.wait_point() == SEMI_SYNC_MASTER_WAIT_POINT_NONE &&
+        !repl_semisync_master.wait_none_info.is_empty())
+    {
+      Wait_none_info_ilist_iterator it(repl_semisync_master.wait_none_info);
+      while(const Wait_none_info *wi= it++)
+      {
+        if(wi->server_id == si->server_id)
+        {
+          log_file= wi->log_file && wi->log_file[0] ? wi->log_file :0;
+          log_pos= wi->log_pos;
+          gtid_state_from_binlog_pos(log_file, (uint32)log_pos, gtid);
+
+          protocol->store((char*) tmp.ptr(), tmp.length()-1, tmp.charset());
+          protocol->store(log_file, safe_strlen(log_file), &my_charset_bin);
+          protocol->store(log_pos);
+          protocol->store(gtid);
+        }
+      }
+    }
     res= protocol->write();
   }
   mysql_mutex_unlock(&thd->LOCK_thd_data);
@@ -234,7 +261,25 @@ bool show_slave_hosts(THD* thd)
   field_list.push_back(new (mem_root)
                        Item_return_int(thd, "Master_id", 10, MYSQL_TYPE_LONG),
                        thd->mem_root);
-
+  if (rpl_semi_sync_master_enabled &&
+      repl_semisync_master.wait_point() == SEMI_SYNC_MASTER_WAIT_POINT_NONE)
+  {
+    if (!repl_semisync_master.wait_none_info.is_empty())
+    {
+      field_list.push_back(new (mem_root)
+                        Item_empty_string(thd, "Semisync", 5),
+                        thd->mem_root);
+      field_list.push_back(new (mem_root)
+                          Item_empty_string(thd, "File", FN_REFLEN),
+                          thd->mem_root);
+      field_list.push_back(new (mem_root)
+                          Item_return_int(thd, "Position", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG),
+                          thd->mem_root);
+      field_list.push_back(new (mem_root)
+                          Item_empty_string(thd, "Gtid", GTID_MAX_STR_LENGTH),
+                          thd->mem_root);
+    }
+  }
   if (protocol->send_result_set_metadata(&field_list,
                             Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
     DBUG_RETURN(TRUE);

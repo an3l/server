@@ -606,7 +606,7 @@ int Repl_semi_sync_master::report_reply_binlog(uint32 server_id,
   int   cmp;
   bool  can_release_threads = false;
   bool  need_copy_send_pos = true;
-
+  Wait_none_info *slave_wait_none_info;
   DBUG_ENTER("Repl_semi_sync_master::report_reply_binlog");
 
   if (!(get_master_enabled()))
@@ -621,7 +621,13 @@ int Repl_semi_sync_master::report_reply_binlog(uint32 server_id,
   if (!is_on())
     /* We check to see whether we can switch semi-sync ON. */
     try_switch_on(server_id, log_file_name, log_file_pos);
+  if (!(slave_wait_none_info= new Wait_none_info))
+    DBUG_RETURN(true);
 
+  strncpy(slave_wait_none_info->log_file, log_file_name, FN_REFLEN);
+  slave_wait_none_info->server_id= server_id;
+  slave_wait_none_info->log_pos= log_file_pos;
+  wait_none_info.push_back(slave_wait_none_info);
   /* The position should increase monotonically, if there is only one
    * thread sending the binlog to the slave.
    * In reality, to improve the transaction availability, we allow multiple
@@ -809,7 +815,6 @@ void Repl_semi_sync_master::dump_end(THD* thd)
 
   remove_slave();
   ack_receiver.remove_slave(thd);
-
   return;
 }
 

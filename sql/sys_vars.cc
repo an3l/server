@@ -3563,14 +3563,15 @@ Sys_semisync_master_trace_level(
        ON_UPDATE(fix_rpl_semi_sync_master_trace_level));
 
 static const char *repl_semisync_wait_point[]=
-{"AFTER_SYNC", "AFTER_COMMIT", NullS};
+{"AFTER_SYNC", "AFTER_COMMIT", "NONE", NullS};
 
 static Sys_var_on_access_global<Sys_var_enum,
                      PRIV_SET_SYSTEM_GLOBAL_VAR_RPL_SEMI_SYNC_MASTER_WAIT_POINT>
 Sys_semisync_master_wait_point(
        "rpl_semi_sync_master_wait_point",
        "Should transaction wait for semi-sync ack after having synced binlog, "
-       "or after having committed in storage engine.",
+       "or after having committed in storage engine, or shouldn't wait what is "
+       "only used to report replica progress.",
        GLOBAL_VAR(rpl_semi_sync_master_wait_point), CMD_LINE(REQUIRED_ARG),
        repl_semisync_wait_point, DEFAULT(1),
        NO_MUTEX_GUARD, NOT_IN_BINLOG,ON_CHECK(0),

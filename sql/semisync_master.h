@@ -28,6 +28,25 @@ extern PSI_mutex_key key_LOCK_binlog;
 extern PSI_cond_key key_COND_binlog_send;
 #endif
 
+// TODO change Trans_binlog_info to ilink?
+class Wait_none_info: public ilink{
+  public:
+  uint32 server_id;
+  my_off_t log_pos;
+  char log_file[FN_REFLEN];
+};
+
+typedef I_List<Wait_none_info> Wait_none_info_ilist;
+typedef I_List_iterator<Wait_none_info> Wait_none_info_ilist_iterator;
+
+
+enum rpl_semi_sync_master_wait_point_t {
+  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_BINLOG_SYNC,
+  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_STORAGE_COMMIT,
+  SEMI_SYNC_MASTER_WAIT_POINT_NONE
+};
+
+
 struct Tranx_node {
   char              log_name[FN_REFLEN];
   my_off_t          log_pos;
@@ -454,7 +473,10 @@ class Repl_semi_sync_master
 
  public:
   Repl_semi_sync_master();
-  ~Repl_semi_sync_master() {}
+  ~Repl_semi_sync_master() {};
+
+  /*Structure list containing the needed information for semisync None wait condition */
+  Wait_none_info_ilist wait_none_info;
 
   void cleanup();
 
@@ -660,11 +682,6 @@ class Repl_semi_sync_master
   }
 
   mysql_mutex_t LOCK_rpl_semi_sync_master_enabled;
-};
-
-enum rpl_semi_sync_master_wait_point_t {
-  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_BINLOG_SYNC,
-  SEMI_SYNC_MASTER_WAIT_POINT_AFTER_STORAGE_COMMIT,
 };
 
 extern Repl_semi_sync_master repl_semisync_master;

@@ -259,6 +259,7 @@ void Ack_receiver::run()
 
     set_stage_info(stage_reading_semi_sync_ack);
     Slave_ilist_iterator it(m_slaves);
+    repl_semisync_master.wait_none_info.empty();
     while ((slave= it++))
     {
       if (listener.is_socket_active(slave))
