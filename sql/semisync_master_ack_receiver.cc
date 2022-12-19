@@ -274,7 +274,15 @@ void Ack_receiver::run()
         net.compress= slave->thd->net.compress;
 
         len= my_net_read(&net);
-        repl_semisync_master.remove_wait_none_info(slave->server_id());
+
+        if (repl_semisync_master.wait_point() == SEMI_SYNC_MASTER_WAIT_POINT_NONE)
+        {
+          sql_print_information("Semi-sync Ack delete for server"
+                              "(server_id: %ld)", (long) slave->server_id());
+          repl_semisync_master.remove_wait_none_info(slave->server_id());
+        }
+        sql_print_information("Semi-sync Ack reply packet for server"
+                              "(server_id: %ld)", (long) slave->server_id());
         if (likely(len != packet_error))
           repl_semisync_master.report_reply_packet(slave->server_id(),
                                                    net.read_pos, len);

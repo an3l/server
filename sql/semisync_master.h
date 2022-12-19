@@ -686,17 +686,43 @@ class Repl_semi_sync_master
   */
   void remove_wait_none_info(uint32 server_id)
   {
-    Wait_none_info_ilist_iterator it(wait_none_info);
-    while(Wait_none_info *wi= it++)
+    while(Wait_none_info *wi= wait_none_info.get())
     {
-      if (server_id == 0)
-        delete wi;
+      sql_print_information("Delete following wait_none_info object "
+                        "(server_id: %ld), pos(%s, %lu)",
+                        (long) server_id, wi->log_file,
+                        (ulong) wi->log_pos);
       if(wi->server_id == server_id)
       {
+        sql_print_information("Deleted wait_none_info object "
+                        "(server_id: %ld), pos(%s, %lu)",
+                        (long) server_id, wi->log_file,
+                        (ulong) wi->log_pos);
         wi=0;
         delete wi;
       }
     }
+    /*
+    Wait_none_info_ilist_iterator it(wait_none_info);
+    while(Wait_none_info *wi= it++)
+    {
+      sql_print_information("Delete following wait_none_info object "
+                        "(server_id: %ld), pos(%s, %lu)",
+                        (long) server_id, wi->log_file,
+                        (ulong) wi->log_pos);
+      if(wi->server_id == server_id)
+      {
+        sql_print_information("Deleted wait_none_info object "
+                        "(server_id: %ld), pos(%s, %lu)",
+                        (long) server_id, wi->log_file,
+                        (ulong) wi->log_pos);
+        wi=0;
+        delete wi;
+      }
+    }
+   if (!wait_none_info.head())
+      wait_none_info.empty();
+    */
   }
 
   int add_to_wait_none_info(uint32 server_id, const char *log_file_name,

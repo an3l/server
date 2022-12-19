@@ -789,6 +789,10 @@ int Repl_semi_sync_master::add_to_wait_none_info(uint32 server_id,
     slave_wait_none_info->server_id= server_id;
     slave_wait_none_info->log_pos= log_file_pos;
     wait_none_info.push_back(slave_wait_none_info);
+    sql_print_information("Add wait_none_info object to empty "
+                        "(server_id: %ld), pos(%s, %lu)",
+                        (long) server_id, log_file_name,
+                        (ulong) log_file_pos);
   }
   else
   {
@@ -797,7 +801,12 @@ int Repl_semi_sync_master::add_to_wait_none_info(uint32 server_id,
       if(wi->server_id == server_id)
       {
         wi->server_id= server_id;
+        strncpy(wi->log_file, log_file_name, FN_REFLEN);
         wi->log_pos= log_file_pos;
+        sql_print_information("Update wait_none_info object "
+                        "(server_id: %ld), pos(%s, %lu)",
+                        (long) server_id, log_file_name,
+                        (ulong) log_file_pos);
         continue;
       }
       else
@@ -808,6 +817,10 @@ int Repl_semi_sync_master::add_to_wait_none_info(uint32 server_id,
         slave_wait_none_info->server_id= server_id;
         slave_wait_none_info->log_pos= log_file_pos;
         wait_none_info.push_back(slave_wait_none_info);
+        sql_print_information("Add wait_none_info object to existing"
+                        "(server_id: %ld), pos(%s, %lu)",
+                        (long) server_id, log_file_name,
+                        (ulong) log_file_pos);
       }
     }
   }

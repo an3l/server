@@ -2867,6 +2867,8 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
 
   /* Check if the dump thread is created by a slave with semisync enabled. */
   thd->semi_sync_slave = is_semi_sync_slave();
+  if (thd->semi_sync_slave)
+      sql_print_information("Semi-sync replication enabled on slave.");
 
   DBUG_ASSERT(pos == linfo.pos);
   //rpl_semi_sync_slave_enabled
