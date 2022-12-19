@@ -118,14 +118,19 @@ source include/wait_for_status_var.inc;
 show status like 'Rpl_semi_sync_master_clients';
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
 SHOW REPLICA HOSTS;
+
 create table t1(a int);
 INSERT INTO t1 SET a=1;
 show status like 'Rpl_semi_sync_master_status';
 show status like 'Rpl_semi_sync_master_no_tx';
 show status like 'Rpl_semi_sync_master_yes_tx';
 show status like 'Rpl_semi_sync_master_clients';
+let $status_var_value= 2;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
-SHOW REPLICA HOSTS;
+SHOW SLAVE HOSTS;
+
 sync_slave_with_master;
 show status like 'Rpl_semi_sync_master_yes_tx';
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
@@ -163,6 +168,8 @@ SHOW REPLICA HOSTS;
 
 --echo # Cleanup
 DROP TABLE t1;
+DROP TABLE t;
+set global rpl_semi_sync_master_enabled = 0;
 --source include/rpl_end.inc
 
 eval SET @@global.rpl_semi_sync_master_wait_point = $save_wait_point;

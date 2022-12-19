@@ -207,7 +207,7 @@ static my_bool show_slave_hosts_callback(THD *thd, Protocol *protocol)
       {
         if(wi->server_id == si->server_id)
         {
-          log_file= wi->log_file && wi->log_file[0] ? wi->log_file :0;
+          log_file= wi->log_file && wi->log_file[0] ? wi->log_file : NULL;
           log_pos= wi->log_pos;
           gtid_state_from_binlog_pos(log_file, (uint32)log_pos, gtid);
 
@@ -263,10 +263,9 @@ bool show_slave_hosts(THD* thd)
                        Item_return_int(thd, "Master_id", 10, MYSQL_TYPE_LONG),
                        thd->mem_root);
   if (rpl_semi_sync_master_enabled &&
-      repl_semisync_master.wait_point() == SEMI_SYNC_MASTER_WAIT_POINT_NONE)
+      repl_semisync_master.wait_point() == SEMI_SYNC_MASTER_WAIT_POINT_NONE &&
+      !repl_semisync_master.wait_none_info.is_empty())
   {
-    if (!repl_semisync_master.wait_none_info.is_empty())
-    {
       field_list.push_back(new (mem_root)
                         Item_empty_string(thd, "Semisync", 5),
                         thd->mem_root);
@@ -279,7 +278,6 @@ bool show_slave_hosts(THD* thd)
       field_list.push_back(new (mem_root)
                           Item_empty_string(thd, "Gtid", GTID_MAX_STR_LENGTH),
                           thd->mem_root);
-    }
   }
   if (protocol->send_result_set_metadata(&field_list,
                             Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))

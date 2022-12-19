@@ -352,6 +352,7 @@ Repl_semi_sync_master::Repl_semi_sync_master()
 {
   strcpy(m_reply_file_name, "");
   strcpy(m_wait_file_name, "");
+  wait_none_info.empty();
 }
 
 int Repl_semi_sync_master::init_object()
@@ -621,8 +622,6 @@ int Repl_semi_sync_master::report_reply_binlog(uint32 server_id,
     /* We check to see whether we can switch semi-sync ON. */
     try_switch_on(server_id, log_file_name, log_file_pos);
 
-
-  add_to_wait_none_info(server_id, log_file_name, log_file_pos);
   /* The position should increase monotonically, if there is only one
    * thread sending the binlog to the slave.
    * In reality, to improve the transaction availability, we allow multiple
@@ -658,6 +657,7 @@ int Repl_semi_sync_master::report_reply_binlog(uint32 server_id,
     /* Remove all active transaction nodes before this point. */
     assert(m_active_tranxs != NULL);
     m_active_tranxs->clear_active_tranx_nodes(log_file_name, log_file_pos);
+    add_to_wait_none_info(server_id, log_file_name, log_file_pos);
 
     DBUG_PRINT("semisync", ("%s: Got reply at (%s, %lu)",
                             "Repl_semi_sync_master::report_reply_binlog",
@@ -831,6 +831,7 @@ int Repl_semi_sync_master::dump_start(THD* thd,
   }
 
   add_slave();
+  if (wait_point() != SEMI_SYNC_MASTER_WAIT_POINT_NONE)
   report_reply_binlog(thd->variables.server_id,
                       log_file + dirname_length(log_file), log_pos);
   sql_print_information("Start semi-sync binlog_dump to slave "

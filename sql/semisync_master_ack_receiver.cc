@@ -259,7 +259,6 @@ void Ack_receiver::run()
 
     set_stage_info(stage_reading_semi_sync_ack);
     Slave_ilist_iterator it(m_slaves);
-    repl_semisync_master.wait_none_info.empty();
     while ((slave= it++))
     {
       if (listener.is_socket_active(slave))
@@ -275,6 +274,7 @@ void Ack_receiver::run()
         net.compress= slave->thd->net.compress;
 
         len= my_net_read(&net);
+        repl_semisync_master.remove_wait_none_info(slave->server_id());
         if (likely(len != packet_error))
           repl_semisync_master.report_reply_packet(slave->server_id(),
                                                    net.read_pos, len);
