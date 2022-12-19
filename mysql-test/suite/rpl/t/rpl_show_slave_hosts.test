@@ -49,4 +49,173 @@ source include/wait_show_condition.inc;
 --replace_result $SLAVE_MYPORT SLAVE_PORT
 SHOW SLAVE HOSTS;
 
+--echo #
+--echo # MDEV-21322: report slave progress to the master
+--echo #
+reset master;
+let $save_wait_point = `select @@global.rpl_semi_sync_master_wait_point`;
+set @@global.rpl_semi_sync_master_wait_point= "NONE";
+--echo # Master didn't enabled semisync
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+--echo # Master enabled semisync and Replica 1 should already be connected with server id 2
+set global rpl_semi_sync_master_enabled = 1;
+show variables like 'rpl_semi_sync_master_enabled';
+
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+--echo # Set semisync on replica 1 and check show replica hosts
+connection slave;
+stop slave;
+reset slave;
+set global rpl_semi_sync_slave_enabled = 1;
+start slave;
+show variables like 'rpl_semi_sync_slave_enabled';
+source include/wait_for_slave_io_to_start.inc;
+connection master;
+
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+--echo # Check GTID on server id 2
+create table t(t int);
+insert into t values (1);
+
+show status like 'Rpl_semi_sync_master_status';
+show status like 'Rpl_semi_sync_master_no_tx';
+show status like 'Rpl_semi_sync_master_yes_tx';
+let $status_var= Rpl_semi_sync_master_clients;
+let $status_var_value= 1;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+--echo # Check with new replication server with id 3
+connection slave2;
+RESET SLAVE;
+--replace_result $MASTER_MYPORT MASTER_PORT
+--eval CHANGE MASTER TO master_host='127.0.0.1',master_port=$MASTER_MYPORT,master_user='root'
+START SLAVE IO_THREAD;
+source include/wait_for_slave_io_to_start.inc;
+connection master;
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
+SHOW REPLICA HOSTS;
+
+--echo # Enable semisync replication on server with id 3
+connection slave2;
+stop slave;
+reset slave;
+set global rpl_semi_sync_slave_enabled = 1;
+start slave;
+show variables like 'rpl_semi_sync_slave_enabled';
+source include/wait_for_slave_io_to_start.inc;
+connection master;
+let $status_var_value= 2;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
+SHOW REPLICA HOSTS;
+create table t1(a int);
+INSERT INTO t1 SET a=1;
+show status like 'Rpl_semi_sync_master_status';
+show status like 'Rpl_semi_sync_master_no_tx';
+show status like 'Rpl_semi_sync_master_yes_tx';
+show status like 'Rpl_semi_sync_master_clients';
+let $status_var_value= 2;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
+SHOW REPLICA HOSTS;
+
+--echo # Replica 1 changed rpl_semi_sync_enabled value to 0 (asynchronous replication)
+connection slave2;
+stop slave;
+reset slave;
+set global rpl_semi_sync_slave_enabled = 0;
+start slave;
+echo [ slave status should be OFF ];
+show status like 'Rpl_semi_sync_slave_status';
+
+connection master;
+let $status_var= Rpl_semi_sync_master_clients;
+let $status_var_value= 1;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+echo [ master status should be ON ];
+let $status_var= Rpl_semi_sync_master_status;
+let $status_var_value= ON;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_status';
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
+SHOW REPLICA HOSTS;
+
+--echo # Stop replica 1 and see the changes 
+connection slave2;
+stop slave;
+connection master;
+let $status_var= Rpl_semi_sync_master_clients;
+let $status_var_value= 1;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
+SHOW REPLICA HOSTS;
+
+--echo #  Replica 2 changed rpl_semi_sync_enabled value to 0
+connection slave;
+stop slave;
+reset slave;
+set global rpl_semi_sync_slave_enabled = 0;
+start slave;
+connection master;
+let $status_var= Rpl_semi_sync_master_clients;
+let $status_var_value= 0;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
+SHOW REPLICA HOSTS;
+
+--echo # Stop replica 2 and see the changes
+connection slave;
+stop slave;
+connection master;
+let $status_var= Rpl_semi_sync_master_clients;
+let $status_var_value= 0;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
+SHOW REPLICA HOSTS;
+
+--echo # Cleanup
+connection slave2;
+start slave;
+connection slave;
+start slave;
+
+connection master;
+DROP TABLE t;
+sync_slave_with_master;
+
+connection master;
+DROP TABLE t1;
+sync_slave_with_master;
+
+--echo # Disconnect slave from asynchronous replication
+connection slave2;
+source include/stop_slave.inc;
+set global rpl_semi_sync_slave_enabled= 0;
+change master to master_user='root',master_password='';
+connection master;
+disconnect slave2;
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT $SLAVE_MYPORT2 SLAVE_PORT2
+SHOW REPLICA HOSTS;
+
+connection master;
+set global rpl_semi_sync_master_enabled = 0;
+set global rpl_semi_sync_master_timeout= default;
+
+eval SET @@global.rpl_semi_sync_master_wait_point = $save_wait_point;
+SELECT @@global.rpl_semi_sync_master_wait_point;
 --source include/rpl_end.inc

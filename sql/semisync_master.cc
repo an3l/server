@@ -51,14 +51,6 @@ ulonglong rpl_semi_sync_master_trx_wait_time = 0;
 Repl_semi_sync_master repl_semisync_master;
 Ack_receiver ack_receiver;
 
-/*
-  structure to save transaction log filename and position
-*/
-typedef struct Trans_binlog_info {
-  my_off_t log_pos;
-  char log_file[FN_REFLEN];
-} Trans_binlog_info;
-
 static int get_wait_time(const struct timespec& start_ts);
 
 static ulonglong timespec_to_usec(const struct timespec *ts)
@@ -551,7 +543,7 @@ void Repl_semi_sync_master::remove_slave()
   unlock();
 }
 
-int Repl_semi_sync_master::report_reply_packet(uint32 server_id,
+int Repl_semi_sync_master::report_reply_packet(THD *thd, uint32 server_id,
                                                const uchar *packet,
                                                ulong packet_len)
 {
@@ -592,6 +584,12 @@ int Repl_semi_sync_master::report_reply_packet(uint32 server_id,
                           log_file_name, (ulong)log_file_pos, server_id));
 
   rpl_semi_sync_master_get_ack++;
+  if (rpl_semi_sync_master_enabled &&
+      repl_semisync_master.wait_point() == SEMI_SYNC_MASTER_WAIT_POINT_NONE)
+  {
+    strncpy(thd->slave_info->tr.log_file, log_file_name, FN_REFLEN);
+    thd->slave_info->tr.log_pos= log_file_pos;
+  }
   report_reply_binlog(server_id, log_file_name, log_file_pos);
 
 l_end:

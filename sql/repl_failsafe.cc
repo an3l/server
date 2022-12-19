@@ -37,18 +37,7 @@
 #include "rpl_filter.h"
 #include "log_event.h"
 #include <mysql.h>
-
-
-struct Slave_info
-{
-  uint32 server_id;
-  uint32 master_id;
-  char host[HOSTNAME_LENGTH*SYSTEM_CHARSET_MBMAXLEN+1];
-  char user[USERNAME_LENGTH+1];
-  char password[MAX_PASSWORD_LENGTH*SYSTEM_CHARSET_MBMAXLEN+1];
-  uint16 port;
-};
-
+#include "semisync_master.h"
 
 Atomic_counter<uint32_t> binlog_dump_thread_count;
 ulong rpl_status=RPL_NULL;
@@ -125,9 +114,9 @@ int THD::register_slave(uchar *packet, size_t packet_length)
   if (check_access(this, PRIV_COM_REGISTER_SLAVE, any_db.str, NULL,NULL,0,0))
     return 1;
   if (!(si= (Slave_info*)my_malloc(key_memory_SLAVE_INFO, sizeof(Slave_info),
-                                   MYF(MY_WME))))
+                                   MYF(MY_ZEROFILL))))
     return 1;
-
+  memset(si->tr.log_file, '\0', FN_REFLEN);
   variables.server_id= si->server_id= uint4korr(p);
   p+= 4;
   get_object(p,si->host, "Failed to register slave: too long 'report-host'");
@@ -179,7 +168,12 @@ static my_bool show_slave_hosts_callback(THD *thd, Protocol *protocol)
 {
   my_bool res= FALSE;
   mysql_mutex_lock(&thd->LOCK_thd_data);
-  if (auto si= thd->slave_info)
+  String gtid[GTID_MAX_STR_LENGTH];
+  const char *log_file;
+  my_off_t log_pos;
+  const char buf[4]= "OFF";
+  const String tmp(buf, sizeof(buf), &my_charset_bin);
+  if (const Slave_info *si= thd->slave_info)
   {
     protocol->prepare_for_resend();
     protocol->store(si->server_id);
@@ -191,6 +185,17 @@ static my_bool show_slave_hosts_callback(THD *thd, Protocol *protocol)
     }
     protocol->store((uint32) si->port);
     protocol->store(si->master_id);
+    if (rpl_semi_sync_master_enabled &&
+        repl_semisync_master.wait_point() == SEMI_SYNC_MASTER_WAIT_POINT_NONE)
+    {
+      log_file= si->tr.log_file && si->tr.log_file[0] ? si->tr.log_file :0;
+      log_pos= si->tr.log_pos;
+      gtid_state_from_binlog_pos(log_file, (uint32)log_pos, gtid);
+      protocol->store((char*) tmp.ptr(), tmp.length()-1, &my_charset_bin);
+      protocol->store(log_file, safe_strlen(log_file), &my_charset_bin);
+      protocol->store(log_pos);
+      protocol->store(gtid);
+    }
     res= protocol->write();
   }
   mysql_mutex_unlock(&thd->LOCK_thd_data);
@@ -234,6 +239,23 @@ bool show_slave_hosts(THD* thd)
   field_list.push_back(new (mem_root)
                        Item_return_int(thd, "Master_id", 10, MYSQL_TYPE_LONG),
                        thd->mem_root);
+
+  if (rpl_semi_sync_master_enabled &&
+      repl_semisync_master.wait_point() == SEMI_SYNC_MASTER_WAIT_POINT_NONE)
+  {
+    field_list.push_back(new (mem_root)
+                        Item_empty_string(thd, "Semisync", 5),
+                        thd->mem_root);
+    field_list.push_back(new (mem_root)
+                        Item_empty_string(thd, "File", FN_REFLEN),
+                        thd->mem_root);
+    field_list.push_back(new (mem_root)
+                        Item_return_int(thd, "Position", MY_INT64_NUM_DECIMAL_DIGITS, MYSQL_TYPE_LONGLONG),
+                        thd->mem_root);
+    field_list.push_back(new (mem_root)
+                        Item_empty_string(thd, "Gtid", GTID_MAX_STR_LENGTH),
+                        thd->mem_root);
+  }
 
   if (protocol->send_result_set_metadata(&field_list,
                             Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
