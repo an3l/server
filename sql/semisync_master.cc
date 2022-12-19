@@ -820,8 +820,6 @@ int Repl_semi_sync_master::dump_start(THD* thd,
 {
   if (!thd->semi_sync_slave)
     return 0;
-  if(!wait_none_info.is_empty())
-    remove_wait_none_info(thd->variables.server_id);
   if (ack_receiver.add_slave(thd))
   {
     sql_print_error("Failed to register slave to semi-sync ACK receiver "
@@ -832,7 +830,7 @@ int Repl_semi_sync_master::dump_start(THD* thd,
 
   add_slave();
   if (wait_point() != SEMI_SYNC_MASTER_WAIT_POINT_NONE)
-  report_reply_binlog(thd->variables.server_id,
+    report_reply_binlog(thd->variables.server_id,
                       log_file + dirname_length(log_file), log_pos);
   sql_print_information("Start semi-sync binlog_dump to slave "
                         "(server_id: %ld), pos(%s, %lu)",

@@ -689,6 +689,8 @@ class Repl_semi_sync_master
     Wait_none_info_ilist_iterator it(wait_none_info);
     while(Wait_none_info *wi= it++)
     {
+      if (server_id == 0)
+        delete wi;
       if(wi->server_id == server_id)
         delete wi;
     }

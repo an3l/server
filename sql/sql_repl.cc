@@ -2869,7 +2869,7 @@ void mysql_binlog_send(THD* thd, char* log_ident, my_off_t pos,
   thd->semi_sync_slave = is_semi_sync_slave();
 
   DBUG_ASSERT(pos == linfo.pos);
-
+  //rpl_semi_sync_slave_enabled
   if (repl_semisync_master.dump_start(thd, linfo.log_file_name, linfo.pos))
   {
     info->errmsg= "Failed to run hook 'transmit_start'";
