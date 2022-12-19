@@ -692,7 +692,10 @@ class Repl_semi_sync_master
       if (server_id == 0)
         delete wi;
       if(wi->server_id == server_id)
+      {
+        wi=0;
         delete wi;
+      }
     }
   }
 
