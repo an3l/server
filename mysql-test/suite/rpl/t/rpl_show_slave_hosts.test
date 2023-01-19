@@ -49,4 +49,76 @@ source include/wait_show_condition.inc;
 --replace_result $SLAVE_MYPORT SLAVE_PORT
 SHOW SLAVE HOSTS;
 
+
+--echo #
+--echo # MDEV-21322: report slave progress to the master
+--echo #
+
+select @@global.rpl_semi_sync_master_wait_point;
+reset master;
+
+--echo # Test 1: Master has not enabled semisync
+--echo # Note:   even if not enabled semisync 2 new columns should be visible
+--echo #         that means, command should return 6 columns,
+--echo #         with already connected replica server_id=2
+--echo # -------------------------------------------
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW SLAVE HOSTS;
+
+--echo # Test 2: Master enabled semisync
+--echo # Note:   it should be the same as test 1
+--echo # -------------------------------------------
+set global rpl_semi_sync_master_enabled = 1;
+show variables like 'rpl_semi_sync_master_enabled';
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW SLAVE HOSTS;
+
+
+--echo # Test 3: Replica enabled semisync
+--echo # Note:   No new GTIDs expected empty result
+--echo # -------------------------------------------
+connection slave;
+stop slave;
+reset slave;
+set global rpl_semi_sync_slave_enabled = 1;
+start slave;
+show variables like 'rpl_semi_sync_slave_enabled';
+source include/wait_for_slave_io_to_start.inc;
+connection master;
+
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+show variables like 'rpl_semi_sync_master_enabled';
+
+--echo # Test 4: Make new events - generate new GTID
+--echo # Note:   
+--echo # -------------------------------------------
+create table t(t int);
+insert into t values (1);
+
+show status like 'Rpl_semi_sync_master_status';
+show status like 'Rpl_semi_sync_master_no_tx';
+show status like 'Rpl_semi_sync_master_yes_tx';
+let $status_var= Rpl_semi_sync_master_clients;
+let $status_var_value= 1;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+# Here we should get ACK
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+--echo # cleanup
+--echo # -------------------------------------------
+connection master;
+drop table t;
+
+connection slave;
+stop slave;
+reset slave;
+set global rpl_semi_sync_slave_enabled = 0;
+start slave;
+show variables like 'rpl_semi_sync_slave_enabled';
+
+connection master;
+set global rpl_semi_sync_master_enabled = 0;
 --source include/rpl_end.inc

@@ -28,6 +28,32 @@ extern PSI_mutex_key key_LOCK_binlog;
 extern PSI_cond_key key_COND_binlog_send;
 #endif
 
+
+/*
+  structure to save transaction log filename and position
+*/
+typedef struct Trans_binlog_info {
+  my_off_t log_pos;
+  char log_file[FN_REFLEN];
+} Trans_binlog_info;
+
+
+struct Slave_info
+{
+  uint32 server_id;
+  uint32 master_id;
+  char host[HOSTNAME_LENGTH*SYSTEM_CHARSET_MBMAXLEN+1];
+  char user[USERNAME_LENGTH+1];
+  char password[MAX_PASSWORD_LENGTH*SYSTEM_CHARSET_MBMAXLEN+1];
+  uint16 port;
+/* Following attributes are slave info, since they are used for show_slave_hosts
+   that is executed on master, when called meaning will be oposite on master side
+*/
+  Trans_binlog_info gtid_state_sent;
+  Trans_binlog_info gtid_state_ack;
+};
+
+
 struct Tranx_node {
   char              log_name[FN_REFLEN];
   my_off_t          log_pos;
@@ -516,7 +542,7 @@ class Repl_semi_sync_master
   void remove_slave();
 
   /* It parses a reply packet and call report_reply_binlog to handle it. */
-  int report_reply_packet(uint32 server_id, const uchar *packet,
+  int report_reply_packet(THD *thd, uint32 server_id, const uchar *packet,
                         ulong packet_len);
 
   /* In semi-sync replication, reports up to which binlog position we have
@@ -531,7 +557,7 @@ class Repl_semi_sync_master
    * Return:
    *  0: success;  non-zero: error
    */
-  int report_reply_binlog(uint32 server_id,
+  int report_reply_binlog(THD *thd, uint32 server_id,
                           const char* log_file_name,
                           my_off_t end_offset);
 
