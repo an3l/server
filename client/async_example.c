@@ -187,6 +187,8 @@ doit(const char *host, const char *user, const char *password)
   {
     status= wait_for_mysql(&mysql, status);
     status= mysql_close_cont(&mysql, status);
+    if (status)
+      mysql_close(&mysql);
   }
 }
 
