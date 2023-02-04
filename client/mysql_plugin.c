@@ -1125,7 +1125,8 @@ static int build_bootstrap_file(char *operation, char *bootstrap)
   }
   
 exit:
-  fclose(file);
+  if (file)
+    fclose(file);
   return error;
 }
 
