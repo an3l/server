@@ -3630,9 +3630,12 @@ void do_system(struct st_command *command)
 /* returns TRUE if path is inside a sandbox */
 bool is_sub_path(const char *path, size_t plen, const char *sandbox)
 {
-  size_t len= strlen(sandbox);
-  if (!sandbox || !len || plen <= len || memcmp(path, sandbox, len - 1)
-      || path[len] != '/')
+  size_t len;
+  if (!sandbox)
+    return false;
+  else
+    len= strlen(sandbox);
+  if (plen <= len || memcmp(path, sandbox, len - 1) || path[len] != '/')
     return false;
   return true;
 }
@@ -6128,6 +6131,7 @@ void do_connect(struct st_command *command)
     mysql_options(con_slot->mysql, MYSQL_OPT_COMPRESS, NullS);
   mysql_options(con_slot->mysql, MYSQL_SET_CHARSET_NAME,
                 csname ? csname : charset_info->cs_name.str);
+  free(csname);
   if (opt_charsets_dir)
     mysql_options(con_slot->mysql, MYSQL_SET_CHARSET_DIR,
                   opt_charsets_dir);
@@ -11888,7 +11892,7 @@ void dynstr_append_sorted(DYNAMIC_STRING* ds, DYNAMIC_STRING *ds_input,
 
   /* Sort array */
   qsort(lines.buffer, lines.elements,
-        sizeof(char**), (qsort_cmp)comp_lines);
+        sizeof(uchar *), (qsort_cmp)comp_lines);
 
   /* Create new result */
   for (i= 0; i < lines.elements ; i++)
