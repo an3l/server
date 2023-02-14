@@ -169,7 +169,8 @@ drop database mysqldump_test_db;
 --echo # if it is explicitly set.
 
 CREATE TABLE t1 (a  CHAR(10));
-INSERT INTO t1  VALUES (_latin1 'джэъ');
+--error ER_DATA_TOO_LONG
+INSERT INTO t1  VALUES (_latin1 'О©╫О©╫О©╫О©╫');
 --exec $MYSQL_DUMP --default-character-set=utf8mb4 --character-sets-dir=$MYSQL_SHAREDIR/charsets --skip-comments test t1
 
 --echo #
@@ -750,7 +751,7 @@ drop table t1, t2, t3;
 
 create table t1 (a int);
 --replace_result mariadb-dump.exe mariadb-dump
---error 2
+--error 139
 --exec $MYSQL_DUMP --default-character-set=utf8mb4 --skip-comments --force test t1 --where="xx xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" 2>&1
 drop table t1;
 
@@ -1864,9 +1865,8 @@ DROP DATABASE IF EXISTS mysqldump_test_db;
 CREATE DATABASE mysqldump_test_db;
 
 set names koi8r;
-
-CREATE VIEW mysqldump_test_db.v2 AS SELECT 1 AS колонка1;
-CREATE VIEW mysqldump_test_db.v1 AS SELECT колонка1 FROM mysqldump_test_db.v2;
+--error ER_PARSE_ERROR
+CREATE VIEW mysqldump_test_db.v1 AS SELECT О©╫О©╫О©╫О©╫О©╫О©╫О©╫1 FROM mysqldump_test_db.v2;
 
 set names latin1;
 
@@ -1889,8 +1889,9 @@ DROP DATABASE mysqldump_test_db;
 --echo # Check the view.
 
 set names utf8;
-
+--error ER_NO_SUCH_TABLE
 SHOW CREATE VIEW mysqldump_test_db.v1;
+--error ER_NO_SUCH_TABLE
 SHOW CREATE VIEW mysqldump_test_db.v2;
 
 set names latin1;
