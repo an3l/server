@@ -3588,6 +3588,12 @@ int main(int argc, char** argv)
 
   my_set_max_open_files(open_files_limit);
 
+  if (opt_flashback && opt_raw_mode)
+  {
+    error("The --raw mode is not allowed with --flashback mode");
+    die();
+  }
+
   if (opt_flashback)
   {
     my_init_dynamic_array(PSI_NOT_INSTRUMENTED, &binlog_events,
