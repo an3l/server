@@ -592,7 +592,7 @@ l_end:
   DBUG_RETURN(result);
 }
 
-int Repl_semi_sync_master::report_reply_binlog(THD *thd, uint32 server_id,
+int Repl_semi_sync_master::report_reply_binlog(THD *replica_thd, uint32 server_id,
                                                const char *log_file_name,
                                                my_off_t log_file_pos)
 {
@@ -674,8 +674,8 @@ int Repl_semi_sync_master::report_reply_binlog(THD *thd, uint32 server_id,
   }
   if (rpl_semi_sync_master_enabled)
   {
-    strncpy(thd->slave_info->gtid_state_ack.log_file, log_file_name, strlen(log_file_name));
-    thd->slave_info->gtid_state_ack.log_pos= log_file_pos;
+    strncpy(replica_thd->slave_info->gtid_state_ack.log_file, log_file_name, strlen(log_file_name));
+    replica_thd->slave_info->gtid_state_ack.log_pos= log_file_pos;
   }
 
  l_end:

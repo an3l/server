@@ -46,8 +46,8 @@ struct Slave_info
   char user[USERNAME_LENGTH+1];
   char password[MAX_PASSWORD_LENGTH*SYSTEM_CHARSET_MBMAXLEN+1];
   uint16 port;
-/* Following attributes are slave info, since they are used for show_slave_hosts
-   that is executed on master, when called meaning will be oposite on master side
+/* Following attributes are information of replica used during show_slave_hosts
+   command that is executed on primary.
 */
   Trans_binlog_info gtid_state_sent;
   Trans_binlog_info gtid_state_ack;
@@ -549,6 +549,7 @@ class Repl_semi_sync_master
    * received replies from the slave indicating that it already get the events.
    *
    * Input:
+   *  replica_thd   - (IN)  replica thread
    *  server_id     - (IN)  master server id number
    *  log_file_name - (IN)  binlog file name
    *  end_offset    - (IN)  the offset in the binlog file up to which we have
@@ -557,7 +558,7 @@ class Repl_semi_sync_master
    * Return:
    *  0: success;  non-zero: error
    */
-  int report_reply_binlog(THD *thd, uint32 server_id,
+  int report_reply_binlog(THD *replica_thd, uint32 server_id,
                           const char* log_file_name,
                           my_off_t end_offset);
 
