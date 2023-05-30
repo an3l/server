@@ -156,18 +156,39 @@ show status like 'Rpl_semi_sync_master_yes_tx';
 --replace_column 3 'SLAVE_PORT'
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
 SHOW REPLICA HOSTS;
+# Determine binlog_dump_thread_count, number of connected semi-sync replica
+show status like "Slaves_connected";
 
 --echo # Test 7: Simulate stop of the IO thread of replica
 --echo # Note:   Expecting the result of show statement will not be visible
 --echo # -------------------------------------------
 connection slave;
-STOP SLAVE IO_THREAD;
---source include/wait_for_slave_io_to_stop.inc
+let $status_var= rpl_semi_sync_slave_status;
+let $status_var_value= ON;
+source include/wait_for_status_var.inc;
+show status like 'rpl_semi_sync_slave%';
 show variables like 'rpl_semi_sync_slave_enabled';
 
-# This is weird, how could be possible that `rpl_semi_sync_master_clients` is decreased and we still have ON for `rpl_semi_sync_slave_enabled` ?
+STOP SLAVE IO_THREAD;
+--source include/wait_for_slave_io_to_stop.inc
+
+let $status_var= rpl_semi_sync_slave_status;
+let $status_var_value= OFF;
+source include/wait_for_status_var.inc;
+
 connection master;
+# Note without waiting that master registers replica, multiple rows (cached) for 
+# the same replica may be showed in show replica hosts statement.
+# Rpl_semi_sync_master_clients can not be trusted compared to previous status check.
+let $status_var= Slaves_connected;
+let $status_var_value= 1;
+source include/wait_for_status_var.inc;
+show status like "Slaves_connected";
+
 show status like 'Rpl_semi_sync_master_clients';
+show status like 'rpl_semi_sync_slave%';
+show variables like 'rpl_semi_sync_slave_enabled';
+
 --replace_column 3 'SLAVE_PORT'
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
 SHOW REPLICA HOSTS;
@@ -184,9 +205,17 @@ SHOW REPLICA HOSTS;
 connection slave;
 START SLAVE IO_THREAD;
 --source include/wait_for_slave_io_to_start.inc
+let $status_var= rpl_semi_sync_slave_status;
+let $status_var_value= ON;
+source include/wait_for_status_var.inc;
+show status like 'rpl_semi_sync_slave%';
 show variables like 'rpl_semi_sync_slave_enabled';
 
 connection master;
+let $status_var= Slaves_connected;
+let $status_var_value= 2;
+source include/wait_for_status_var.inc;
+show status like "Slaves_connected";
 show status like 'Rpl_semi_sync_master_clients';
 --replace_column 3 'SLAVE_PORT'
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
@@ -199,14 +228,17 @@ show status like 'Rpl_semi_sync_master_clients';
 --replace_column 3 'SLAVE_PORT'
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
 SHOW REPLICA HOSTS;
+show status like "Slaves_connected";
 
 --echo # Test 8: Replica server_id=2 failure
---echo # Note:   Simulate replicas failure by making replica busy.
+--echo # Note 1:   Simulate replicas failure by making replica busy.
 --echo #         Consequence is that replica will be unregistered and that is why
 --echo #         we need to wait that replica unregisters.
 --echo #         By creating new event, only working replicas should respond
---echo #         (server_id=3) with ACK, and we will still have the old result
---echo #         from busy replica (QUESTION 1 (below): why cached result is showed in show statement if thread is unregistered?)
+--echo #         (server_id=3) with ACK
+--echo # Note 2: In order not to show old result from server_id=2,from busy replica
+--echo #         we have to *wait* that binlog_dump_thread_count showed with status 
+--echo #         `Slaves_connected` to decrease and after that check show statement.
 --echo # -------------------------------------------
 connection slave;
 --let $sav_server_2_dbug= `SELECT @@GLOBAL.debug_dbug`
@@ -219,15 +251,11 @@ let $status_var_value= 6;
 source include/wait_for_status_var.inc;
 show status like 'Rpl_semi_sync_master_yes_tx';
 
-let $status_var= Rpl_semi_sync_master_clients;
+let $status_var= Slaves_connected;
 let $status_var_value= 1;
-let $status_timeout= 30; # 3[s]
 source include/wait_for_status_var.inc;
-show status like 'Rpl_semi_sync_master_clients';
-
-# Question 1:
-# If server_id=2 is unregistered in this momment from semi-sync, and it is
-# looking the output of previos command, show statement shouldn't show its row!
+show status like "Slaves_connected";
+let $status_var= Rpl_semi_sync_master_clients;
 
 --replace_column 3 'SLAVE_PORT'
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
@@ -236,15 +264,18 @@ SHOW REPLICA HOSTS;
 connection slave;
 --eval SET @@GLOBAL.debug_dbug= "$sav_server_2_dbug"
 
-# Below show statment outputs the same result as above (and it's wrong, should be single row server_id=3)
-# Question 2:
-# See in Test 9, when server_id is stopped than no server_id=2 is shown, why?
 connection master;
+let $status_var= Slaves_connected;
+# Setting the old value for debug_dbug will not start the slave
+let $status_var_value= 1;
+source include/wait_for_status_var.inc;
+show status like "Slaves_connected";
+show status like 'Rpl_semi_sync_master_clients';
 --replace_column 3 'SLAVE_PORT'
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
 SHOW REPLICA HOSTS;
 
---echo # Test 9: Stop server_id=3.
+--echo # Test 9: Stop server_id=3
 --echo # Note:   Reason to simulate the same behaviour is to check that
 --echo #         no replicas get new generated event, so show statement
 --echo #         is expected to be empty.
@@ -254,9 +285,13 @@ connection slave2;
 --source include/reset_slave.inc
 
 connection master;
-INSERT INTO t VALUES (5);
+let $status_var= Slaves_connected;
+let $status_var_value= 0;
+source include/wait_for_status_var.inc;
+show status like "Slaves_connected";
 show status like 'Rpl_semi_sync_master_yes_tx';
 show status like 'Rpl_semi_sync_master_clients';
+INSERT INTO t VALUES (5);
 
 --replace_column 3 'SLAVE_PORT'
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
