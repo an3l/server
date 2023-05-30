@@ -159,6 +159,116 @@ SHOW REPLICA HOSTS;
 # Determine binlog_dump_thread_count, number of connected semi-sync replica
 show status like "Slaves_connected";
 
+--echo # Test 6.1: Check rpl_semi_sync_master_timeout=0 aka async
+--echo # Note 1:   For asynchronous replication `Gtid_state_sent` is not null,
+--echo #           but `Gtid_state_ack` is null.
+--echo # Note 2:   We want that `rpl_semi_sync_master_timeout=0` be edge case,
+--echo #           by mimicking asynchronous replication, for which
+--echo #           `Gtid_state_ack` should not update (see Note 3).
+--echo # Note 3:   With this option we want `Gtid_state_ack` to reflect
+--echo #           the latest received transaction by the replica[s].
+--let $save_default_master_timeout= `SELECT @@GLOBAL.rpl_semi_sync_master_timeout`
+select @@global.rpl_semi_sync_master_timeout;
+set global rpl_semi_sync_master_timeout=0;
+select @@global.rpl_semi_sync_master_timeout;
+show variables like 'rpl_semi_sync_master_enabled';
+
+# `Gtid_State_Sent=Gtid_State_Ack=0-1-4`
+--replace_column 3 'SLAVE_PORT'
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+# --echo Write new event IO thread is running
+INSERT INTO t VALUES (505);
+
+# Should `yes_tx` be incremented, I guess not, since it is async
+let $status_var= Rpl_semi_sync_master_yes_tx;
+let $status_var_value= 4;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_yes_tx';
+
+--echo # Q1: Here we need to get the `Gtid_State_Sent=0-1-5 != Gtid_State_Ack=0-1-4` for server_id=2 OR MAYBE THIS IS GOOD,
+--echo # since IO thread of replicas is ON ?
+--echo # Currently we observed the same `Gtid_State_Sent=Gtid_State_Ack=0-1-5`
+--replace_column 3 'SLAVE_PORT'
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+# Stop IO thread
+connection slave;
+STOP SLAVE IO_THREAD;
+--source include/wait_for_slave_io_to_stop.inc
+
+let $status_var= rpl_semi_sync_slave_status;
+let $status_var_value= OFF;
+source include/wait_for_status_var.inc;
+show status like 'rpl_semi_sync_slave%';
+show variables like 'rpl_semi_sync_slave_enabled';
+
+connection master;
+let $status_var= Slaves_connected;
+let $status_var_value= 1;
+source include/wait_for_status_var.inc;
+show status like "Slaves_connected";
+show status like 'Rpl_semi_sync_master_clients';
+show variables like 'rpl_semi_sync_slave_enabled';
+
+--echo # Q2: Here we don't get any row for server_id=2, but we should? we get only `Gtid_State_Sent= Gtid_State_Ack=0-1-5` for server_id=3
+--replace_column 3 'SLAVE_PORT'
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+--echo # Write new event when IO thread is stopped
+INSERT INTO t VALUES (505);
+--echo # Writing new events will affect only on replica server_id=3 Gtid_State_Sent= Gtid_State_Ack=0-1-6`
+--replace_column 3 'SLAVE_PORT'
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+# Start IO thread again
+connection slave;
+START SLAVE IO_THREAD;
+--source include/wait_for_slave_io_to_start.inc
+
+--echo # Q*: Stoping and starting the new IO thread will restart slave sent ack count, see below.
+--echo # So we basically want this to be recorded in edge case, right ? 
+--echo # And that is rpl_semi_sync_master_timeout=0 and rpl_semi_sync_master_enabled=TRUE
+--echo # Can we use this as patch instead of injecting the DBUG_SYNC?
+--echo # We are expecting here `Rpl_semi_sync_slave_send_ack == 4` 
+let $status_var= rpl_semi_sync_slave_status;
+let $status_var_value= ON;
+source include/wait_for_status_var.inc;
+show status like 'rpl_semi_sync_slave%';
+show variables like 'rpl_semi_sync_slave_enabled';
+
+connection master;
+let $status_var= Slaves_connected;
+let $status_var_value= 2;
+source include/wait_for_status_var.inc;
+show status like "Slaves_connected";
+let $status_var= Rpl_semi_sync_master_clients;
+let $status_var_value= 2;
+source include/wait_for_status_var.inc;
+show status like 'Rpl_semi_sync_master_clients';
+
+--echo # Q3: here we get  `Gtid_State_Sent= 0-1-5 != Gtid_State_Ack=''` (but Gtid_State_Ack should be 0-1-4 right?)
+--echo # So should we get for server_id=2 `Gtid_State_Sent= 0-1-6 != Gtid_State_Ack=0-1-4` ?
+--echo # Note if there were no new events here we woud get empty `Gtid_State_Sent= Gtid_State_Ack=''` for server_id=2, since server_id catched that event.
+
+--replace_column 3 'SLAVE_PORT'
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+sync_slave_with_master;
+
+--echo # Q4: here we get sync good with server_id=3, `Gtid_State_Sent= Gtid_State_Ack=0-1-6` for server_id=2?
+--echo # or  we should get for server_id=2 `Gtid_State_Sent= 0-1-6 != Gtid_State_Ack=0-1-4` ?
+connection master;
+--replace_column 3 'SLAVE_PORT'
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
+
+--eval SET @@GLOBAL.rpl_semi_sync_master_timeout= $save_default_master_timeout
+
 --echo # Test 7: Simulate stop of the IO thread of replica
 --echo # Note:   Expecting the result of show statement will not be visible
 --echo # -------------------------------------------
