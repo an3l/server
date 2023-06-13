@@ -85,6 +85,7 @@ create table t1 (a int);
 create sequence s1;
 create temporary table t1 (b int);
 create temporary sequence s1;
+create temporary sequence s2;
 --horizontal_results
 select table_schema, table_name, table_type, temporary from information_schema.tables where table_schema = 'test' order by 'table_schema';
 
@@ -92,6 +93,7 @@ drop table t1;
 drop table t1;
 drop table s1;
 drop table s1;
+drop table s2;
 
 # First we are removing temporary table and after base table
 drop table some_db.my_t;
@@ -178,6 +180,7 @@ create table base_table(t int);
 create temporary table tmp_table (b int, key(b));
 create sequence s1;
 create temporary sequence s1;
+create temporary sequence s2;
 
 # This should show all tables
 show tables;

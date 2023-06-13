@@ -4806,7 +4806,7 @@ end:
 static int fill_schema_table_names(THD *thd, TABLE_LIST *tables,
                                    LEX_CSTRING *db_name,
                                    LEX_CSTRING *table_name,
-                                   bool is_temp= false)
+                                   bool is_temp= false, bool is_temp_sequence=false)
 {
   TABLE *table= tables->table;
   if (db_name == &INFORMATION_SCHEMA_NAME)
@@ -4833,7 +4833,7 @@ static int fill_schema_table_names(THD *thd, TABLE_LIST *tables,
     else
     {
       if (is_temp)
-        if (is_sequence)
+        if (is_temp_sequence)
           table->field[3]->store(STRING_WITH_LEN("TEMPORARY SEQUENCE"), cs);
         else
           table->field[3]->store(STRING_WITH_LEN("TEMPORARY TABLE"), cs);
@@ -5345,8 +5345,12 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
               if (IS_USER_TEMP_TABLE(share_temp))
               {
                 if (schema_table_idx == SCH_TABLE_NAMES)
+                {
+                  bool is_temp_sequence= (tmp_tbl->s->table_type == TABLE_TYPE_SEQUENCE);
                   fill_schema_table_names(thd, tables, &tmp_tbl->s->db,
-                                          &tmp_tbl->s->table_name, true);
+                                          &tmp_tbl->s->table_name, true, is_temp_sequence);
+                }
+
                 else if (tmp_tbl->file->ha_table_flags() & HA_CAN_MULTISTEP_MERGE)
                 {
                   /*
