@@ -8,15 +8,15 @@ START SLAVE IO_THREAD;
 include/wait_for_slave_io_to_start.inc
 connection master;
 SHOW SLAVE HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1		
-2	localhost	SLAVE_PORT	1		
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1			asynchronous
+2	localhost	SLAVE_PORT	1			asynchronous
 connection slave2;
 include/stop_slave_io.inc
 connection master;
 SHOW SLAVE HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-2	localhost	SLAVE_PORT	1		
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+2	localhost	SLAVE_PORT	1			asynchronous
 #
 # MDEV-21322: report slave progress to the primary
 #
@@ -39,8 +39,8 @@ reset master;
 #         where replica with `server_id=2` is already connected
 # -----------------------------------------------------------------------
 SHOW SLAVE HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-2	localhost	SLAVE_PORT	1		
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+2	localhost	SLAVE_PORT	1			asynchronous
 # Test 2: Primary enabled semisync
 # Note:   it should be the same as test 1
 # -----------------------------------------------------------------------
@@ -49,8 +49,8 @@ show variables like 'rpl_semi_sync_master_enabled';
 Variable_name	Value
 rpl_semi_sync_master_enabled	ON
 SHOW SLAVE HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-2	localhost	SLAVE_PORT	1		
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+2	localhost	SLAVE_PORT	1			asynchronous
 # Test 3: Replica (server_id=2) enabled semisync
 # Note:   No new GTIDs, so expected empty `Gtid_State_Sent`,`Gtid_State_Ack`
 # -----------------------------------------------------------------------
@@ -67,8 +67,8 @@ Variable_name	Value
 Rpl_semi_sync_slave_send_ack	0
 connection master;
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-2	localhost	SLAVE_PORT	1		
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+2	localhost	SLAVE_PORT	1			semi-sync stale
 # Test 4: Make new events - generate new GTID
 # Note 1: Create 2 events on primary. Replica is already connected
 # Note 2: `Gtid_State_Sent` and `Gtid_State_Ack` should have event group
@@ -89,8 +89,8 @@ Variable_name	Value
 Rpl_semi_sync_master_yes_tx	2
 include/save_master_gtid.inc
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-2	localhost	SLAVE_PORT	1	0-1-2	0-1-2
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+2	localhost	SLAVE_PORT	1	0-1-2	0-1-2	semi-sync active
 show status like 'Rpl_semi_sync_master_clients';
 Variable_name	Value
 Rpl_semi_sync_master_clients	1
@@ -135,9 +135,9 @@ show status like 'Rpl_semi_sync_master_clients';
 Variable_name	Value
 Rpl_semi_sync_master_clients	2
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-2	
-2	localhost	SLAVE_PORT	1	0-1-2	0-1-2
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-2		semi-sync stale
+2	localhost	SLAVE_PORT	1	0-1-2	0-1-2	semi-sync active
 connection slave2;
 include/diff_tables.inc [master:test.t,slave:test.t,slave2:test.t]
 show status like "Rpl_semi_sync_slave_send_ack";
@@ -159,9 +159,9 @@ create table t2(t2 int);
 insert into t2 values (2);
 include/save_master_gtid.inc
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-4	0-1-4
-2	localhost	SLAVE_PORT	1	0-1-4	0-1-4
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-4	0-1-4	semi-sync active
+2	localhost	SLAVE_PORT	1	0-1-4	0-1-4	semi-sync active
 show status like 'Rpl_semi_sync_master_request_ack';
 Variable_name	Value
 Rpl_semi_sync_master_request_ack	4
@@ -208,8 +208,8 @@ show status like "Slaves_connected";
 Variable_name	Value
 Slaves_connected	1
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-4	0-1-4
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-4	0-1-4	semi-sync active
 INSERT INTO t VALUES (10);
 show status like 'Rpl_semi_sync_master_get_ack';
 Variable_name	Value
@@ -218,8 +218,8 @@ show status like 'Rpl_semi_sync_master_request_ack';
 Variable_name	Value
 Rpl_semi_sync_master_request_ack	5
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-5	0-1-5
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-5	0-1-5	semi-sync active
 connection slave;
 START SLAVE IO_THREAD;
 include/wait_for_slave_io_to_start.inc
@@ -240,9 +240,9 @@ show status like 'Rpl_semi_sync_master_clients';
 Variable_name	Value
 Rpl_semi_sync_master_clients	2
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-2	localhost	SLAVE_PORT	1	0-1-5	
-3	slave2	SLAVE_PORT	1	0-1-5	0-1-5
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+2	localhost	SLAVE_PORT	1	0-1-5		semi-sync stale
+3	slave2	SLAVE_PORT	1	0-1-5	0-1-5	semi-sync active
 "Sync replica with master"
 connection slave;
 connection master;
@@ -250,9 +250,9 @@ show status like 'Rpl_semi_sync_master_clients';
 Variable_name	Value
 Rpl_semi_sync_master_clients	2
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-2	localhost	SLAVE_PORT	1	0-1-5	
-3	slave2	SLAVE_PORT	1	0-1-5	0-1-5
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+2	localhost	SLAVE_PORT	1	0-1-5		semi-sync stale
+3	slave2	SLAVE_PORT	1	0-1-5	0-1-5	semi-sync active
 show status like "Rpl_semi_sync_master_get_ack";
 Variable_name	Value
 Rpl_semi_sync_master_get_ack	7
@@ -283,8 +283,8 @@ show status like "Slaves_connected";
 Variable_name	Value
 Slaves_connected	1
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-6	0-1-6
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-6	0-1-6	semi-sync active
 connection slave;
 SET @@GLOBAL.debug_dbug= "";
 connection master;
@@ -355,7 +355,7 @@ show status like 'rpl_semi_sync_master_get_ack';
 Variable_name	Value
 Rpl_semi_sync_master_get_ack	8
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
 # Start slaves again
 connection slave;
 include/start_slave.inc
@@ -440,9 +440,9 @@ Rpl_semi_sync_master_get_ack	9
 # `Gtid_State_Sent` event sent from primary
 include/save_master_gtid.inc
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-8	
-2	localhost	SLAVE_PORT	1	0-1-8	
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-8		semi-sync active
+2	localhost	SLAVE_PORT	1	0-1-8		semi-sync active
 connection slave;
 SET debug_sync='now SIGNAL reply_ack_to_master';
 # Replica server_2 has sent ACK
@@ -453,9 +453,9 @@ show status like 'rpl_semi_sync_master_get_ack';
 Variable_name	Value
 Rpl_semi_sync_master_get_ack	10
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-8	
-2	localhost	SLAVE_PORT	1	0-1-8	0-1-8
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-8		semi-sync active
+2	localhost	SLAVE_PORT	1	0-1-8	0-1-8	semi-sync active
 connection slave2;
 SET debug_sync='now SIGNAL reply_ack_to_master';
 # Replica server_3 has sent ACK
@@ -463,18 +463,18 @@ connection master;
 connection master;
 include/save_master_gtid.inc
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-8	0-1-8
-2	localhost	SLAVE_PORT	1	0-1-8	0-1-8
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-8	0-1-8	semi-sync active
+2	localhost	SLAVE_PORT	1	0-1-8	0-1-8	semi-sync active
 connection slave2;
 connection slave2;
 # Sync server_3 with master should return the same result as before
 connection master;
 include/save_master_gtid.inc
 SHOW REPLICA HOSTS;
-Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack
-3	slave2	SLAVE_PORT	1	0-1-8	0-1-8
-2	localhost	SLAVE_PORT	1	0-1-8	0-1-8
+Server_id	Host	Port	Master_id	Gtid_State_Sent	Gtid_State_Ack	Sync_Status
+3	slave2	SLAVE_PORT	1	0-1-8	0-1-8	semi-sync active
+2	localhost	SLAVE_PORT	1	0-1-8	0-1-8	semi-sync active
 # cleanup
 # -------------------------------------------
 connection master;

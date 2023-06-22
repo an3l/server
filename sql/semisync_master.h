@@ -51,6 +51,7 @@ struct Slave_info
 */
   Trans_binlog_info gtid_state_sent;
   Trans_binlog_info gtid_state_ack;
+  bool semi_sync_trans_status;
 };
 
 

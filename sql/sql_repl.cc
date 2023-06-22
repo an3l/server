@@ -2070,13 +2070,12 @@ send_event_to_slave(binlog_send_info *info, Log_event_type event_type,
     show_slave_hosts_callback.
     We are interested in GTID sent by primary to replica.
   */
+  strncpy(info->thd->slave_info->gtid_state_sent.log_file,
+          info->log_file_name + info->dirlen,
+          strlen(info->log_file_name)-info->dirlen);
+  info->thd->slave_info->gtid_state_sent.log_pos= pos;
   if (info->thd->semi_sync_slave)
-  {
-    strncpy(info->thd->slave_info->gtid_state_sent.log_file,
-            info->log_file_name + info->dirlen,
-            strlen(info->log_file_name)-info->dirlen);
-    info->thd->slave_info->gtid_state_sent.log_pos= pos;
-  }
+    info->thd->slave_info->semi_sync_trans_status= need_sync;
 
   return NULL;    /* Success */
 }
