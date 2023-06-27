@@ -21,6 +21,7 @@
 
 #include "semisync.h"
 #include "semisync_master_ack_receiver.h"
+#include "debug_sync.h"
 
 #ifdef HAVE_PSI_INTERFACE
 extern PSI_mutex_key key_LOCK_rpl_semi_sync_master_enabled;
@@ -51,6 +52,9 @@ struct Slave_info
 */
   Trans_binlog_info gtid_state_sent;
   Trans_binlog_info gtid_state_ack;
+  /* semi_sync_trans_status is the status on the replica and represents
+     the status of the latest transaction event from the primary
+  */
   bool semi_sync_trans_status;
 };
 

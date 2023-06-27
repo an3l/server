@@ -192,20 +192,23 @@ show status like 'Rpl_semi_sync_master_get_ack';
 let $master_get_ack_num= query_get_value(show status like 'Rpl_semi_sync_master_get_ack', Value, 1);
 let $master_request_ack_num= query_get_value(show status like 'Rpl_semi_sync_master_request_ack', Value, 1);
 
-# Write 2 new events
+# In this test there are 2 active replicas and 1 transactions.
+# Using DBUG_SYNC(pause_ack_thread_on_next_ack)
+# test will ensure that we should wait on single ACK from active replica.
+--let $save_primary_dbug= `SELECT @@GLOBAL.DEBUG_DBUG`
+SET @@GLOBAL.DEBUG_DBUG="d,pause_ack_thread_on_next_ack";
+SELECT @@GLOBAL.DEBUG_DBUG;
+
+# Write the new event
 create table t2(t2 int);
-insert into t2 values (2);
+SET debug_sync='now WAIT_FOR pause_ack_reply_to_binlog';
 
-# Wait on transaction/request/ack and show them
-# Check number of received transactions and requested ACKs (it should be 4)
+# In this point master_request_ack should be incremented
+# Check number of received transactions and requested ACKs
 let $status_var= Rpl_semi_sync_master_request_ack;
-let $status_var_value= `SELECT $master_request_ack_num + 2`;
+let $status_var_value= `SELECT $master_request_ack_num + 1`;
 source include/wait_for_status_var.inc;
-
-# In this point it is the same as number of received transactions
-let $status_var= Rpl_semi_sync_master_yes_tx;
-let $status_var_value= `SELECT $master_request_ack_num + 2`;
-source include/wait_for_status_var.inc;
+--echo "Waited on master_request_ack
 
 # In this test we did not check for `Rpl_semi_sync_master_get_ack`, since it gets
 # incremented for each event that is sent to the replica, that needs an ack.
@@ -220,23 +223,56 @@ source include/wait_for_status_var.inc;
 # Result show statement
 --source include/save_master_gtid.inc #Saves the gtid into $master_pos
 let $show_statement= SHOW REPLICA HOSTS;
-let $field= Gtid_State_Ack;
+let $field= Gtid_State_Sent;
 let $condition= LIKE '%$master_pos%';
 let $wait_for_all= 1;
 source include/wait_show_condition.inc;
+--echo "Waited on Gtid_State_Sent be sent to all replicas
+
 --replace_column 3 'SLAVE_PORT'
 --replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
 SHOW REPLICA HOSTS;
+--echo # Get ack before
+show status like 'Rpl_semi_sync_master_get_ack';
+
+# BUG IN DBUG_SYNC ?
+SET debug_sync='now SIGNAL unpause_ack_reply_to_binlog';
+
+# Wait on master's get_ACK incremented
+# let $status_var= Rpl_semi_sync_master_get_ack;
+# let $status_var_value= `SELECT $master_get_ack_num + 1`;
+# source include/wait_for_status_var.inc;
+
+# Here we know that there will be single active replica that has sent ACK
+# and master got the ack, while other replica will be stale.
+# If the transaction is not committed on primary we may get new master_get_ack_num
+# from other replica
+# Result show statement
+--source include/save_master_gtid.inc #Saves the gtid into $master_pos
+let $show_statement= SHOW REPLICA HOSTS;
+let $field= Gtid_State_Ack;
+let $condition= LIKE '%$master_pos%';
+let $wait_for_all= 0;
+source include/wait_show_condition.inc;
+--echo "Waited on Gtid_State_Ack be obtained to single replica
+
+
+# Wait that number of active transactions get incremented
+let $status_var= Rpl_semi_sync_master_yes_tx;
+let $status_var_value= `SELECT $master_request_ack_num + 1`;
+source include/wait_for_status_var.inc;
 
 show status like 'Rpl_semi_sync_master_request_ack';
+show status like 'Rpl_semi_sync_master_get_ack';
 # Determine binlog_dump_thread_count, number of connected semi-sync replica
 show status like "Slaves_connected";
 
 # Update ACK get/request number
-let $master_request_ack_num= `SELECT $master_request_ack_num + 2`;
+let $master_request_ack_num= `SELECT $master_request_ack_num + 1`;
 # Here we may have get increment by 4 or by 3 for `rpl_semi_sync_master_get_ack`,
 # so instead of manual increment, get the returned value of status.
 let $master_get_ack_num= query_get_value(show status like 'Rpl_semi_sync_master_get_ack', Value, 1);
+--eval SET @@GLOBAL.debug_dbug= "$save_primary_dbug"
 
 # Check ACKs on replica server_id=2
 connection slave;
