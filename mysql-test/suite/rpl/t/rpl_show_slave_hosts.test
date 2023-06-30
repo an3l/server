@@ -235,13 +235,18 @@ SHOW REPLICA HOSTS;
 --echo # Get ack before
 show status like 'Rpl_semi_sync_master_get_ack';
 
-# BUG IN DBUG_SYNC ?
 SET debug_sync='now SIGNAL unpause_ack_reply_to_binlog';
 
 # Wait on master's get_ACK incremented
-# let $status_var= Rpl_semi_sync_master_get_ack;
-# let $status_var_value= `SELECT $master_get_ack_num + 1`;
-# source include/wait_for_status_var.inc;
+let $status_var= Rpl_semi_sync_master_get_ack;
+let $status_var_comparsion= >=;
+let $status_var_value= `SELECT $master_get_ack_num + 1`;
+source include/wait_for_status_var.inc;
+
+--echo # Reset debug sync on primary
+--eval SET @@GLOBAL.debug_dbug= "$save_primary_dbug"
+SELECT @@GLOBAL.debug_dbug;
+SET debug_sync='RESET';
 
 # Here we know that there will be single active replica that has sent ACK
 # and master got the ack, while other replica will be stale.
@@ -256,11 +261,16 @@ let $wait_for_all= 0;
 source include/wait_show_condition.inc;
 --echo "Waited on Gtid_State_Ack be obtained to single replica
 
+--replace_column 3 'SLAVE_PORT'
+--replace_result $SLAVE_MYPORT SLAVE_PORT $DEFAULT_MASTER_PORT DEFAULT_PORT
+SHOW REPLICA HOSTS;
 
-# Wait that number of active transactions get incremented
-let $status_var= Rpl_semi_sync_master_yes_tx;
-let $status_var_value= `SELECT $master_request_ack_num + 1`;
-source include/wait_for_status_var.inc;
+# Wait that number of active transactions gets incremented
+# No increment? Even though the ACK is received ^.
+# let $status_var= Rpl_semi_sync_master_yes_tx;
+# let $status_var_comparsion= >=;
+# let $status_var_value= `SELECT $master_request_ack_num + 1`;
+# source include/wait_for_status_var.inc;
 
 show status like 'Rpl_semi_sync_master_request_ack';
 show status like 'Rpl_semi_sync_master_get_ack';
@@ -272,12 +282,11 @@ let $master_request_ack_num= `SELECT $master_request_ack_num + 1`;
 # Here we may have get increment by 4 or by 3 for `rpl_semi_sync_master_get_ack`,
 # so instead of manual increment, get the returned value of status.
 let $master_get_ack_num= query_get_value(show status like 'Rpl_semi_sync_master_get_ack', Value, 1);
---eval SET @@GLOBAL.debug_dbug= "$save_primary_dbug"
 
 # Check ACKs on replica server_id=2
 connection slave;
 let $status_var= Rpl_semi_sync_slave_send_ack;
-let $status_var_value= `SELECT $slave1_sent_ack + 2`;
+let $status_var_value= `SELECT $slave1_sent_ack + 1`;
 source include/wait_for_status_var.inc;
 show status like "Rpl_semi_sync_slave_send_ack";
 

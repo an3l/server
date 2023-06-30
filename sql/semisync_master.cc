@@ -583,19 +583,6 @@ int Repl_semi_sync_master::report_reply_packet(THD *thd, uint32 server_id,
   DBUG_PRINT("semisync", ("%s: Got reply(%s, %lu) from server %u",
                           "Repl_semi_sync_master::report_reply_packet",
                           log_file_name, (ulong)log_file_pos, server_id));
-#ifdef ENABLED_DEBUG_SYNC
-      /*
-        A (+d,pause_ack_thread_on_next_ack)-test is supposed to
-        be run to check `Gtid_state_ack` in show replica hosts
-        for cases where there are multiple active replicas.
-      */
-      DBUG_EXECUTE_IF("pause_ack_thread_on_next_ack",
-        {
-          const char act[]= "now SIGNAL pause_ack_reply_to_binlog WAIT_FOR unpause_ack_reply_to_binlog";
-          DBUG_ASSERT(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
-          DBUG_SET("-d,pause_ack_thread_on_next_ack");
-        };);
-#endif
   rpl_semi_sync_master_get_ack++;
   report_reply_binlog(thd, server_id, log_file_name, log_file_pos);
 
