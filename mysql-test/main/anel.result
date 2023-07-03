@@ -1,0 +1,19 @@
+# 
+# MDEV-31541: Optimize calls to build_table_filenames for CREATE TABLE
+# 
+select @@debug_dbug;
+@@debug_dbug
+
+set @old_debug= @@debug_dbug;
+select @old_debug;
+@old_debug
+
+set debug_dbug= "d:t:i:o,/tmp/anel.trace";
+select @@debug_dbug;
+@@debug_dbug
+d:i:o,/tmp/anel.trace:t
+Create table t(t int);
+Create table if not exists t (t int);
+Warnings:
+Note	1050	Table 't' already exists
+drop table t;

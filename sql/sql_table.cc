@@ -4502,9 +4502,13 @@ int create_table_impl(THD *thd,
     }
 
     handlerton *db_type;
-    if (!internal_tmp_table &&
-        ha_table_exists(thd, &db, &table_name,
-                        &create_info->org_tabledef_version, NULL, &db_type))
+    bool table_exists= (create_info->options && HA_CREATE_TABLE_EXISTS);
+    if (!table_exists)
+      table_exists= ha_table_exists(thd, &db, &table_name,
+                                    &create_info->org_tabledef_version,
+                                    NULL, &db_type);
+
+    if (!internal_tmp_table && table_exists)
     {
       if (ha_check_if_updates_are_ignored(thd, db_type, "CREATE"))
       {
@@ -4746,28 +4750,34 @@ int mysql_create_table_no_lock(THD *thd,
   int res;
   uint path_length;
   char path[FN_REFLEN + 1];
-  LEX_CSTRING cpath;
+  LEX_CSTRING cpath= create_info->create_tbl_path;
   LEX_CUSTRING frm= {0,0};
 
   DBUG_ASSERT(create_info->default_table_charset);
 
   if (create_info->tmp_table())
+  {
     path_length= build_tmptable_filename(thd, path, sizeof(path));
+    lex_string_set3(&cpath, path, path_length);
+  }
   else
   {
-    const LEX_CSTRING *alias= table_case_name(create_info, table_name);
-    path_length= build_table_filename(path, sizeof(path) - 1, db->str,
-                                      alias->str,
-                                 "", 0);
-    // Check if we hit FN_REFLEN bytes along with file extension.
-    if (path_length+reg_ext_length > FN_REFLEN)
+    // If table is not created
+    if (!create_info->create_tbl_path.str)
     {
-      my_error(ER_IDENT_CAUSES_TOO_LONG_PATH, MYF(0), (int) sizeof(path)-1,
-               path);
-      return true;
+      const LEX_CSTRING *alias= table_case_name(create_info, table_name);
+      path_length= build_table_filename(path, sizeof(path) - 1, db->str,
+                                        alias->str,"", 0);
+      // Check if we hit FN_REFLEN bytes along with file extension.
+      if (path_length+reg_ext_length > FN_REFLEN)
+      {
+        my_error(ER_IDENT_CAUSES_TOO_LONG_PATH, MYF(0), (int) sizeof(path)-1,
+                path);
+        return true;
+      }
+      lex_string_set3(&cpath, path, path_length);
     }
   }
-  lex_string_set3(&cpath, path, path_length);
 
   res= create_table_impl(thd, ddl_log_state_create, ddl_log_state_rm,
                          *db, *table_name, *db, *table_name, cpath,
@@ -4830,6 +4840,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   DDL_LOG_STATE ddl_log_state_create, ddl_log_state_rm;
   int create_table_mode;
   uint save_thd_create_info_options;
+  LEX_CSTRING *create_tbl_path;
   bool is_trans= FALSE;
   bool result;
   DBUG_ENTER("mysql_create_table");
@@ -4845,12 +4856,17 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   save_thd_create_info_options= thd->lex->create_info.options;
   thd->lex->create_info.options|= create_info->options;
 
+  create_tbl_path= thd->make_clex_string(create_info->create_tbl_path);
+  if (!create_tbl_path)
+    DBUG_RETURN(TRUE);
+
   /* Open or obtain an exclusive metadata lock on table being created  */
   create_table->db_type= 0;
-  result= open_and_lock_tables(thd, *create_info, create_table, FALSE, 0);
-
+  result= open_and_lock_tables(thd, *create_info, create_table, FALSE, 0,
+                               create_tbl_path);
+  if (create_tbl_path->str)
+    create_info->options|= HA_CREATE_TABLE_EXISTS;
   thd->lex->create_info.options= save_thd_create_info_options;
-
   if (result)
   {
     if (thd->slave_thread &&
@@ -4982,6 +4998,8 @@ err:
   }
   ddl_log_complete(&ddl_log_state_rm);
   ddl_log_complete(&ddl_log_state_create);
+  // if (create_tbl_path->str)
+  //   create_info->options|= HA_CREATE_TABLE_EXISTS;
   DBUG_RETURN(result);
 }
 
