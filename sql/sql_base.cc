@@ -4247,7 +4247,8 @@ end:
 static bool upgrade_lock_if_not_exists(THD *thd,
                                        const DDL_options_st &create_info,
                                        TABLE_LIST *create_table,
-                                       ulong lock_wait_timeout)
+                                       ulong lock_wait_timeout,
+                                       LEX_CSTRING *create_tbl_path)
 {
   DBUG_ENTER("upgrade_lock_if_not_exists");
 
@@ -4257,7 +4258,7 @@ static bool upgrade_lock_if_not_exists(THD *thd,
     DEBUG_SYNC(thd,"create_table_before_check_if_exists");
     if (!create_info.or_replace() &&
         ha_table_exists(thd, &create_table->db, &create_table->table_name,
-                        NULL, NULL, &create_table->db_type))
+                        NULL, NULL, &create_table->db_type, NULL, create_tbl_path))
     {
       if (create_info.if_not_exists())
       {
@@ -4270,6 +4271,7 @@ static bool upgrade_lock_if_not_exists(THD *thd,
         my_error(ER_TABLE_EXISTS_ERROR, MYF(0), create_table->table_name.str);
       DBUG_RETURN(true);
     }
+
     DBUG_RETURN(thd->mdl_context.upgrade_shared_lock(
                                    create_table->mdl_request.ticket,
                                    MDL_EXCLUSIVE,
@@ -4292,6 +4294,7 @@ static bool upgrade_lock_if_not_exists(THD *thd,
   @param lock_wait_timeout Seconds to wait before timeout.
   @param flags             Bitmap of flags to modify how the tables will be
                            open, see open_table() description for details.
+  @param create_tbl_path   Path to created table
 
   @retval FALSE  Success.
   @retval TRUE   Failure (e.g. connection was killed) or table existed
@@ -4312,7 +4315,8 @@ static bool upgrade_lock_if_not_exists(THD *thd,
 bool
 lock_table_names(THD *thd, const DDL_options_st &options,
                  TABLE_LIST *tables_start, TABLE_LIST *tables_end,
-                 ulong lock_wait_timeout, uint flags)
+                 ulong lock_wait_timeout, uint flags,
+                 LEX_CSTRING *create_tbl_path)
 {
   MDL_request_list mdl_requests;
   TABLE_LIST *table;
@@ -4364,7 +4368,7 @@ lock_table_names(THD *thd, const DDL_options_st &options,
     DBUG_RETURN(thd->mdl_context.acquire_locks(&mdl_requests,
                                                lock_wait_timeout) ||
                 upgrade_lock_if_not_exists(thd, options, tables_start,
-                                           lock_wait_timeout));
+                                           lock_wait_timeout, create_tbl_path));
   }
 
   /* Protect this statement against concurrent BACKUP STAGE or FTWRL. */
@@ -4377,7 +4381,7 @@ lock_table_names(THD *thd, const DDL_options_st &options,
 
   while (!thd->mdl_context.acquire_locks(&mdl_requests, lock_wait_timeout) &&
          !upgrade_lock_if_not_exists(thd, options, tables_start,
-                                     lock_wait_timeout) &&
+                                     lock_wait_timeout, create_tbl_path) &&
          !thd->mdl_context.try_acquire_lock(&global_request))
   {
     if (global_request.ticket)
@@ -4484,7 +4488,7 @@ open_tables_check_upgradable_mdl(THD *thd, TABLE_LIST *tables_start,
                           open, see open_table() description for details.
   @param[in]     prelocking_strategy  Strategy which specifies how prelocking
                                       algorithm should work for this statement.
-
+  @param[in]     create_tbl_path      Path of created table.
   @note
     Unless we are already in prelocked mode and prelocking strategy prescribes
     so this function will also precache all SP/SFs explicitly or implicitly
@@ -4503,7 +4507,8 @@ open_tables_check_upgradable_mdl(THD *thd, TABLE_LIST *tables_start,
 
 bool open_tables(THD *thd, const DDL_options_st &options,
                  TABLE_LIST **start, uint *counter, uint flags,
-                 Prelocking_strategy *prelocking_strategy)
+                 Prelocking_strategy *prelocking_strategy,
+                 LEX_CSTRING *create_tbl_path)
 {
   /*
     We use pointers to "next_global" member in the last processed
@@ -4593,7 +4598,7 @@ restart:
       TABLE_LIST *table;
       if (lock_table_names(thd, options, *start,
                            thd->lex->first_not_own_table(),
-                           ot_ctx.get_timeout(), flags))
+                           ot_ctx.get_timeout(), flags, create_tbl_path))
       {
         error= TRUE;
         goto error;
@@ -5579,6 +5584,7 @@ end:
                               for details).
   @param prelocking_strategy  Strategy which specifies how prelocking algorithm
                               should work for this statement.
+  @param create_tbl_path      Path of created table
 
   @note
     The thr_lock locks will automatically be freed by
@@ -5591,14 +5597,16 @@ end:
 bool open_and_lock_tables(THD *thd, const DDL_options_st &options,
                           TABLE_LIST *tables,
                           bool derived, uint flags,
-                          Prelocking_strategy *prelocking_strategy)
+                          Prelocking_strategy *prelocking_strategy,
+                          LEX_CSTRING *create_tbl_path)
 {
   uint counter;
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
   DBUG_ENTER("open_and_lock_tables");
   DBUG_PRINT("enter", ("derived handling: %d", derived));
 
-  if (open_tables(thd, options, &tables, &counter, flags, prelocking_strategy))
+  if (open_tables(thd, options, &tables, &counter, flags, prelocking_strategy,
+                  create_tbl_path))
     goto err;
 
   DBUG_EXECUTE_IF("sleep_open_and_lock_after_open", {

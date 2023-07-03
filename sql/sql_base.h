@@ -247,7 +247,7 @@ int init_ftfuncs(THD *thd, SELECT_LEX* select, bool no_order);
 bool lock_table_names(THD *thd, const DDL_options_st &options,
                       TABLE_LIST *table_list,
                       TABLE_LIST *table_list_end, ulong lock_wait_timeout,
-                      uint flags);
+                      uint flags, LEX_CSTRING *create_tbl_path= 0);
 static inline bool
 lock_table_names(THD *thd, TABLE_LIST *table_list,
                  TABLE_LIST *table_list_end, ulong lock_wait_timeout,
@@ -258,7 +258,8 @@ lock_table_names(THD *thd, TABLE_LIST *table_list,
 }
 bool open_tables(THD *thd, const DDL_options_st &options,
                  TABLE_LIST **tables, uint *counter,
-                 uint flags, Prelocking_strategy *prelocking_strategy);
+                 uint flags, Prelocking_strategy *prelocking_strategy,
+                 LEX_CSTRING *create_tbl_path= 0);
 
 static inline bool
 open_tables(THD *thd, TABLE_LIST **tables, uint *counter, uint flags,
@@ -271,7 +272,8 @@ open_tables(THD *thd, TABLE_LIST **tables, uint *counter, uint flags,
 bool open_and_lock_tables(THD *thd, const DDL_options_st &options,
                           TABLE_LIST *tables,
                           bool derived, uint flags,
-                          Prelocking_strategy *prelocking_strategy);
+                          Prelocking_strategy *prelocking_strategy,
+                          LEX_CSTRING *create_tbl_path= 0);
 static inline bool
 open_and_lock_tables(THD *thd, TABLE_LIST *tables,
                      bool derived, uint flags,
@@ -510,15 +512,16 @@ inline TABLE *open_n_lock_single_table(THD *thd, TABLE_LIST *table_l,
 inline bool open_and_lock_tables(THD *thd,
                                  const DDL_options_st &options,
                                  TABLE_LIST *tables,
-                                 bool derived, uint flags)
+                                 bool derived, uint flags,
+                                 LEX_CSTRING *create_tbl_path=0)
 {
   DML_prelocking_strategy prelocking_strategy;
 
   return open_and_lock_tables(thd, options, tables, derived, flags,
-                              &prelocking_strategy);
+                              &prelocking_strategy, create_tbl_path);
 }
 inline bool open_and_lock_tables(THD *thd, TABLE_LIST *tables,
-                                  bool derived, uint flags)
+                                 bool derived, uint flags)
 {
   DML_prelocking_strategy prelocking_strategy;
 

@@ -6402,7 +6402,8 @@ static my_bool discover_existence(THD *thd, plugin_ref plugin,
 bool ha_table_exists(THD *thd, const LEX_CSTRING *db,
                      const LEX_CSTRING *table_name, LEX_CUSTRING *table_id,
                      LEX_CSTRING *partition_engine_name,
-                     handlerton **hton, bool *is_sequence)
+                     handlerton **hton, bool *is_sequence,
+                     LEX_CSTRING *create_tbl_path __attribute__((unused)))
 {
   handlerton *dummy;
   bool dummy2;
@@ -6459,6 +6460,8 @@ retry_from_frm:
   size_t path_len = build_table_filename(path, sizeof(path) - 1,
                                          db->str, table_name->str, "", 0);
   st_discover_existence_args args= {path, path_len, db->str, table_name->str, 0, true};
+  LEX_CSTRING cpath= {path, path_len};
+  create_tbl_path= &cpath;
 
   if (file_ext_exists(path, path_len, reg_ext))
   {

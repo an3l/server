@@ -651,6 +651,8 @@ given at all. */
 #define HA_CREATE_USED_SEQUENCE           (1UL << 25)
 /* Tell binlog_show_create_table to print all engine options */
 #define HA_CREATE_PRINT_ALL_OPTIONS       (1UL << 26)
+/* Set the bit during ha_table_create_info when table is created */
+#define HA_CREATE_TABLE_EXISTS            (1UL << 27)
 
 typedef ulonglong alter_table_operations;
 typedef bool Log_func(THD*, TABLE*, bool, const uchar*, const uchar*);
@@ -2244,6 +2246,8 @@ struct Table_scope_and_contents_source_pod_st // For trivial members
   MDL_ticket *mdl_ticket;
   bool table_was_deleted;
   sequence_definition *seq_create_info;
+  /* The following is used to save path of created table */
+  LEX_CSTRING create_tbl_path;
 
   void init()
   {
@@ -2306,7 +2310,6 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
 {
   /* TODO: remove after MDEV-20865 */
   Alter_info *alter_info;
-
   void init()
   {
     Table_scope_and_contents_source_st::init();
@@ -5530,7 +5533,8 @@ bool ha_table_exists(THD *thd, const LEX_CSTRING *db,
                      const LEX_CSTRING *table_name,
                      LEX_CUSTRING *table_version= 0,
                      LEX_CSTRING *partition_engine_name= 0,
-                     handlerton **hton= 0, bool *is_sequence= 0);
+                     handlerton **hton= 0, bool *is_sequence= 0,
+                     LEX_CSTRING *create_table_path= 0);
 bool ha_check_if_updates_are_ignored(THD *thd, handlerton *hton,
                                      const char *op);
 #endif /* MYSQL_SERVER */
