@@ -5310,6 +5310,8 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
       }
 
       TABLE *tmp_tbl= share_temp->all_tmp_tables.front();
+      if(!tmp_tbl)
+        continue;
       if (schema_table_idx == SCH_TABLE_NAMES)
       {
         LEX_CSTRING *table_name= &tmp_tbl->s->table_name;
@@ -5326,7 +5328,7 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
                                  system_charset_info);
         schema_table_store_record(thd, table);
       }
-      else /* SCH_TABLE */
+      else /* SCH_TABLES */
         process_i_s_table_temporary_tables(thd, table, tmp_tbl);
     }
   }
@@ -5372,7 +5374,7 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
             continue;
         }
 #endif
-	restore_record(table, s->default_values);
+        restore_record(table, s->default_values);
         table->field[schema_table->idx_field1]->
           store(db_name->str, db_name->length, system_charset_info);
         table->field[schema_table->idx_field2]->
