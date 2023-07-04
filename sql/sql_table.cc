@@ -2807,7 +2807,8 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
   List_iterator<Create_field> it2(alter_info->create_list);
   uint total_uneven_bit_length= 0;
   int select_field_count= C_CREATE_SELECT(create_table_mode);
-  bool tmp_table= create_table_mode == C_ALTER_TABLE;
+  bool frm_only= create_table_mode == C_ALTER_TABLE_FRM_ONLY;
+  bool tmp_table= (create_table_mode == C_ALTER_TABLE) || frm_only;
   const bool create_simple= thd->lex->create_simple();
   bool is_hash_field_needed= false;
   DBUG_ENTER("mysql_prepare_create_table");
@@ -2842,7 +2843,7 @@ mysql_prepare_create_table_finalize(THD *thd, HA_CREATE_INFO *create_info,
     }
 
     /* The user specified fields: check that structure is ok */
-    if (check_sequence_fields(thd->lex, &alter_info->create_list))
+    if (!frm_only && check_sequence_fields(thd->lex, &alter_info->create_list))
       DBUG_RETURN(TRUE);
   }
 
@@ -4455,8 +4456,14 @@ int create_table_impl(THD *thd,
       If a table exists, it must have been pre-opened. Try looking for one
       in-use in THD::all_temp_tables list of TABLE_SHAREs.
     */
-    TABLE *tmp_table= thd->find_temporary_table(db.str, table_name.str,
-                                                THD::TMP_TABLE_ANY);
+     TABLE *tmp_table;
+    if(create_info->sequence && frm_only)
+      tmp_table= thd->find_temporary_table(db.str, table_name.str,
+                                           THD::TMP_TABLE_IN_USE);
+    else
+      tmp_table= thd->find_temporary_table(db.str, table_name.str,
+                                           THD::TMP_TABLE_ANY);
+
 
     if (tmp_table)
     {
@@ -10684,6 +10691,7 @@ do_continue:;
 
     Partitioning: part_info is passed via thd->work_part_info
   */
+ 
   error= create_table_impl(thd, (DDL_LOG_STATE*) 0, (DDL_LOG_STATE*) 0,
                            alter_ctx.db, alter_ctx.table_name,
                            alter_ctx.new_db, alter_ctx.tmp_name,

@@ -1,0 +1,9 @@
+create temporary sequence s1;
+SHOW FULL TABLES;
+# --error 4086
+alter table s1 change cache_size cache_size text;
+SHOW FULL TABLES;
+# show create table s1;
+SHOW FULL TABLES;
+CREATE OR REPLACE TEMPORARY sequence s1;
+SHOW FULL TABLES;
