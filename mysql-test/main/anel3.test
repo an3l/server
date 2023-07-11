@@ -1,0 +1,19 @@
+--source include/have_innodb.inc
+--source include/have_metadata_lock_info.inc
+
+CREATE OR REPLACE TABLE t1 (a int);
+CREATE OR REPLACE TABLE t2 (a int);
+LOCK TABLES t1 write, t2 read;
+# --error HA_ERR_TABLE_EXIST
+CREATE OR REPLACE TABLE t1 (a int, b int);
+unlock tables;
+drop table t1;
+
+create table t1 (b int);
+lock tables t1 write, t2 read;
+# --error HA_ERR_TABLE_EXIST
+create or replace table t1 like t2;
+
+unlock tables;
+drop table t1;
+drop table t2;

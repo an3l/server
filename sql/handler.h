@@ -2306,12 +2306,15 @@ struct HA_CREATE_INFO: public Table_scope_and_contents_source_st,
 {
   /* TODO: remove after MDEV-20865 */
   Alter_info *alter_info;
-
+  bool table_exists;
+  char table_name[NAME_CHAR_LEN];
   void init()
   {
     Table_scope_and_contents_source_st::init();
     Schema_specification_st::init();
     alter_info= NULL;
+    table_exists= false;
+    strncpy(table_name, "\0", NAME_CHAR_LEN);
   }
   ulong table_options_with_row_type()
   {

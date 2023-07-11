@@ -1,0 +1,12 @@
+
+--source include/have_innodb.inc
+create table t1 (i int);
+create table t2 (i int);
+show create table t2;
+lock table t1 read, t2 write;
+--error ER_TABLE_EXISTS_ERROR
+create table t2 select * from t1;
+unlock tables;
+
+drop table t1;
+drop table t2;
