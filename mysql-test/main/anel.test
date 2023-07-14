@@ -1,0 +1,15 @@
+--echo # 
+--echo # MDEV-31541: Optimize calls to build_table_filenames for CREATE TABLE
+--echo # 
+
+--source include/have_debug.inc
+--source include/have_debug_sync.inc
+select @@debug_dbug;
+set @old_debug= @@debug_dbug;
+select @old_debug;
+set debug_dbug= "d:t:i:o,/tmp/anel.trace";
+select @@debug_dbug;
+#set debug_sync='create_table_before_check_if_exists SIGNAL parked WAIT_FOR go';
+Create table t(t int);
+
+drop table t;

@@ -4503,14 +4503,22 @@ int create_table_impl(THD *thd,
 
     handlerton *db_type= NULL;
     bool tbl_exists=  false;
-    /* This check is need in case of LOCK being held
-       with OPT_REPLACE and OPT_IF_NOT_EXISTS ddl, for which there
-       is no call of `lock_table_names` and `ha_table_exists`.
+    /* This check is need in case OPT_REPLACE and OPT_IF_NOT_EXISTS ddl and LOCK,
+       for which there is no call of `lock_table_names` and `ha_table_exists`.
     */
     if (options.or_replace() || options.if_not_exists())
-      tbl_exists= ha_table_exists(thd, &db, &table_name,
-                                  &create_info->org_tabledef_version,
-                                  NULL, &db_type, NULL);
+    {
+        char path[FN_REFLEN + 1];
+        create_info->table_path.length= build_table_filename(path, FN_REFLEN - 1,
+                                                             db.str,
+                                                             table_name.str,
+                                                             "", 0);
+        lex_string_set3(&create_info->table_path, path,
+                        create_info->table_path.length);
+        tbl_exists= ha_table_exists(thd, &db, &table_name,
+                                    &create_info->org_tabledef_version,
+                                    NULL, &db_type, NULL, create_info);
+    }
     else
       tbl_exists= create_info->table_exists;
 
@@ -4857,7 +4865,7 @@ bool mysql_create_table(THD *thd, TABLE_LIST *create_table,
   /* Open or obtain an exclusive metadata lock on table being created  */
   create_table->db_type= 0;
   create_info->table_exists= false;
-  strncpy(create_info->table_name, "\0", NAME_CHAR_LEN);
+  lex_string_set3(&create_info->table_path, "\0", FN_REFLEN);
   result= open_and_lock_tables(thd, *create_info, *create_info,
                                create_table, FALSE, 0);
 
@@ -12451,8 +12459,13 @@ bool Sql_cmd_create_table_like::execute(THD *thd)
         */
         create_info.table_exists= ha_table_exists(thd, &create_table->db, &create_table->table_name,
                                                     NULL, NULL, &create_table->db_type);
-        strncpy(create_info.table_name, create_table->table_name.str,
-                strlen(create_table->table_name.str));
+        char path[FN_REFLEN + 1];
+        create_info.table_path.length= build_table_filename(path, FN_REFLEN - 1,
+                                                            create_table->db.str,
+                                                            create_table->table_name.str,
+                                                            "", 0);
+        lex_string_set3(&create_info.table_path, path,
+                        create_info.table_path.length);
         if (!(res= handle_select(thd, lex, result, 0)))
         {
           if (create_info.tmp_table())

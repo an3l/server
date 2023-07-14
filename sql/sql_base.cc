@@ -4257,14 +4257,13 @@ static bool upgrade_lock_if_not_exists(THD *thd,
       thd->lex->sql_command == SQLCOM_CREATE_SEQUENCE)
   {
     DEBUG_SYNC(thd,"create_table_before_check_if_exists");
-    /* Mark table as created to optimize calls of ha_table_exists
-       and store table name. We should not change original default handlerton
+    /* Mark table as existed for CREATE to optimize calls of ha_table_exists
+       and store table path. We should not change original default handlerton
        ha_create_info.db_type from `ha_table_exists`.
     */
     ha_create_info.table_exists= ha_table_exists(thd, &create_table->db, &create_table->table_name,
-                                                 NULL, NULL, &create_table->db_type);
-    strncpy(ha_create_info.table_name, create_table->table_name.str,
-            strlen(create_table->table_name.str));
+                                                 NULL, NULL, &create_table->db_type,
+                                                 NULL, &ha_create_info);
     if (!create_info.or_replace() && ha_create_info.table_exists)
     {
       if (create_info.if_not_exists())
@@ -4366,7 +4365,12 @@ lock_table_names(THD *thd, const DDL_options_st &options, HA_CREATE_INFO &ha_opt
 
   if (mdl_requests.is_empty())
     DBUG_RETURN(FALSE);
-
+  char path[FN_REFLEN + 1];
+  ha_opt.table_path.length= build_table_filename(path, FN_REFLEN - 1,
+                                                 tables_start->db.str,
+                                                 tables_start->table_name.str,
+                                                 "", 0);
+  lex_string_set3(&ha_opt.table_path, path, ha_opt.table_path.length);
   if (flags & MYSQL_OPEN_SKIP_SCOPED_MDL_LOCK)
   {
     DBUG_RETURN(thd->mdl_context.acquire_locks(&mdl_requests,
