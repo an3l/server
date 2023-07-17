@@ -5310,8 +5310,6 @@ int get_all_tables(THD *thd, TABLE_LIST *tables, COND *cond)
       }
 
       TABLE *tmp_tbl= share_temp->all_tmp_tables.front();
-      if(!tmp_tbl)
-        continue;
       if (schema_table_idx == SCH_TABLE_NAMES)
       {
         LEX_CSTRING *table_name= &tmp_tbl->s->table_name;
@@ -6613,7 +6611,7 @@ int store_schema_params(THD *thd, TABLE *table, TABLE *proc_table,
 
   bzero((char*) &tbl, sizeof(TABLE));
   (void) build_table_filename(path, sizeof(path), "", "", "", 0);
-  init_tmp_table_share(thd, &share, "", 0, "", path);
+  //init_tmp_table_share(thd, &share, "", 0, "", path);
 
   proc_table->field[MYSQL_PROC_FIELD_DB]->val_str_nopad(thd->mem_root, &db);
   proc_table->field[MYSQL_PROC_FIELD_NAME]->val_str_nopad(thd->mem_root, &name);

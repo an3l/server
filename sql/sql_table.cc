@@ -4404,7 +4404,8 @@ int create_table_impl(THD *thd,
   handler	*file= 0;
   int		error= 1;
   bool          frm_only= create_table_mode == C_ALTER_TABLE_FRM_ONLY;
-  bool          internal_tmp_table= create_table_mode == C_ALTER_TABLE || frm_only;
+  bool          internal_tmp_table= (create_table_mode == C_ALTER_TABLE || frm_only);
+  bool is_temporary_sequence= (frm_only && create_info->tmp_table() && create_info->sequence);
   DBUG_ENTER("create_table_impl");
   DBUG_PRINT("enter", ("db: '%s'  table: '%s'  tmp: %d  path: %s",
                        db.str, table_name.str, internal_tmp_table, path.str));
@@ -4655,7 +4656,13 @@ int create_table_impl(THD *thd,
     if (!file || thd->is_error())
     {
       if (!file)
-        deletefrm(path.str);
+      {
+        
+        if (is_temporary_sequence)
+          goto tmp;
+        else
+          deletefrm(path.str);
+      }
       goto err;
     }
 
@@ -4679,8 +4686,9 @@ int create_table_impl(THD *thd,
     }
   }
 
+tmp:
   create_info->table= 0;
-  if (!frm_only && create_info->tmp_table())
+  if ((!frm_only && create_info->tmp_table()) || is_temporary_sequence)
   {
     TABLE *table= thd->create_and_open_tmp_table(frm, path.str, db.str,
                                                  table_name.str,
@@ -8069,6 +8077,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
   bool drop_period= false;
   LEX_CSTRING period_start_name= {nullptr, 0};
   LEX_CSTRING period_end_name= {nullptr, 0};
+  bool is_temp_table, is_sequence_tbl;
   if (table->s->period.name)
   {
     period_start_name= table->s->period_start_field()->field_name;
@@ -8423,7 +8432,7 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
       }
 
       if (likely(find && !find->field))
-	find_it.remove();
+        find_it.remove();
       else
       {
         my_error(ER_BAD_FIELD_ERROR, MYF(0), def->change.str,
@@ -8512,6 +8521,15 @@ mysql_prepare_alter_table(THD *thd, TABLE *table,
       alter_it.remove();
     }
   }
+
+/* When new_create_list (list that will be swaped to alter_info->create_list)
+     is created we should check the case if the table is temporary sequence
+     and check the fields. We can not use create_info->tmp_table() ?
+  */
+  is_temp_table= (table->s->tmp_table != NO_TMP_TABLE);
+  is_sequence_tbl= create_info->sequence;
+  if (is_temp_table && is_sequence_tbl && check_sequence_fields(thd->lex, &new_create_list))
+      goto err;
 
   new_create_list.append(&new_create_tail);
 
