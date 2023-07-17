@@ -1,0 +1,15 @@
+--source include/have_innodb.inc
+CREATE TEMPORARY SEQUENCE seq1 ;
+# Check show temp tables before alter
+SHOW FULL TABLES;
+SELECT table_schema, table_name FROM  INFORMATION_SCHEMA.TABLES WHERE table_type='temporary sequence';
+ --error 4086
+ ALTER TABLE `seq1` CHANGE `cache_size` cache_size int ;
+ # Check show temp tables after alter
+ SHOW FULL TABLES;
+ SELECT table_schema, table_name FROM  INFORMATION_SCHEMA.TABLES WHERE table_type='temporary sequence';
+
+ CREATE OR REPLACE TEMPORARY SEQUENCE seq1;
+  # Check show temp tables after create/replace alter
+ SHOW FULL TABLES;
+ SELECT table_schema, table_name FROM  INFORMATION_SCHEMA.TABLES WHERE table_type='temporary sequence';

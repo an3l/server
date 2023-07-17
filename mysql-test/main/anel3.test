@@ -1,0 +1,10 @@
+create temporary table t1 (t1 int);
+#--error 4086 # ER_SEQUENCE_INVALID_TABLE_STRUCTURE < Q1 is this bug?
+#alter table s1 change cache_size cache_size text;
+
+--error ER_BAD_FIELD_ERROR
+alter table t1 change t2 t3 int;
+
+CREATE OR REPLACE TEMPORARY table t1 (t1 int);
+show full tables;
+drop table t1;

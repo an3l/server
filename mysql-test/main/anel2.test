@@ -1,0 +1,9 @@
+--source include/have_innodb.inc
+create temporary sequence s1;
+show create table s1;
+--error 4086 # ER_SEQUENCE_INVALID_TABLE_STRUCTURE < Q1 is this bug?
+alter table s1 change cache_size cache_size bigint(21);
+
+CREATE OR REPLACE TEMPORARY sequence s1;
+show full tables;
+drop table s1;
