@@ -1226,8 +1226,9 @@ static int get_options(int *argc, char ***argv)
   if (opt_slave_data)
   {
     opt_lock_all_tables= !opt_single_transaction;
-    opt_master_data= 0;
     opt_delete_master_logs= 0;
+    if (opt_slave_data != MYSQL_OPT_SLAVE_DATA_COMMENTED_SQL)
+      opt_master_data= 0;
   }
 
   /* Ensure consistency of the set of binlog & locking options */
@@ -1242,7 +1243,8 @@ static int get_options(int *argc, char ***argv)
   if (opt_master_data)
   {
     opt_lock_all_tables= !opt_single_transaction;
-    opt_slave_data= 0;
+    if (opt_master_data != MYSQL_OPT_MASTER_DATA_COMMENTED_SQL)
+      opt_slave_data= 0;
   }
   if (opt_single_transaction || opt_lock_all_tables)
     lock_tables= 0;
