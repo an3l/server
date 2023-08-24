@@ -1,0 +1,8 @@
+--source include/have_binlog_format_row.inc
+--let $rpl_debug= 1
+--let $rpl_check_server_ids= 1
+--source include/master-slave.inc
+SELECT 1;
+ 
+# End of tests
+--source include/rpl_end.inc

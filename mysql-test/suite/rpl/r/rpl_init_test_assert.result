@@ -1,0 +1,258 @@
+include/master-slave.inc
+==== BEGIN include/master-slave.inc ====
+ con='default' warn='1' qlog='1' rlog='1' aborterr='1'
+.==== BEGIN include/rpl_init.inc [topology=1->2] ====
+. con='default' warn='1' qlog='1' rlog='1' aborterr='1'
+---- Check input ----
+MASTER_MYPORT='16000' SLAVE_MYPORT='16001' MASTER_MYPORT1='' SLAVE_MYPORT1=''
+---- Setup connections and reset each server ----
+..==== BEGIN include/rpl_connect.inc [creating server_2] ====
+.. con='default' warn='1' qlog='1' rlog='1' aborterr='1'
+connect (server_2,127.0.0.1,root,,test,16001,)
+[connection default]
+..==== END include/rpl_connect.inc ====
+.. con='default' warn='1' qlog='1' rlog='1' aborterr='1'
+..==== BEGIN include/rpl_connect.inc [creating server_2_1] ====
+.. con='default' warn='1' qlog='1' rlog='1' aborterr='1'
+connect (server_2_1,127.0.0.1,root,,test,16001,)
+[connection default]
+..==== END include/rpl_connect.inc ====
+.. con='default' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+USE test;
+RESET MASTER;
+SET GLOBAL gtid_slave_pos= "";
+RESET SLAVE;
+..==== BEGIN include/rpl_connect.inc [creating server_1] ====
+.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+connect (server_1,127.0.0.1,root,,test,16000,)
+[connection server_2]
+..==== END include/rpl_connect.inc ====
+.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+..==== BEGIN include/rpl_connect.inc [creating server_1_1] ====
+.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+connect (server_1_1,127.0.0.1,root,,test,16000,)
+[connection server_2]
+..==== END include/rpl_connect.inc ====
+.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_1]
+USE test;
+RESET MASTER;
+SET GLOBAL gtid_slave_pos= "";
+RESET SLAVE;
+---- Check that @@server_id is distinct for all servers ----
+..==== BEGIN include/assert.inc [Servers 2 and 1 should have different @@server_id] ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+# debug: assert_text='Servers 2 and 1 should have different @@server_id' assert_cond='[SELECT @@server_id AS i, i, 1] != 2'
+# debug: old connection, sub-statement='SELECT @@server_id AS i, i, 1'
+# debug: result of sub-statement='1'
+# debug: interpolated_cond='1 != 2'
+# debug: result='1'
+[connection server_1]
+..==== END include/assert.inc [Servers 2 and 1 should have different @@server_id] ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+..==== BEGIN include/rpl_change_topology.inc [new topology=1->2] ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+---- Check input ----
+$rpl_server_count='2'
+$rpl_server_count_length=''
+new $rpl_topology='1->2'
+old $rpl_master_list='xx'
+old $rpl_sync_chain=''
+---- Generate $rpl_server_count_length and $rpl_master_list ----
+new $rpl_server_count_length = '1'
+new $rpl_master_list = ' 1'
+---- Execute CHANGE MASTER on all servers ----
+$_rpl_server='2' $_rpl_master='1'
+[connection server_1]
+[connection server_2]
+CHANGE MASTER TO MASTER_HOST = '127.0.0.1', MASTER_PORT = 16000, MASTER_USER = 'root', MASTER_LOG_FILE = 'master-bin.000001', MASTER_CONNECT_RETRY = 1;
+$_rpl_server='1' $_rpl_master=''
+[connection server_1]
+..==== END include/rpl_change_topology.inc ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+..==== BEGIN include/rpl_start_slaves.inc ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+...==== BEGIN include/rpl_for_each_file.inc [include/start_slave.inc] ====
+... con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+....==== BEGIN include/start_slave.inc ====
+.... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+START SLAVE;
+.....==== BEGIN include/wait_for_slave_to_start.inc ====
+..... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+......==== BEGIN include/wait_for_slave_io_to_start.inc ====
+...... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+.......==== BEGIN include/wait_for_slave_param.inc [Slave_IO_Running] ====
+....... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+Waiting until 'Slave_IO_Running' = 'Yes' [$slave_error_param='Last_IO_Errno']
+[connection server_2]
+.......==== END include/wait_for_slave_param.inc [Slave_IO_Running] ====
+....... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+......==== END include/wait_for_slave_io_to_start.inc ====
+...... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+......==== BEGIN include/wait_for_slave_sql_to_start.inc ====
+...... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+.......==== BEGIN include/wait_for_slave_param.inc [Slave_SQL_Running] ====
+....... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+Waiting until 'Slave_SQL_Running' = 'Yes' [$slave_error_param='1']
+[connection server_2]
+.......==== END include/wait_for_slave_param.inc [Slave_SQL_Running] ====
+....... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+......==== END include/wait_for_slave_sql_to_start.inc ====
+...... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+.....==== END include/wait_for_slave_to_start.inc ====
+..... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+....==== END include/start_slave.inc ====
+.... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_1]
+...==== END include/rpl_for_each_file.inc [include/start_slave.inc] ====
+... con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_1]
+..==== END include/rpl_start_slaves.inc ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_1]
+.==== END include/rpl_init.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+.==== BEGIN include/rpl_connect.inc [creating master] ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+connect (master,127.0.0.1,root,,test,16000,)
+[connection server_1]
+.==== END include/rpl_connect.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+.==== BEGIN include/rpl_connect.inc [creating master1] ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+connect (master1,127.0.0.1,root,,test,16000,)
+[connection server_1]
+.==== END include/rpl_connect.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+.==== BEGIN include/rpl_connect.inc [creating slave] ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+connect (slave,127.0.0.1,root,,test,16001,)
+[connection server_1]
+.==== END include/rpl_connect.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+.==== BEGIN include/rpl_connect.inc [creating slave1] ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+connect (slave1,127.0.0.1,root,,test,16001,)
+[connection server_1]
+.==== END include/rpl_connect.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection default]
+==== END include/master-slave.inc ====
+ con='default' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection master]
+SELECT 1;
+1
+1
+include/rpl_end.inc
+==== BEGIN include/rpl_end.inc ====
+ con='master' warn='1' qlog='1' rlog='1' aborterr='1'
+---- Check that no slave thread has an error ----
+[connection server_2]
+.==== BEGIN include/check_slave_no_error.inc ====
+. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+..==== BEGIN include/check_slave_param.inc [Last_SQL_Errno] ====
+.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+..==== END include/check_slave_param.inc ====
+.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+..==== BEGIN include/check_slave_param.inc [Last_IO_Errno] ====
+.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+..==== END include/check_slave_param.inc ====
+.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+.==== END include/check_slave_no_error.inc ====
+. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_1]
+.==== BEGIN include/rpl_sync.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+..==== BEGIN include/rpl_generate_sync_chain.inc ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+Generated $rpl_sync_chain = ' 12'
+[connection server_1]
+..==== END include/rpl_generate_sync_chain.inc ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+$rpl_sync_chain = ' 12' $rpl_only_running_threads= 
+[sync server_1 -> server_2]
+syncing master_file='master-bin.000001' master_pos='329'
+[connection server_1]
+.==== END include/rpl_sync.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+.==== BEGIN include/rpl_stop_slaves.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+..==== BEGIN include/rpl_for_each_file.inc [include/stop_slave.inc] ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+...==== BEGIN include/stop_slave.inc ====
+... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+STOP SLAVE;
+....==== BEGIN include/wait_for_slave_to_stop.inc ====
+.... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+.....==== BEGIN include/wait_for_slave_sql_to_stop.inc ====
+..... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+......==== BEGIN include/wait_for_slave_param.inc [Slave_SQL_Running] ====
+...... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+Waiting until 'Slave_SQL_Running' = 'No' [$slave_error_param='Last_SQL_Errno']
+[connection server_2]
+......==== END include/wait_for_slave_param.inc [Slave_SQL_Running] ====
+...... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+.....==== END include/wait_for_slave_sql_to_stop.inc ====
+..... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+.....==== BEGIN include/wait_for_slave_io_to_stop.inc ====
+..... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+......==== BEGIN include/wait_for_slave_param.inc [Slave_IO_Running] ====
+...... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+Waiting until 'Slave_IO_Running' = 'No' [$slave_error_param='Last_IO_Errno']
+[connection server_2]
+......==== END include/wait_for_slave_param.inc [Slave_IO_Running] ====
+...... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+.....==== END include/wait_for_slave_io_to_stop.inc ====
+..... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+....==== END include/wait_for_slave_to_stop.inc ====
+.... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+...==== END include/stop_slave.inc ====
+... con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_1]
+..==== END include/rpl_for_each_file.inc [include/stop_slave.inc] ====
+.. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_1]
+.==== END include/rpl_stop_slaves.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+[connection server_2]
+CHANGE MASTER TO master_log_file='';
+[connection server_1]
+CHANGE MASTER TO master_log_file='';
+.==== BEGIN include/rpl_change_topology.inc [new topology=none] ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+---- Check input ----
+$rpl_server_count='2'
+$rpl_server_count_length='1'
+new $rpl_topology=''
+old $rpl_master_list=' 1'
+old $rpl_sync_chain=' 12'
+---- Generate $rpl_server_count_length and $rpl_master_list ----
+new $rpl_server_count_length = '1'
+new $rpl_master_list = '  '
+---- Execute CHANGE MASTER on all servers ----
+$_rpl_server='2' $_rpl_master=''
+$_rpl_server='1' $_rpl_master='0'
+[connection server_1]
+.==== END include/rpl_change_topology.inc ====
+. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+connection default;
+disconnect server_2;
+disconnect server_2_1;
+disconnect server_1;
+disconnect server_1_1;
+==== END include/rpl_end.inc ====
+ con='default' warn='1' qlog='1' rlog='1' aborterr='1'
