@@ -193,6 +193,11 @@ if ($rpl_check_server_ids)
   }
 }
 
+if ($rpl_debug)
+{
+  --echo ---- Check the topology and call CHANGE MASTER ----
+}
+
 # $rpl_master_list must be set so that include/rpl_change_topology.inc
 # knows which servers are initialized and not.
 --let $rpl_master_list= `SELECT REPEAT('x', $rpl_server_count * LENGTH($rpl_server_count))`
@@ -201,6 +206,10 @@ if ($rpl_check_server_ids)
 
 if (!$rpl_skip_start_slave)
 {
+  if ($rpl_debug)
+  {
+    --echo ---- Start slaves ----
+  }
   --source include/rpl_start_slaves.inc
 }
 

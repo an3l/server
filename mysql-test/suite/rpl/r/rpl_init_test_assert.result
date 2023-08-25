@@ -39,11 +39,12 @@ RESET SLAVE;
 [connection server_1]
 ..==== END include/assert.inc [Servers 2 and 1 should have different @@server_id] ====
 .. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+---- Check the topology and call CHANGE MASTER ----
 ..==== BEGIN include/rpl_change_topology.inc [new topology=1->2] ====
 .. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
 ---- Check input ----
 $rpl_server_count='2'
-$rpl_server_count_length=''
+old $rpl_server_count_length=''
 new $rpl_topology='1->2'
 old $rpl_master_list='xx'
 old $rpl_sync_chain=''
@@ -53,12 +54,15 @@ new $rpl_master_list = ' 1'
 ---- Execute CHANGE MASTER on all servers ----
 $_rpl_server='2' $_rpl_master='1'
 [connection server_1]
+"$rpl_master_log_file parameter not set for the master: 1, use the latest binlog file by executing SHOW MASTER STATUS."
 [connection server_2]
+"$rpl_master_log_pos parameter not set for the master: 1. Set log position to empty."
 CHANGE MASTER TO MASTER_HOST = '127.0.0.1', MASTER_PORT = 16000, MASTER_USER = 'root', MASTER_LOG_FILE = 'master-bin.000001', MASTER_CONNECT_RETRY = 1;
 $_rpl_server='1' $_rpl_master=''
 [connection server_1]
 ..==== END include/rpl_change_topology.inc ====
 .. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
+---- Start slaves ----
 ..==== BEGIN include/rpl_start_slaves.inc ====
 .. con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
 ...==== BEGIN include/rpl_for_each_file.inc [include/start_slave.inc] ====
@@ -224,7 +228,7 @@ CHANGE MASTER TO master_log_file='';
 . con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
 ---- Check input ----
 $rpl_server_count='2'
-$rpl_server_count_length='1'
+old $rpl_server_count_length='1'
 new $rpl_topology=''
 old $rpl_master_list=' 1'
 old $rpl_sync_chain=' 12'

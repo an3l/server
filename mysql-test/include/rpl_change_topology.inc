@@ -210,6 +210,10 @@ if (!$rpl_skip_change_master)
         --let $rpl_connection_name= server_$_rpl_master
         --source include/rpl_connection.inc
         --let $_rpl_master_log_file= query_get_value(SHOW MASTER STATUS, File, 1)
+        if ($rpl_debug)
+        {
+          --echo "\$rpl_master_log_file parameter not set for the master: $_rpl_master, use the latest binlog file by executing SHOW MASTER STATUS."
+        }
       }
       # Change connection.
       --let $rpl_connection_name= server_$_rpl_server
@@ -224,6 +228,10 @@ if (!$rpl_skip_change_master)
       if (!$_rpl_master_log_pos_index)
       {
         --let $_rpl_master_log_pos=
+        if ($rpl_debug)
+        {
+          --echo "\$rpl_master_log_pos parameter not set for the master: $_rpl_master. Set log position to empty."
+        }
       }
       eval CHANGE MASTER TO MASTER_HOST = '127.0.0.1', MASTER_PORT = $_rpl_port, MASTER_USER = 'root', MASTER_LOG_FILE = '$_rpl_master_log_file'$_rpl_master_log_pos, MASTER_CONNECT_RETRY = 1;
     }
