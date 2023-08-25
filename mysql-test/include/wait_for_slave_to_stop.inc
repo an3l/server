@@ -29,10 +29,12 @@
 --let $include_filename= wait_for_slave_to_stop.inc
 --source include/begin_include_file.inc
 
-
+# Persist slave_error_param in case of stopping the slave
+# see `include/stop_slave.inc`.
+--let $old_slave_error_param= $slave_error_param
 --source include/wait_for_slave_sql_to_stop.inc
+--let $slave_error_param= $old_slave_error_param
 --source include/wait_for_slave_io_to_stop.inc
-
 
 --let $include_filename= wait_for_slave_to_stop.inc
 --source include/end_include_file.inc

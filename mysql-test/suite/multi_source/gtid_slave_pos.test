@@ -119,6 +119,8 @@ STOP SLAVE;
 --source include/wait_for_slave_to_stop.inc
 set default_master_connection = 'slave2';
 STOP SLAVE;
+# Don't check the error condition, since slave is already stopped
+--let $slave_error_param= slave stopped
 --source include/wait_for_slave_to_stop.inc
 set default_master_connection = 'slave1';
 START SLAVE;

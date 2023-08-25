@@ -73,6 +73,8 @@ if ($rpl_only_running_threads)
     if (!$_slave_running_bits)
     {
       STOP SLAVE;
+      # Slave is stopped don't generate error for IO/SQL thread
+      --let $slave_error_param= slave stopped
       --source include/wait_for_slave_to_stop.inc
     }
   }
@@ -80,6 +82,8 @@ if ($rpl_only_running_threads)
 if (!$rpl_only_running_threads)
 {
   STOP SLAVE;
+  # Slave is stopped don't generate error for IO/SQL thread
+  --let $slave_error_param= slave stopped
   --source include/wait_for_slave_to_stop.inc
 }
 

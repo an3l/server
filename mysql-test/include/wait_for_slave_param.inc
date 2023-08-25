@@ -10,7 +10,7 @@
 # --let $slave_param_value= No
 # [--let $slave_param_comparison= [ < | <= | >= | > | = | != ]]
 # [--let $slave_timeout= NUMBER]
-# [--let $slave_error_param= [Slave_SQL_Errno | Slave_IO_Errno]]
+# [--let $slave_error_param= [ Last_SQL_Errno | Last_IO_Errno]]
 # [--let $rpl_debug= 1]
 # --source include/wait_for_slave_param.inc
 #
@@ -34,9 +34,11 @@
 #
 # $slave_error_param
 #   If set, this script will check if the column of the output from
-#   SHOW SLAVE STATUS named $slave_error_param is nonzero.  If it is,
-#   this script will faile immediately.  Typically, this should be set
-#   to Last_IO_Errno or Last_SQL_Errno.
+#   SHOW SLAVE STATUS named $slave_error_param is nonzero. If it is,
+#   this script will fail immediately. Typically, this should be set
+#   to Last_IO_Errno or Last_SQL_Errno. In case slave is stopped or one or both
+#   threads are stopped, caller should set this value to "slave stopped",
+#   see `/include/stop_slave.inc`.
 #
 # $rpl_debug
 #   See include/rpl_init.inc
@@ -56,6 +58,7 @@ if (!$_slave_timeout)
   }
 }
 
+# This happens for SQL thread (see `wait_for_slave_sql_to_start.inc`)
 if ($slave_error_param == '')
 {
   --let $slave_error_param= 1
@@ -85,36 +88,44 @@ if ($_slave_check_configured == 'No such row')
 --let $_wait_for_slave_param_zero= 0
 --let $_slave_timeout_counter= $_slave_timeout$_wait_for_slave_param_zero
 --let $_slave_continue= 1
-while ($_slave_continue)
+
+# If slave is not already stopped
+if ($slave_error_param != "slave stopped")
 {
-  --let $_show_slave_status_value= query_get_value("SHOW SLAVE STATUS", $slave_param, 1)
-
-  # Check if an error condition is reached.
-  if (!$slave_error_param)
+  while ($_slave_continue)
   {
-    --let $_show_slave_status_error_value= query_get_value("SHOW SLAVE STATUS", $slave_error_param, 1)
-    if ($_show_slave_status_error_value)
-    {
-      --echo **** ERROR: $slave_error_param = '$_show_slave_status_error_value' while waiting for slave parameter $slave_param $_slave_param_comparison $slave_param_value ****
-      --source include/show_rpl_debug_info.inc
-      --die Error condition reached in include/wait_for_slave_param.inc
-    }
-  }
+    --let $_show_slave_status_value= query_get_value("SHOW SLAVE STATUS", $slave_param, 1)
 
-  # Check if the termination condition is reached.
-  --let $_slave_continue= `SELECT NOT('$_show_slave_status_value' $_slave_param_comparison '$slave_param_value')`
-
-  # Decrease timer, and check if the timeout is reached.
-  if ($_slave_continue)
-  {
-    --dec $_slave_timeout_counter
-    if (!$_slave_timeout_counter)
+    # Check if an error condition is reached.
+    if ($slave_error_param)
     {
-      --echo **** ERROR: timeout after $_slave_timeout seconds while waiting for slave parameter $slave_param $_slave_param_comparison $slave_param_value ****
-      --source include/show_rpl_debug_info.inc
-      --die Timeout in include/wait_for_slave_param.inc
+      if ($slave_error_param != "1")
+      {
+        --let $_show_slave_status_error_value= query_get_value("SHOW SLAVE STATUS", $slave_error_param, 1)
+        if ($_show_slave_status_error_value)
+        {
+          --echo **** ERROR: $slave_error_param = '$_show_slave_status_error_value' while waiting for slave parameter $slave_param $_slave_param_comparison $slave_param_value ****
+          --source include/show_rpl_debug_info.inc
+          --die Error condition reached in include/wait_for_slave_param.inc
+        }
+      }
     }
-    --sleep  0.1
+
+    # Check if the termination condition is reached.
+    --let $_slave_continue= `SELECT NOT('$_show_slave_status_value' $_slave_param_comparison '$slave_param_value')`
+
+    # Decrease timer, and check if the timeout is reached.
+    if ($_slave_continue)
+    {
+      --dec $_slave_timeout_counter
+      if (!$_slave_timeout_counter)
+      {
+        --echo **** ERROR: timeout after $_slave_timeout seconds while waiting for slave parameter $slave_param $_slave_param_comparison $slave_param_value ****
+        --source include/show_rpl_debug_info.inc
+        --die Timeout in include/wait_for_slave_param.inc
+      }
+      --sleep  0.1
+    }
   }
 }
 

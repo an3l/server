@@ -117,9 +117,9 @@ INSERT INTO table3_no_encryption SELECT NULL,NOW(),b FROM table3_no_encryption;
 start slave;
 # Make slave to try to synchronize. It shouldn't work, the slave IO thread is
 # expected to abort with an error
+# ER_MASTER_FATAL_ERROR_READING_BINLOG
 --let $slave_io_errno= 1236
 --source include/wait_for_slave_io_error.inc
-
 --echo # Ensuring slave was unable to replicate any transactions..
 --let $gsp= `SELECT @@global.gtid_slave_pos`
 if (`SELECT strcmp("$gsp","")`)
