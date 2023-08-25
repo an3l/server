@@ -1,7 +1,7 @@
 # ==== Purpose ====
 #
-# Execute a .inc file once for each server that was configured as a
-# slave by rpl_init.inc
+# Execute a start_slave.inc or stop_slave.inc file once for each server,
+# that was configured as a slave by rpl_init.inc
 #
 #
 # ==== Usage ====
