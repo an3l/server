@@ -12,12 +12,6 @@ connect (server_2,127.0.0.1,root,,test,16001,)
 [connection default]
 ..==== END include/rpl_connect.inc ====
 .. con='default' warn='1' qlog='1' rlog='1' aborterr='1'
-..==== BEGIN include/rpl_connect.inc [creating server_2_1] ====
-.. con='default' warn='1' qlog='1' rlog='1' aborterr='1'
-connect (server_2_1,127.0.0.1,root,,test,16001,)
-[connection default]
-..==== END include/rpl_connect.inc ====
-.. con='default' warn='1' qlog='1' rlog='1' aborterr='1'
 [connection server_2]
 USE test;
 RESET MASTER;
@@ -26,12 +20,6 @@ RESET SLAVE;
 ..==== BEGIN include/rpl_connect.inc [creating server_1] ====
 .. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
 connect (server_1,127.0.0.1,root,,test,16000,)
-[connection server_2]
-..==== END include/rpl_connect.inc ====
-.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
-..==== BEGIN include/rpl_connect.inc [creating server_1_1] ====
-.. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
-connect (server_1_1,127.0.0.1,root,,test,16000,)
 [connection server_2]
 ..==== END include/rpl_connect.inc ====
 .. con='server_2' warn='1' qlog='1' rlog='1' aborterr='1'
@@ -251,8 +239,6 @@ $_rpl_server='1' $_rpl_master='0'
 . con='server_1' warn='1' qlog='1' rlog='1' aborterr='1'
 connection default;
 disconnect server_2;
-disconnect server_2_1;
 disconnect server_1;
-disconnect server_1_1;
 ==== END include/rpl_end.inc ====
  con='default' warn='1' qlog='1' rlog='1' aborterr='1'
