@@ -1,0 +1,164 @@
+#
+# MDEV-24602: cannot specify a name for a column check constraint
+#
+create table t(t int,
+check (t>0),
+constraint check(t>1),
+constraint t_named check(t>2));
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `t` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (`t` > 0),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`t` > 1),
+  CONSTRAINT `t_named` CHECK (`t` > 2)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+drop table t;
+create table t(t0 int,
+t1 int check (t1>0),
+t2 int constraint check(t2>0),
+t3 int constraint t_field check(t3>0));
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `t0` int(11) DEFAULT NULL,
+  `t1` int(11) DEFAULT NULL,
+  `t2` int(11) DEFAULT NULL,
+  `t3` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (`t1` > 0),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`t2` > 0),
+  CONSTRAINT `t_field` CHECK (`t3` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+drop table t;
+#
+# MDEV-24598: duplicate CHECK constraint name
+#
+create table t(t0 int,
+t1 int check (t1>0),
+t2 int constraint check(t2>0),
+t3 int constraint t_field check(t3>0),
+t4 int constraint t_field check(t4>0));
+ERROR HY000: Duplicate CHECK constraint name 't_field'
+create table t(check(t>0),
+t int constraint CONSTRAINT_1 check(t<0));
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `t` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_2` CHECK (`t` > 0),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`t` < 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE 
+FROM information_schema.TABLE_CONSTRAINTS WHERE 
+TABLE_NAME = 't' AND TABLE_SCHEMA = 'test';
+CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
+CONSTRAINT_2	t	CHECK
+CONSTRAINT_1	t	CHECK
+SELECT * from INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE
+CONSTRAINT_SCHEMA = 'test';
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+def	test	t	CONSTRAINT_2	`t` > 0
+def	test	t	CONSTRAINT_1	`t` < 0
+drop table t;
+create table t (a int check (a>2), constraint a check (a < 5));
+drop table t;
+CREATE TABLE t (
+path VARCHAR(100) NOT NULL COLLATE 'utf8_general_ci',
+json_c1 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+json_c2 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+comment VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8_general_ci',
+UNIQUE INDEX path (path),
+CONSTRAINT json_test CHECK (path > 0)
+);
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `path` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `json_c1` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '',
+  `json_c2` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '',
+  `comment` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  UNIQUE KEY `path` (`path`),
+  CONSTRAINT `json_c1` CHECK (json_valid(`json_c1`)),
+  CONSTRAINT `json_c2` CHECK (json_valid(`json_c2`)),
+  CONSTRAINT `json_test` CHECK (`path` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+select * from information_schema.check_constraints where table_name='t';
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+def	test	t	json_c1	json_valid(`json_c1`)
+def	test	t	json_c2	json_valid(`json_c2`)
+def	test	t	json_c1	json_valid(`json_c1`)
+def	test	t	json_c2	json_valid(`json_c2`)
+def	test	t	json_test	`path` > 0
+drop table t;
+CREATE TABLE t (
+path VARCHAR(100) NOT NULL COLLATE 'utf8_general_ci',
+json_c1 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+json_c2 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+comment VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8_general_ci',
+UNIQUE INDEX path (path),
+CONSTRAINT json_c1 CHECK (path > 0)
+);
+ERROR HY000: Duplicate CHECK constraint name 'json_c1'
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE 
+FROM information_schema.TABLE_CONSTRAINTS WHERE 
+TABLE_NAME = 't' AND TABLE_SCHEMA = 'test';
+CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
+SELECT * from INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE
+CONSTRAINT_SCHEMA = 'test';
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+SHOW CREATE TABLE mysql.global_priv;
+Table	Create Table
+global_priv	CREATE TABLE `global_priv` (
+  `Host` char(60) NOT NULL DEFAULT '',
+  `User` char(80) NOT NULL DEFAULT '',
+  `Priv` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}',
+  PRIMARY KEY (`Host`,`User`),
+  CONSTRAINT `Priv` CHECK (json_valid(`Priv`))
+) ENGINE=Aria DEFAULT CHARSET=utf8 COLLATE=utf8_bin PAGE_CHECKSUM=1 TRANSACTIONAL=1 COMMENT='Users and global privileges'
+SELECT `COLUMN_NAME` AS `Field`,`COLUMN_TYPE` AS `Type`,
+`IS_NULLABLE` AS `Null`,`COLUMN_KEY` AS `Key`,
+`COLUMN_DEFAULT` AS `Default`, `EXTRA` AS `Extra`,
+`COLUMN_COMMENT` AS `Comment`
+FROM `INFORMATION_SCHEMA`.`COLUMNS` WHERE
+TABLE_SCHEMA = "mysql" AND TABLE_NAME ="global_priv";
+Field	Type	Null	Key	Default	Extra	Comment
+Host	char(60)	NO	PRI	''		
+User	char(80)	NO	PRI	''		
+Priv	longtext	NO		'{}'		
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE 
+FROM information_schema.TABLE_CONSTRAINTS WHERE 
+TABLE_SCHEMA = 'mysql' AND TABLE_NAME ="global_priv";
+CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
+PRIMARY	global_priv	PRIMARY KEY
+Priv	global_priv	CHECK
+Priv	global_priv	CHECK
+SELECT * from INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE
+CONSTRAINT_SCHEMA = 'test';
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+CREATE TABLE t0 (c1 INT CHECK ( c1 > 0 ));
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (`c1` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+ALTER TABLE t0 DROP CONSTRAINT CONSTRAINT_1;
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+ALTER TABLE t0 ADD CONSTRAINT c1 CHECK (c1<0);
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL,
+  CONSTRAINT `c1` CHECK (`c1` < 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+ALTER TABLE t0 DROP CONSTRAINT c1;
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+drop table t0;

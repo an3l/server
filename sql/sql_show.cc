@@ -2348,16 +2348,6 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
 
     append_create_options(thd, packet, field->option_list, check_options,
                           hton->field_options);
-    
-    if (field->check_constraint)
-    {
-      StringBuffer<MAX_FIELD_WIDTH> str(&my_charset_utf8mb4_general_ci);
-      field->check_constraint->print(&str);
-      packet->append(STRING_WITH_LEN(" CHECK ("));
-      packet->append(str);
-      packet->append(STRING_WITH_LEN(")"));
-    }
-
   }
 
   key_info= table->s->key_info;

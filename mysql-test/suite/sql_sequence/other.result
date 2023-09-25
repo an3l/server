@@ -186,14 +186,30 @@ DROP SEQUENCE s1;
 #
 CREATE SEQUENCE s1 nocache engine=myisam;
 CREATE table t1 (a int check (next value for s1 > 0));
-ERROR HY000: Function or expression 'nextval()' cannot be used in the CHECK clause of `a`
-CREATE table t1 (a int check (previous value for s1 > 0));
-ERROR HY000: Function or expression 'lastval()' cannot be used in the CHECK clause of `a`
-CREATE table t1 (a int check (setval(s1,10)));
-ERROR HY000: Function or expression 'setval()' cannot be used in the CHECK clause of `a`
-CREATE TABLE t1 (a int, b int as (next value for s1 > 0));
+show create table t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `a` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (nextval(`test`.`s1`) > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+CREATE table t2 (a int check (previous value for s1 > 0));
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (lastval(`test`.`s1`) > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+CREATE table t3 (a int check (setval(s1,10)));
+show create table t3;
+Table	Create Table
+t3	CREATE TABLE `t3` (
+  `a` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (setval(`test`.`s1`,10,1,0))
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+CREATE TABLE t4 (a int, b int as (next value for s1 > 0));
 ERROR HY000: Function or expression 'nextval()' cannot be used in the GENERATED ALWAYS AS clause of `b`
 drop sequence s1;
+drop table t1,t2,t3;
 #
 # MDEV-13024: Server crashes in my_store_ptr upon DELETE from
 # sequence in multi-table format

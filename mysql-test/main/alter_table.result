@@ -2448,11 +2448,12 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` int(11) NOT NULL,
   `new_b` int(11) NOT NULL,
-  `c` int(11) DEFAULT (`a` + `new_b`) CHECK (`a` + `new_b` > 0),
+  `c` int(11) DEFAULT (`a` + `new_b`),
   `d` int(11) GENERATED ALWAYS AS (`a` + `new_b`) VIRTUAL,
   `b` char(1) DEFAULT NULL,
   PRIMARY KEY (`a`),
   KEY `b` (`new_b`),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`a` + `new_b` > 0),
   CONSTRAINT `test` CHECK (`a` + `new_b` > 1),
   CONSTRAINT `new` CHECK (octet_length(`b`) > 0)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
