@@ -829,7 +829,7 @@ static_assert(sizeof(YYSTYPE) == sizeof(void*)*2+8, "%union size check");
 bool my_yyoverflow(short **a, YYSTYPE **b, size_t *yystacksize);
 %}
 
-%pure-parser                                    /* We have threads */
+%define api.pure                                    /* We have threads */
 %parse-param { THD *thd }
 %lex-param { THD *thd }
 /*
@@ -6609,6 +6609,11 @@ column_def:
           { $$= $1; }
         | field_spec references
           { $$= $1; }
+        | field_spec constraint check_constraint
+          {
+            $$= $1;
+            Lex->add_constraint($2, $3, FALSE);
+          }
         ;
 
 key_def:
@@ -6771,11 +6776,13 @@ field_spec:
             lex->parsing_options.lookup_keywords_after_qualifier= false;
             $$= $<create_field>2;
 
-            $$->check_constraint= $4;
-
+            if ($4)
+            {
+              $$->check_constraint= $4;
+              lex->add_constraint(null_clex_str, $4, TRUE);
+            }
             if (unlikely($$->check(thd)))
               MYSQL_YYABORT;
-
             lex->alter_info.create_list.push_back($$, thd->mem_root);
 
             $$->create_if_not_exists= Lex->check_exists;
@@ -8479,7 +8486,7 @@ alter_list_item:
         | ADD constraint_def
           {
             Lex->alter_info.flags|= ALTER_ADD_CHECK_CONSTRAINT;
-	  }
+          }
         | ADD CONSTRAINT IF_SYM not EXISTS field_ident check_constraint
          {
            Lex->alter_info.flags|= ALTER_ADD_CHECK_CONSTRAINT;

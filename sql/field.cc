@@ -2479,7 +2479,11 @@ int Field::set_default()
           TABLE::update_virtual_fields(handler *, enum_vcol_update_mode).
     */
     table->in_use->set_n_backup_active_arena(table->expr_arena, &backup_arena);
-    int rc= default_value->expr->save_in_field(this, 0);
+    int rc= 0;
+    // Item expr may be null if default_value is evaluated for check_constraint
+    // Problem - check constraint not visible (default.testmake)
+    if (default_value->expr)
+      rc= default_value->expr->save_in_field(this, 0);
     table->in_use->restore_active_arena(table->expr_arena, &backup_arena);
     return rc;
   }

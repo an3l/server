@@ -46,18 +46,20 @@ CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
 def	foo	t0	CONSTRAINT_1	`t` > 32
 def	foo	t0	CONSTRAINT_2	`t` < 50
 def	foo	t1	CHK_tt	`tt` < 100
-def	foo	t1	CONSTRAINT_1	`tt` > 32
-def	foo	t1	CONSTRAINT_2	`tt` < 50
-def	foo	t1	t	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_2	`tt` > 32
+def	foo	t1	CONSTRAINT_3	`tt` < 50
 ALTER TABLE t1
 DROP CONSTRAINT CHK_tt;
 SELECT * from information_schema.check_constraints;
 CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
 def	foo	t0	CONSTRAINT_1	`t` > 32
 def	foo	t0	CONSTRAINT_2	`t` < 50
-def	foo	t1	CONSTRAINT_1	`tt` > 32
-def	foo	t1	CONSTRAINT_2	`tt` < 50
-def	foo	t1	t	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_2	`tt` > 32
+def	foo	t1	CONSTRAINT_3	`tt` < 50
 CREATE TABLE t2
 (
 name VARCHAR(30) CHECK(CHAR_LENGTH(name)>2), #field constraint
@@ -69,11 +71,13 @@ SELECT * from information_schema.check_constraints;
 CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
 def	foo	t0	CONSTRAINT_1	`t` > 32
 def	foo	t0	CONSTRAINT_2	`t` < 50
-def	foo	t1	CONSTRAINT_1	`tt` > 32
-def	foo	t1	CONSTRAINT_2	`tt` < 50
-def	foo	t1	t	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_2	`tt` > 32
+def	foo	t1	CONSTRAINT_3	`tt` < 50
 def	foo	t2	CHK_dates	`start_date` is null
-def	foo	t2	name	char_length(`name`) > 2
+def	foo	t2	CONSTRAINT_1	char_length(`name`) > 2
+def	foo	t2	CONSTRAINT_1	char_length(`name`) > 2
 ALTER TABLE t1
 ADD CONSTRAINT CHK_new_ CHECK(t>tt);
 SELECT * from information_schema.check_constraints;
@@ -81,11 +85,13 @@ CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
 def	foo	t0	CONSTRAINT_1	`t` > 32
 def	foo	t0	CONSTRAINT_2	`t` < 50
 def	foo	t1	CHK_new_	`t` > `tt`
-def	foo	t1	CONSTRAINT_1	`tt` > 32
-def	foo	t1	CONSTRAINT_2	`tt` < 50
-def	foo	t1	t	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_2	`tt` > 32
+def	foo	t1	CONSTRAINT_3	`tt` < 50
 def	foo	t2	CHK_dates	`start_date` is null
-def	foo	t2	name	char_length(`name`) > 2
+def	foo	t2	CONSTRAINT_1	char_length(`name`) > 2
+def	foo	t2	CONSTRAINT_1	char_length(`name`) > 2
 CREATE TABLE t3
 (
 a int,
@@ -99,12 +105,15 @@ CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
 def	foo	t0	CONSTRAINT_1	`t` > 32
 def	foo	t0	CONSTRAINT_2	`t` < 50
 def	foo	t1	CHK_new_	`t` > `tt`
-def	foo	t1	CONSTRAINT_1	`tt` > 32
-def	foo	t1	CONSTRAINT_2	`tt` < 50
-def	foo	t1	t	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_1	`t` > 2
+def	foo	t1	CONSTRAINT_2	`tt` > 32
+def	foo	t1	CONSTRAINT_3	`tt` < 50
 def	foo	t2	CHK_dates	`start_date` is null
-def	foo	t2	name	char_length(`name`) > 2
-def	foo	t3	b	`b` > 0
+def	foo	t2	CONSTRAINT_1	char_length(`name`) > 2
+def	foo	t2	CONSTRAINT_1	char_length(`name`) > 2
+def	foo	t3	CONSTRAINT_1	`b` > 0
+def	foo	t3	CONSTRAINT_1	`b` > 0
 def	foo	t3	b	`b` > 10
 def	foo	t3	b1	`b` < 123456789012345678901234567890123456789012345678901234567890123456789
 disconnect con1;
@@ -138,6 +147,7 @@ GRANT SELECT (`a`) ON `db`.`t1` TO `foo`@`%`
 SELECT * FROM information_schema.check_constraints;
 CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
 def	db	t1	CONSTRAINT_1	`b` > 0
+def	mysql	global_priv	Priv	json_valid(`Priv`)
 def	mysql	global_priv	Priv	json_valid(`Priv`)
 CONNECT con1,localhost, foo,, db;
 SELECT a FROM t1;

@@ -4309,7 +4309,10 @@ public:
   bool add_constraint(const LEX_CSTRING &name, Virtual_column_info *constr,
                       bool if_not_exists)
   {
-    constr->name= name;
+    if (name.str)
+      constr->name= name;
+    else
+      constr->automatic_name= 1;
     constr->flags= if_not_exists ?
                    Alter_info::CHECK_CONSTRAINT_IF_NOT_EXISTS : 0;
     alter_info.check_constraint_list.push_back(constr);

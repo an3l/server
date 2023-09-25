@@ -5,14 +5,16 @@ Table	Create Table
 t1	CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL CHECK (`a` > 10),
   `b` int(11) DEFAULT NULL CHECK (`b` > 20),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`a` > 10),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`b` > 20),
   CONSTRAINT `min` CHECK (`a` + `b` > 100),
   CONSTRAINT `max` CHECK (`a` + `b` < 500)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 insert into t1 values (100,100);
 insert into t1 values (1,1);
-ERROR 23000: CONSTRAINT `t1.a` failed for `test`.`t1`
+ERROR 23000: CONSTRAINT `t1.CONSTRAINT_1` failed for `test`.`t1`
 insert into t1 values (20,1);
-ERROR 23000: CONSTRAINT `t1.b` failed for `test`.`t1`
+ERROR 23000: CONSTRAINT `t1.CONSTRAINT_2` failed for `test`.`t1`
 insert into t1 values (20,30);
 ERROR 23000: CONSTRAINT `min` failed for `test`.`t1`
 insert into t1 values (500,500);
@@ -55,14 +57,17 @@ t1	CREATE TABLE `t1` (
   `a` int(11) DEFAULT NULL CHECK (`a` > 10),
   `b` int(11) DEFAULT NULL CHECK (`b` > 20),
   `c` int(11) DEFAULT 0 CHECK (`c` < 10),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`a` > 10),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`b` > 20),
   CONSTRAINT `min` CHECK (`a` + `b` > 100),
   CONSTRAINT `max` CHECK (`a` + `b` < 500),
-  CONSTRAINT `CONSTRAINT_1` CHECK (`a` + `b` + `c` < 500)
+  CONSTRAINT `CONSTRAINT_3` CHECK (`c` < 10),
+  CONSTRAINT `CONSTRAINT_4` CHECK (`a` + `b` + `c` < 500)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 insert into t1 values(105,105,105);
-ERROR 23000: CONSTRAINT `t1.c` failed for `test`.`t1`
+ERROR 23000: CONSTRAINT `t1.CONSTRAINT_3` failed for `test`.`t1`
 insert into t1 values(249,249,9);
-ERROR 23000: CONSTRAINT `CONSTRAINT_1` failed for `test`.`t1`
+ERROR 23000: CONSTRAINT `CONSTRAINT_4` failed for `test`.`t1`
 insert into t1 values(105,105,9);
 select * from t1;
 a	b	c
@@ -78,9 +83,12 @@ t2	CREATE TABLE `t2` (
   `a` int(11) DEFAULT NULL CHECK (`a` > 10),
   `b` int(11) DEFAULT NULL CHECK (`b` > 20),
   `c` int(11) DEFAULT 0 CHECK (`c` < 10),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`a` > 10),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`b` > 20),
   CONSTRAINT `min` CHECK (`a` + `b` > 100),
   CONSTRAINT `max` CHECK (`a` + `b` < 500),
-  CONSTRAINT `CONSTRAINT_1` CHECK (`a` + `b` + `c` < 500)
+  CONSTRAINT `CONSTRAINT_3` CHECK (`c` < 10),
+  CONSTRAINT `CONSTRAINT_4` CHECK (`a` + `b` + `c` < 500)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 alter table t2 drop constraint c;
 ERROR 42000: Can't DROP CONSTRAINT `c`; check that it exists
@@ -94,8 +102,11 @@ t2	CREATE TABLE `t2` (
   `a` int(11) DEFAULT NULL CHECK (`a` > 10),
   `b` int(11) DEFAULT NULL CHECK (`b` > 20),
   `c` int(11) DEFAULT 0 CHECK (`c` < 10),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`a` > 10),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`b` > 20),
   CONSTRAINT `max` CHECK (`a` + `b` < 500),
-  CONSTRAINT `CONSTRAINT_1` CHECK (`a` + `b` + `c` < 500)
+  CONSTRAINT `CONSTRAINT_3` CHECK (`c` < 10),
+  CONSTRAINT `CONSTRAINT_4` CHECK (`a` + `b` + `c` < 500)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 drop table t1,t2;
 create or replace table t1 (a int, b int, constraint check (a>b));
@@ -145,7 +156,7 @@ ERROR HY000: Function or expression '@b' cannot be used in the CHECK clause of `
 create table t1 (a int check (a = 1));
 insert t1 values (1);
 insert t1 values (2);
-ERROR 23000: CONSTRAINT `t1.a` failed for `test`.`t1`
+ERROR 23000: CONSTRAINT `t1.CONSTRAINT_1` failed for `test`.`t1`
 insert t1 values (NULL);
 select * from t1;
 a
@@ -165,27 +176,33 @@ ERROR 22007: Truncated incorrect DECIMAL value: 'Ken'
 SHOW WARNINGS;
 Level	Code	Message
 Error	1292	Truncated incorrect DECIMAL value: 'Ken'
-Error	4025	CONSTRAINT `t1.FirstName` failed for `test`.`t1`
+Error	4025	CONSTRAINT `t1.CONSTRAINT_1` failed for `test`.`t1`
 INSERT INTO t1 VALUES (NULL, 'Ken'),(NULL, 'Brian');
 ERROR 22007: Truncated incorrect DECIMAL value: 'Ken'
 SHOW WARNINGS;
 Level	Code	Message
 Error	1292	Truncated incorrect DECIMAL value: 'Ken'
-Error	4025	CONSTRAINT `t1.FirstName` failed for `test`.`t1`
+Error	4025	CONSTRAINT `t1.CONSTRAINT_1` failed for `test`.`t1`
 INSERT IGNORE INTO t1 VALUES (NULL, 'Ken');
 Warnings:
+Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
 Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
 INSERT IGNORE INTO t1 VALUES (NULL, 'Ken'),(NULL, 'Brian');
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Brian'
 Warning	1292	Truncated incorrect DECIMAL value: 'Brian'
 set sql_mode="";
 INSERT INTO t1 VALUES (NULL, 'Ken');
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
 INSERT INTO t1 VALUES (NULL, 'Ken'),(NULL, 'Brian');
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Brian'
 Warning	1292	Truncated incorrect DECIMAL value: 'Brian'
 set sql_mode=default;
 select * from t1;
@@ -211,13 +228,14 @@ Table	Create Table
 t	CREATE TABLE `t` (
   `a` int(11) DEFAULT NULL,
   `b` int(11) DEFAULT NULL CHECK (`b` > 0),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`b` > 0),
   CONSTRAINT `b` CHECK (`a` < `b`),
   CONSTRAINT `a` CHECK (`a` > 0),
   CONSTRAINT `x` CHECK (`a` > 10)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 # Field constraint 'b' will fail
 insert into t values (-1, 0);
-ERROR 23000: CONSTRAINT `t.b` failed for `test`.`t`
+ERROR 23000: CONSTRAINT `t.CONSTRAINT_1` failed for `test`.`t`
 # Table constraint 'b' will fail
 insert into t values (1,1);
 ERROR 23000: CONSTRAINT `b` failed for `test`.`t`
@@ -242,9 +260,13 @@ create table t1 (v1 bigint check (v1 not in ('x' , 'x111'))) ;
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'x'
 Warning	1292	Truncated incorrect DECIMAL value: 'x111'
+Warning	1292	Truncated incorrect DECIMAL value: 'x'
+Warning	1292	Truncated incorrect DECIMAL value: 'x111'
 select * from t1;
 v1
 Warnings:
+Warning	1292	Truncated incorrect DECIMAL value: 'x'
+Warning	1292	Truncated incorrect DECIMAL value: 'x111'
 Warning	1292	Truncated incorrect DECIMAL value: 'x'
 Warning	1292	Truncated incorrect DECIMAL value: 'x111'
 select v1 from t1;
@@ -262,6 +284,8 @@ v1
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'x'
 Warning	1292	Truncated incorrect DECIMAL value: 'x111'
+Warning	1292	Truncated incorrect DECIMAL value: 'x'
+Warning	1292	Truncated incorrect DECIMAL value: 'x111'
 select * from t1;
 v1
 deallocate prepare stmt;
@@ -272,10 +296,13 @@ drop table t1;
 create table t1 (v2 date check (v1 like default (v1)), v1 date default (from_days ('x')));
 Warnings:
 Warning	1292	Truncated incorrect INTEGER value: 'x'
+Warning	1292	Truncated incorrect INTEGER value: 'x'
 insert ignore into t1 values ( 'x' , 'x' ) ;
 Warnings:
+Warning	1292	Truncated incorrect INTEGER value: 'x'
 Warning	1265	Data truncated for column 'v2' at row 1
 Warning	1265	Data truncated for column 'v1' at row 1
+Warning	1292	Truncated incorrect INTEGER value: 'x'
 Warning	1292	Truncated incorrect INTEGER value: 'x'
 drop table t1;
 #
@@ -289,7 +316,8 @@ show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
   `d` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() CHECK (default(`d`) is true),
-  `1` int(1) NOT NULL
+  `1` int(1) NOT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (default(`d`) is true)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 drop table t1;
 #
@@ -307,6 +335,164 @@ t1	CREATE TABLE `t1` (
   CONSTRAINT `id` CHECK (`id` regexp '[a-z]')
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 drop table t1;
+#
+# MDEV-24602: cannot specify a name for a column check constraint
+#
+create table t(t int,
+check (t>0),
+constraint check(t>1),
+constraint t_named check(t>2));
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `t` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (`t` > 0),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`t` > 1),
+  CONSTRAINT `t_named` CHECK (`t` > 2)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+drop table t;
+create table t(t0 int,
+t1 int check (t1>0),
+t2 int constraint check(t2>0),
+t3 int constraint t_field check(t3>0));
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `t0` int(11) DEFAULT NULL,
+  `t1` int(11) DEFAULT NULL CHECK (`t1` > 0),
+  `t2` int(11) DEFAULT NULL,
+  `t3` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (`t1` > 0),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`t2` > 0),
+  CONSTRAINT `t_field` CHECK (`t3` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+drop table t;
+#
+# MDEV-24598: duplicate CHECK constraint name
+#
+create table t(t0 int,
+t1 int check (t1>0),
+t2 int constraint check(t2>0),
+t3 int constraint t_field check(t3>0),
+t4 int constraint t_field check(t4>0));
+ERROR HY000: Duplicate CHECK constraint name 't_field'
+create table t(check(t>0),
+t int constraint CONSTRAINT_1 check(t<0));
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `t` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_2` CHECK (`t` > 0),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`t` < 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE 
+FROM information_schema.TABLE_CONSTRAINTS WHERE 
+TABLE_NAME = 't' AND TABLE_SCHEMA = 'test';
+CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
+CONSTRAINT_2	t	CHECK
+CONSTRAINT_1	t	CHECK
+SELECT * from INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE
+CONSTRAINT_SCHEMA = 'test';
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+def	test	t	CONSTRAINT_2	`t` > 0
+def	test	t	CONSTRAINT_1	`t` < 0
+drop table t;
+create table t (a int check (a>2), constraint a check (a < 5));
+drop table t;
+CREATE TABLE t (
+path VARCHAR(100) NOT NULL COLLATE 'utf8_general_ci',
+json_c1 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+json_c2 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+json_c3 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin' CHECK(JSON_VALID(json_c3)) /* there is no need to write implicitly check constraint, currently all field constraints will be printed twice in show create statement */,
+json_c4 longtext ,
+json_c5 longtext CHECK(JSON_VALID(json_c5)) /* for longtext we need to write explicitly constraint */,
+comment VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8_general_ci',
+UNIQUE INDEX path (path),
+CONSTRAINT json_test CHECK (path > 0)
+);
+show create table t;
+Table	Create Table
+t	CREATE TABLE `t` (
+  `path` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `json_c1` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' CHECK (json_valid(`json_c1`)),
+  `json_c2` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' CHECK (json_valid(`json_c2`)),
+  `json_c3` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' CHECK (json_valid(`json_c3`)),
+  `json_c4` longtext DEFAULT NULL,
+  `json_c5` longtext DEFAULT NULL CHECK (json_valid(`json_c5`)),
+  `comment` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  UNIQUE KEY `path` (`path`),
+  CONSTRAINT `json_c1` CHECK (json_valid(`json_c1`)),
+  CONSTRAINT `json_c2` CHECK (json_valid(`json_c2`)),
+  CONSTRAINT `CONSTRAINT_1` CHECK (json_valid(`json_c3`)),
+  CONSTRAINT `CONSTRAINT_1` CHECK (json_valid(`json_c3`)),
+  CONSTRAINT `CONSTRAINT_2` CHECK (json_valid(`json_c5`)),
+  CONSTRAINT `json_test` CHECK (`path` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+select * from information_schema.check_constraints where table_name='t';
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+def	test	t	json_c1	json_valid(`json_c1`)
+def	test	t	json_c2	json_valid(`json_c2`)
+def	test	t	CONSTRAINT_1	json_valid(`json_c3`)
+def	test	t	CONSTRAINT_2	json_valid(`json_c5`)
+def	test	t	json_c1	json_valid(`json_c1`)
+def	test	t	json_c2	json_valid(`json_c2`)
+def	test	t	CONSTRAINT_1	json_valid(`json_c3`)
+def	test	t	CONSTRAINT_1	json_valid(`json_c3`)
+def	test	t	CONSTRAINT_2	json_valid(`json_c5`)
+def	test	t	json_test	`path` > 0
+drop table t;
+CREATE TABLE t (
+path VARCHAR(100) NOT NULL COLLATE 'utf8_general_ci',
+json_c1 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+json_c2 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+comment VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8_general_ci',
+UNIQUE INDEX path (path),
+CONSTRAINT json_c1 CHECK (path > 0)
+);
+ERROR HY000: Duplicate CHECK constraint name 'json_c1'
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE 
+FROM information_schema.TABLE_CONSTRAINTS WHERE 
+TABLE_NAME = 't' AND TABLE_SCHEMA = 'test';
+CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
+SELECT * from INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE
+CONSTRAINT_SCHEMA = 'test';
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+SHOW CREATE TABLE mysql.global_priv;
+Table	Create Table
+global_priv	CREATE TABLE `global_priv` (
+  `Host` char(60) NOT NULL DEFAULT '',
+  `User` char(80) NOT NULL DEFAULT '',
+  `Priv` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '{}' CHECK (json_valid(`Priv`)),
+  PRIMARY KEY (`Host`,`User`),
+  CONSTRAINT `Priv` CHECK (json_valid(`Priv`))
+) ENGINE=Aria DEFAULT CHARSET=utf8 COLLATE=utf8_bin PAGE_CHECKSUM=1 TRANSACTIONAL=1 COMMENT='Users and global privileges'
+CREATE TABLE t0 (c1 INT CHECK ( c1 > 0 ));
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL CHECK (`c1` > 0),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`c1` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+ALTER TABLE t0 DROP CONSTRAINT CONSTRAINT_1;
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL CHECK (`c1` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+ALTER TABLE t0 ADD CONSTRAINT c1 CHECK (c1<0);
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL CHECK (`c1` > 0),
+  CONSTRAINT `c1` CHECK (`c1` < 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+ALTER TABLE t0 DROP CONSTRAINT c1;
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL CHECK (`c1` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+drop table t0;
 #
 # End of 10.4 tests
 #
