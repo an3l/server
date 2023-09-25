@@ -1,0 +1,19 @@
+CREATE TABLE t0 (c1 INT CHECK ( c1 > 0 ));
+show create table t0;
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_NAME = 't0' AND TABLE_SCHEMA = 'test';
+SELECT * FROM information_schema.CHECK_CONSTRAINTS;
+#ALTER TABLE t0 DROP CONSTRAINT c1;
+show create table t0;
+drop table t0;
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_NAME = 't0' AND TABLE_SCHEMA = 'test';
+SELECT * FROM information_schema.CHECK_CONSTRAINTS;
+
+CREATE TABLE t2 (
+a DECIMAL UNIQUE CHECK (a>3));
+
+show create table t2;
+#--error ER_DUP_CONSTRAINT_NAME
+ALTER TABLE t2 ADD (
+  b INT UNIQUE CHECK (b>0));
+show create table t2;
+drop table t2;

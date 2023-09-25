@@ -51,5 +51,6 @@ bool Type_handler_json_longtext::
   if (!c->check_constraint &&
       !(c->check_constraint= make_json_valid_expr(thd, &c->field_name)))
     return true;
+  thd->lex->add_constraint(*&c->field_name, c->check_constraint, FALSE);
   return Type_handler::Column_definition_validate_check_constraint(thd, c);
 }

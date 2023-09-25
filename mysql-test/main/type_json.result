@@ -2,7 +2,8 @@ create or replace table t1(a json);
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`a`))
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 create or replace table t1(a json character set utf8);
 ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'character set utf8)' at line 1
@@ -10,13 +11,16 @@ create or replace table t1(a json default '{a:1}');
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT '{a:1}' CHECK (json_valid(`a`))
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT '{a:1}',
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 create or replace table t1(a json not null check (json_valid(a)));
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`a`))
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (json_valid(`a`)),
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 insert t1 values ('[]');
 insert t1 values ('a');
@@ -25,7 +29,8 @@ create or replace table t1(a json not null);
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`a`))
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 insert t1 values ('[]');
 insert t1 values ('a');
@@ -35,7 +40,8 @@ create or replace table t1(a json default(json_object('now', now())));
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT json_object('now',current_timestamp()) CHECK (json_valid(`a`))
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT json_object('now',current_timestamp()),
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 insert t1 values ();
 select * from t1;
@@ -51,25 +57,30 @@ t
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `t` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`t`))
+  `t` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  CONSTRAINT `t` CHECK (json_valid(`t`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`a`)),
-  `t` varchar(38) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `t` varchar(38) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 show create table t3;
 Table	Create Table
 t3	CREATE TABLE `t3` (
-  `t` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`t`))
+  `t` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  CONSTRAINT `t` CHECK (json_valid(`t`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 drop table t1,t2,t3;
 create table t1 (t json check (length(t) > 0));
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `t` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (octet_length(`t`) > 0)
+  `t` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (octet_length(`t`) > 0),
+  CONSTRAINT `t` CHECK (json_valid(`t`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 drop table t1;
 create table t1 (t text) engine=myisam;
@@ -91,7 +102,9 @@ a
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT json_object('now',1) CHECK (json_valid(`a`))
+  `a` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT json_object('now',1),
+  CONSTRAINT `CONSTRAINT_1` CHECK (json_valid(`a`)),
+  CONSTRAINT `a` CHECK (json_valid(`a`))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 drop table t1;
 select cast('{a:1}' as text);

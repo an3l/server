@@ -1,0 +1,58 @@
+CREATE TABLE t0 (c1 INT CHECK ( c1 > 0 ));
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (`c1` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_NAME = 't0' AND TABLE_SCHEMA = 'test';
+CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
+CONSTRAINT_1	t0	CHECK
+SELECT * FROM information_schema.CHECK_CONSTRAINTS;
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+def	test	t0	CONSTRAINT_1	`c1` > 0
+def	mysql	global_priv	Priv	json_valid(`Priv`)
+def	mysql	global_priv	Priv	json_valid(`Priv`)
+Warnings:
+Warning	1286	Unknown storage engine 'InnoDB'
+Warning	1286	Unknown storage engine 'InnoDB'
+Warning	1286	Unknown storage engine 'InnoDB'
+show create table t0;
+Table	Create Table
+t0	CREATE TABLE `t0` (
+  `c1` int(11) DEFAULT NULL,
+  CONSTRAINT `CONSTRAINT_1` CHECK (`c1` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+drop table t0;
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_NAME = 't0' AND TABLE_SCHEMA = 'test';
+CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
+SELECT * FROM information_schema.CHECK_CONSTRAINTS;
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	TABLE_NAME	CONSTRAINT_NAME	CHECK_CLAUSE
+def	mysql	global_priv	Priv	json_valid(`Priv`)
+def	mysql	global_priv	Priv	json_valid(`Priv`)
+Warnings:
+Warning	1286	Unknown storage engine 'InnoDB'
+Warning	1286	Unknown storage engine 'InnoDB'
+Warning	1286	Unknown storage engine 'InnoDB'
+CREATE TABLE t2 (
+a DECIMAL UNIQUE CHECK (a>3));
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` decimal(10,0) DEFAULT NULL,
+  UNIQUE KEY `a` (`a`),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`a` > 3)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+ALTER TABLE t2 ADD (
+b INT UNIQUE CHECK (b>0));
+show create table t2;
+Table	Create Table
+t2	CREATE TABLE `t2` (
+  `a` decimal(10,0) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL,
+  UNIQUE KEY `a` (`a`),
+  UNIQUE KEY `b` (`b`),
+  CONSTRAINT `CONSTRAINT_1` CHECK (`a` > 3),
+  CONSTRAINT `CONSTRAINT_2` CHECK (`b` > 0)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
+drop table t2;

@@ -1,0 +1,1 @@
+create table t1 (a int check (@b in (select user from mysql.user)));

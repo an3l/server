@@ -3,8 +3,10 @@ create table t1 (a int check(a>10), b int check (b > 20), constraint `min` check
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` int(11) DEFAULT NULL CHECK (`a` > 10),
-  `b` int(11) DEFAULT NULL CHECK (`b` > 20),
+  `a` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL,
+  CONSTRAINT `a` CHECK (`a` > 10),
+  CONSTRAINT `b` CHECK (`b` > 20),
   CONSTRAINT `min` CHECK (`a` + `b` > 100),
   CONSTRAINT `max` CHECK (`a` + `b` < 500)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
@@ -52,11 +54,14 @@ set check_constraint_checks=@save_check_constraint;
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `a` int(11) DEFAULT NULL CHECK (`a` > 10),
-  `b` int(11) DEFAULT NULL CHECK (`b` > 20),
-  `c` int(11) DEFAULT 0 CHECK (`c` < 10),
+  `a` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT 0,
+  CONSTRAINT `a` CHECK (`a` > 10),
+  CONSTRAINT `b` CHECK (`b` > 20),
   CONSTRAINT `min` CHECK (`a` + `b` > 100),
   CONSTRAINT `max` CHECK (`a` + `b` < 500),
+  CONSTRAINT `c` CHECK (`c` < 10),
   CONSTRAINT `CONSTRAINT_1` CHECK (`a` + `b` + `c` < 500)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 insert into t1 values(105,105,105);
@@ -75,15 +80,17 @@ create table t2 like t1;
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL CHECK (`a` > 10),
-  `b` int(11) DEFAULT NULL CHECK (`b` > 20),
-  `c` int(11) DEFAULT 0 CHECK (`c` < 10),
+  `a` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT 0,
+  CONSTRAINT `a` CHECK (`a` > 10),
+  CONSTRAINT `b` CHECK (`b` > 20),
   CONSTRAINT `min` CHECK (`a` + `b` > 100),
   CONSTRAINT `max` CHECK (`a` + `b` < 500),
+  CONSTRAINT `c` CHECK (`c` < 10),
   CONSTRAINT `CONSTRAINT_1` CHECK (`a` + `b` + `c` < 500)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 alter table t2 drop constraint c;
-ERROR 42000: Can't DROP CONSTRAINT `c`; check that it exists
 alter table t2 drop constraint if exists c;
 Warnings:
 Note	1091	Can't DROP CONSTRAINT `c`; check that it exists
@@ -91,9 +98,11 @@ alter table t2 drop constraint min;
 show create table t2;
 Table	Create Table
 t2	CREATE TABLE `t2` (
-  `a` int(11) DEFAULT NULL CHECK (`a` > 10),
-  `b` int(11) DEFAULT NULL CHECK (`b` > 20),
-  `c` int(11) DEFAULT 0 CHECK (`c` < 10),
+  `a` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL,
+  `c` int(11) DEFAULT 0,
+  CONSTRAINT `a` CHECK (`a` > 10),
+  CONSTRAINT `b` CHECK (`b` > 20),
   CONSTRAINT `max` CHECK (`a` + `b` < 500),
   CONSTRAINT `CONSTRAINT_1` CHECK (`a` + `b` + `c` < 500)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
@@ -175,17 +184,23 @@ Error	4025	CONSTRAINT `t1.FirstName` failed for `test`.`t1`
 INSERT IGNORE INTO t1 VALUES (NULL, 'Ken');
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
 INSERT IGNORE INTO t1 VALUES (NULL, 'Ken'),(NULL, 'Brian');
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Brian'
 Warning	1292	Truncated incorrect DECIMAL value: 'Brian'
 set sql_mode="";
 INSERT INTO t1 VALUES (NULL, 'Ken');
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
 INSERT INTO t1 VALUES (NULL, 'Ken'),(NULL, 'Brian');
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Ken'
+Warning	1292	Truncated incorrect DECIMAL value: 'Brian'
 Warning	1292	Truncated incorrect DECIMAL value: 'Brian'
 set sql_mode=default;
 select * from t1;
@@ -206,22 +221,7 @@ drop table if exists t;
 create table t(a int, b int check(b>0),
 constraint b check(a<b), constraint a check(a>0),
 constraint x check (a>10));
-show create table t;
-Table	Create Table
-t	CREATE TABLE `t` (
-  `a` int(11) DEFAULT NULL,
-  `b` int(11) DEFAULT NULL CHECK (`b` > 0),
-  CONSTRAINT `b` CHECK (`a` < `b`),
-  CONSTRAINT `a` CHECK (`a` > 0),
-  CONSTRAINT `x` CHECK (`a` > 10)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
-# Field constraint 'b' will fail
-insert into t values (-1, 0);
-ERROR 23000: CONSTRAINT `t.b` failed for `test`.`t`
-# Table constraint 'b' will fail
-insert into t values (1,1);
-ERROR 23000: CONSTRAINT `b` failed for `test`.`t`
-drop table t;
+ERROR HY000: Duplicate CHECK constraint name 'b'
 create table t1 (a int auto_increment primary key, b int, check (b > 5));
 insert t1 (b) values (1);
 ERROR 23000: CONSTRAINT `CONSTRAINT_1` failed for `test`.`t1`
@@ -242,9 +242,13 @@ create table t1 (v1 bigint check (v1 not in ('x' , 'x111'))) ;
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'x'
 Warning	1292	Truncated incorrect DECIMAL value: 'x111'
+Warning	1292	Truncated incorrect DECIMAL value: 'x'
+Warning	1292	Truncated incorrect DECIMAL value: 'x111'
 select * from t1;
 v1
 Warnings:
+Warning	1292	Truncated incorrect DECIMAL value: 'x'
+Warning	1292	Truncated incorrect DECIMAL value: 'x111'
 Warning	1292	Truncated incorrect DECIMAL value: 'x'
 Warning	1292	Truncated incorrect DECIMAL value: 'x111'
 select v1 from t1;
@@ -262,6 +266,8 @@ v1
 Warnings:
 Warning	1292	Truncated incorrect DECIMAL value: 'x'
 Warning	1292	Truncated incorrect DECIMAL value: 'x111'
+Warning	1292	Truncated incorrect DECIMAL value: 'x'
+Warning	1292	Truncated incorrect DECIMAL value: 'x111'
 select * from t1;
 v1
 deallocate prepare stmt;
@@ -272,10 +278,13 @@ drop table t1;
 create table t1 (v2 date check (v1 like default (v1)), v1 date default (from_days ('x')));
 Warnings:
 Warning	1292	Truncated incorrect INTEGER value: 'x'
+Warning	1292	Truncated incorrect INTEGER value: 'x'
 insert ignore into t1 values ( 'x' , 'x' ) ;
 Warnings:
+Warning	1292	Truncated incorrect INTEGER value: 'x'
 Warning	1265	Data truncated for column 'v2' at row 1
 Warning	1265	Data truncated for column 'v1' at row 1
+Warning	1292	Truncated incorrect INTEGER value: 'x'
 Warning	1292	Truncated incorrect INTEGER value: 'x'
 drop table t1;
 #
@@ -288,8 +297,9 @@ create table t1 (d timestamp check (default (d) is true)) as select 1;
 show create table t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
-  `d` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() CHECK (default(`d`) is true),
-  `1` int(1) NOT NULL
+  `d` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `1` int(1) NOT NULL,
+  CONSTRAINT `d` CHECK (default(`d`) is true)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci
 drop table t1;
 #

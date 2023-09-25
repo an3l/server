@@ -1,0 +1,95 @@
+--echo #
+--echo # MDEV-24602: cannot specify a name for a column check constraint
+--echo #
+
+# Table constraints (unnamed and named)
+create table t(t int,
+               check (t>0),
+               constraint check(t>1),
+               constraint t_named check(t>2));
+show create table t;
+drop table t;
+# Field constraints (with and without the names)
+create table t(t0 int,
+               t1 int check (t1>0),
+               t2 int constraint check(t2>0),
+               t3 int constraint t_field check(t3>0));
+show create table t;
+drop table t;
+
+--echo #
+--echo # MDEV-24598: duplicate CHECK constraint name
+--echo #
+
+--error ER_DUP_CONSTRAINT_NAME
+create table t(t0 int,
+               t1 int check (t1>0),
+               t2 int constraint check(t2>0),
+               t3 int constraint t_field check(t3>0),
+               t4 int constraint t_field check(t4>0));
+
+
+create table t(check(t>0),
+               t int constraint CONSTRAINT_1 check(t<0));
+show create table t;
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE 
+FROM information_schema.TABLE_CONSTRAINTS WHERE 
+TABLE_NAME = 't' AND TABLE_SCHEMA = 'test';
+SELECT * from INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE
+CONSTRAINT_SCHEMA = 'test';
+drop table t;
+
+create table t (a int check (a>2), constraint a check (a < 5));
+drop table t;
+
+CREATE TABLE t (
+path VARCHAR(100) NOT NULL COLLATE 'utf8_general_ci',
+json_c1 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+json_c2 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+comment VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8_general_ci',
+UNIQUE INDEX path (path),
+CONSTRAINT json_test CHECK (path > 0)
+);
+show create table t;
+select * from information_schema.check_constraints where table_name='t';
+drop table t;
+
+# Check native Json constraint
+--error ER_DUP_CONSTRAINT_NAME
+CREATE TABLE t (
+path VARCHAR(100) NOT NULL COLLATE 'utf8_general_ci',
+json_c1 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+json_c2 JSON NOT NULL DEFAULT '' COLLATE 'utf8mb4_bin',
+comment VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8_general_ci',
+UNIQUE INDEX path (path),
+CONSTRAINT json_c1 CHECK (path > 0)
+);
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE 
+FROM information_schema.TABLE_CONSTRAINTS WHERE 
+TABLE_NAME = 't' AND TABLE_SCHEMA = 'test';
+SELECT * from INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE
+CONSTRAINT_SCHEMA = 'test';
+
+SHOW CREATE TABLE mysql.global_priv;
+
+SELECT `COLUMN_NAME` AS `Field`,`COLUMN_TYPE` AS `Type`,
+`IS_NULLABLE` AS `Null`,`COLUMN_KEY` AS `Key`,
+`COLUMN_DEFAULT` AS `Default`, `EXTRA` AS `Extra`,
+`COLUMN_COMMENT` AS `Comment`
+FROM `INFORMATION_SCHEMA`.`COLUMNS` WHERE
+TABLE_SCHEMA = "mysql" AND TABLE_NAME ="global_priv";
+SELECT CONSTRAINT_NAME, TABLE_NAME, CONSTRAINT_TYPE 
+FROM information_schema.TABLE_CONSTRAINTS WHERE 
+TABLE_SCHEMA = 'mysql' AND TABLE_NAME ="global_priv";
+SELECT * from INFORMATION_SCHEMA.CHECK_CONSTRAINTS WHERE
+CONSTRAINT_SCHEMA = 'test';
+
+CREATE TABLE t0 (c1 INT CHECK ( c1 > 0 ));
+show create table t0;
+ALTER TABLE t0 DROP CONSTRAINT CONSTRAINT_1;
+show create table t0;
+ALTER TABLE t0 ADD CONSTRAINT c1 CHECK (c1<0);
+show create table t0;
+ALTER TABLE t0 DROP CONSTRAINT c1;
+show create table t0;
+drop table t0;
