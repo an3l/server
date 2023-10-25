@@ -652,9 +652,48 @@ static bool pack_vcols(THD *thd, String *buf, List<Create_field> &create_fields,
       if (pack_expression(buf, field->default_value, field_nr, VCOL_DEFAULT))
         return 1;
     if (field->check_constraint)
+    {
+      /* Check that there's no repeating field CHECK constraint names.
+         Table CHECK constraint names are checked before in mysql_prepare_create_table().
+      */
+      {
+        List_iterator_fast<Create_field> dup_it(create_fields);
+        const Create_field *dup_check;
+        while ((dup_check= dup_it++) && dup_check != field)
+        {
+          if (dup_check->check_constraint)
+          {
+            if (dup_check->check_constraint->name.str &&
+                field->check_constraint->name.str &&
+                !lex_string_cmp(system_charset_info,
+                                &field->check_constraint->name,
+                                &dup_check->check_constraint->name))
+            {
+              my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "CHECK", field->check_constraint->name.str);
+              return 1;
+            }
+          }
+        }
+      }
+      /* Check that there is no same field and table CHECK constraint names*/
+      {
+        List_iterator<Virtual_column_info> cit(*check_constraint_list);
+        const Virtual_column_info *table_check_constraint;
+        while ((table_check_constraint= cit++))
+        {
+          if (!lex_string_cmp(system_charset_info,
+                              &field->check_constraint->name,
+                              &table_check_constraint->name))
+          {
+            my_error(ER_DUP_CONSTRAINT_NAME, MYF(0), "CHECK", field->check_constraint->name.str);
+            return 1;
+          }
+        }
+      }
       if (pack_expression(buf, field->check_constraint, field_nr,
                           VCOL_CHECK_FIELD))
         return 1;
+    }
   }
 
   List_iterator<Virtual_column_info> cit(*check_constraint_list);

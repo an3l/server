@@ -2353,6 +2353,16 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
     {
       StringBuffer<MAX_FIELD_WIDTH> str(&my_charset_utf8mb4_general_ci);
       field->check_constraint->print(&str);
+      if (field->check_constraint->name)
+      {
+        if (lex_string_cmp(system_charset_info,
+                                &field->check_constraint->name,
+                                &field->field_name))
+        {
+          packet->append(STRING_WITH_LEN(" CONSTRAINT "));
+          packet->append(field->check_constraint->name.str);
+        }
+      }
       packet->append(STRING_WITH_LEN(" CHECK ("));
       packet->append(str);
       packet->append(STRING_WITH_LEN(")"));
