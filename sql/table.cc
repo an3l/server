@@ -6015,7 +6015,7 @@ int TABLE::verify_constraints(bool ignore_failure)
           in_use->is_error())
       {
         my_error(ER_CONSTRAINT_FAILED,
-                 MYF(ignore_failure ? ME_JUST_WARNING : 0), (*chk)->name.str,
+                 MYF(ignore_failure ? ME_WARNING : 0), (*chk)->name.str,
                  s->db.str, s->table_name.str);
         return ignore_failure ? VIEW_CHECK_SKIP : VIEW_CHECK_ERROR;
       }
