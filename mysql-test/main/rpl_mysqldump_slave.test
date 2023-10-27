@@ -64,16 +64,28 @@ DROP TABLE t2;
 --exec $MYSQL_DUMP_SLAVE --compact --dump-slave=1 --master-data=1  --gtid test
 
 --echo
+--echo 1.2 --master-data=1 --dump-slave=1 
+--echo
+--replace_regex /MASTER_LOG_POS=[0-9]+/MASTER_LOG_POS=BINLOG_START/
+--exec $MYSQL_DUMP_SLAVE --compact --master-data=1 --dump-slave=1  --gtid test
+
+--echo
 --echo 2. --dump-slave=2
 --echo
 --replace_regex /MASTER_LOG_POS=[0-9]+/MASTER_LOG_POS=BINLOG_START/
 --exec $MYSQL_DUMP_SLAVE --compact --dump-slave=2 --gtid test
 
 --echo
---echo 1.1 --dump-slave=2 --master-data=1
+--echo 2.1 --dump-slave=2 --master-data=1
 --echo
 --replace_regex /MASTER_LOG_POS=[0-9]+/MASTER_LOG_POS=BINLOG_START/
 --exec $MYSQL_DUMP_SLAVE --compact --dump-slave=2 --master-data=1  --gtid test
+
+--echo
+--echo 2.2 --master-data=1 --dump-slave=2 
+--echo
+--replace_regex /MASTER_LOG_POS=[0-9]+/MASTER_LOG_POS=BINLOG_START/
+--exec $MYSQL_DUMP_SLAVE --compact --master-data=1 --dump-slave=2 --gtid test
 
 --echo *** Test mysqldump --master-data GTID functionality.
 --echo
@@ -94,13 +106,24 @@ DROP TABLE t2;
 --replace_regex /MASTER_LOG_POS=[0-9]+/MASTER_LOG_POS=BINLOG_START/
 --exec $MYSQL_DUMP_SLAVE --compact --dump-slave=1 --master-data=2  --gtid test
 
+--echo
+--echo 2.2  --master-data=2 --dump-slave=1
+--echo
+--replace_regex /MASTER_LOG_POS=[0-9]+/MASTER_LOG_POS=BINLOG_START/
+--exec $MYSQL_DUMP_SLAVE --compact --master-data=2 --dump-slave=1  --gtid test
+
 
 --echo
---echo 2.2 --dump-slave=2 --master-data=2
+--echo 2.3 --dump-slave=2 --master-data=2
 --echo
 --replace_regex /MASTER_LOG_POS=[0-9]+/MASTER_LOG_POS=BINLOG_START/
 --exec $MYSQL_DUMP_SLAVE --compact --dump-slave=2 --master-data=2  --gtid test
 
+--echo
+--echo 2.3 --master-data=2 --dump-slave=2 
+--echo
+--replace_regex /MASTER_LOG_POS=[0-9]+/MASTER_LOG_POS=BINLOG_START/
+--exec $MYSQL_DUMP_SLAVE --compact --master-data=2 --dump-slave=2 --gtid test
 --echo
 --echo 3. --master-data --single-transaction
 --echo
