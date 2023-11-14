@@ -1124,7 +1124,7 @@ static my_bool from_before_10_1()
 
 static void uninstall_plugins(void)
 {
-  if (ds_plugin_data_types.length)
+  if (strcmp(ds_plugin_data_types.str, "") > 0)
   {
     char *plugins= ds_plugin_data_types.str;
     char *next= get_line(plugins);
@@ -1181,6 +1181,7 @@ static int install_used_plugin_data_types(void)
         else
         {
           fprintf(stderr, "... can't %s\n", "INSTALL SONAME 'type_mysql_json'");
+          dynstr_set(&ds_plugin_data_types, "");
           return 1;
         }
       }
