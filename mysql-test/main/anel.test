@@ -1,0 +1,18 @@
+--source include/have_log_bin.inc
+--source include/have_innodb.inc
+
+let $MYSQLD_DATADIR= `SELECT @@datadir`;
+let $binlog_file= query_get_value(SHOW MASTER STATUS, File, 1);
+FLUSH LOGS;
+--echo # Before
+--exec $MYSQL_BINLOG -v $MYSQLD_DATADIR/$binlog_file > $MYSQL_TMP_DIR/before.sql
+
+--echo # AFter
+create table t(t blob);
+insert into t values (0x000000000101000000000000000000F03F000000000000F03F);
+select * from t;
+FLUSH LOGS;
+--exec MYSQL_BINLOG -v $MYSQLD_DATADIR/$binlog_file  > $MYSQL_TMP_DIR/after.sql
+
+
+drop table t;
