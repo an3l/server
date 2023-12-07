@@ -846,7 +846,7 @@ public:
   */
   Atomic_counter<uint64> reset_master_count;
 
-  MYSQL_BIN_LOG(uint *sync_period);
+  MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
   /*
     note that there's no destructor ~MYSQL_BIN_LOG() !
     The reason is that we don't want it to be automatically called
@@ -1165,6 +1165,25 @@ public:
   my_off_t binlog_end_pos;
   char binlog_end_pos_file[FN_REFLEN];
 };
+
+
+class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
+{
+  public:
+  MYSQL_BINARY_LOG(uint *sync_period, bool is_relay_log = 0)
+    :MYSQL_BIN_LOG(sync_period, is_relay_log)
+    {}
+};
+
+
+class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
+{
+  public:
+  MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log = 1)
+    :MYSQL_BIN_LOG(sync_period, is_relay_log)
+    {}
+};
+
 
 class Log_event_handler
 {

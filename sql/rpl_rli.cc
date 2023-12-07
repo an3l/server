@@ -49,7 +49,7 @@ const char *const Relay_log_info::state_delaying_string = "Waiting until MASTER_
 Relay_log_info::Relay_log_info(bool is_slave_recovery, const char* thread_name)
   :Slave_reporting_capability(thread_name),
    replicate_same_server_id(::replicate_same_server_id),
-   info_fd(-1), cur_log_fd(-1), relay_log(&sync_relaylog_period),
+   info_fd(-1), cur_log_fd(-1), relay_log(&sync_relaylog_period, 1),
    sync_counter(0), is_relay_log_recovery(is_slave_recovery),
    save_temporary_tables(0),
    mi(0), inuse_relaylog_list(0), last_inuse_relaylog(0),
