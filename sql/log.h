@@ -845,8 +845,7 @@ public:
     Tracks the number of times that the master has been reset
   */
   Atomic_counter<uint64> reset_master_count;
-
-  MYSQL_BIN_LOG(uint *sync_period);
+  MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
   /*
     note that there's no destructor ~MYSQL_BIN_LOG() !
     The reason is that we don't want it to be automatically called
@@ -1166,6 +1165,23 @@ public:
   char binlog_end_pos_file[FN_REFLEN];
 };
 
+
+class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
+{
+  public:
+  MYSQL_BINARY_LOG(uint *sync_period, bool is_relay_log= 0)
+    :MYSQL_BIN_LOG(sync_period, is_relay_log) {}
+};
+
+
+class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
+{
+  public:
+  MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log= 1)
+    :MYSQL_BIN_LOG(sync_period, is_relay_log) {}
+};
+
+
 class Log_event_handler
 {
 public:
@@ -1373,7 +1389,7 @@ online_alter_cache_data *online_alter_binlog_get_cache_data(THD *thd, TABLE *tab
 binlog_cache_data* binlog_get_cache_data(binlog_cache_mngr *cache_mngr,
                                          bool use_trans_cache);
 
-extern MYSQL_PLUGIN_IMPORT MYSQL_BIN_LOG mysql_bin_log;
+extern MYSQL_PLUGIN_IMPORT MYSQL_BINARY_LOG mysql_bin_log;
 extern handlerton *binlog_hton;
 extern LOGGER logger;
 

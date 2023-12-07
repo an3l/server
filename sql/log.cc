@@ -87,7 +87,7 @@ LOGGER logger;
 const char *log_bin_index= 0;
 const char *log_bin_basename= 0;
 
-MYSQL_BIN_LOG mysql_bin_log(&sync_binlog_period);
+MYSQL_BINARY_LOG mysql_bin_log(&sync_binlog_period);
 
 static bool test_if_number(const char *str,
 			   ulong *res, bool allow_wildcards);
@@ -3733,7 +3733,7 @@ const char *MYSQL_LOG::generate_name(const char *log_name,
 #define WSREP_XID_LIST_ENTRY(X, Y) do { } while(0)
 #endif
 
-MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
+MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log)
   :reset_master_pending(0), mark_xid_done_waiting(0),
    bytes_written(0), binlog_space_total(0),
    last_used_log_number(0), file_id(1), open_count(1),
@@ -3743,7 +3743,7 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
    group_commit_trigger_lock_wait(0),
    sync_period_ptr(sync_period), sync_counter(0),
    state_file_deleted(false), binlog_state_recover_done(false),
-   is_relay_log(0), relay_signal_cnt(0),
+   is_relay_log(is_relay_log), relay_signal_cnt(0),
    checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF),
    relay_log_checksum_alg(BINLOG_CHECKSUM_ALG_UNDEF),
    description_event_for_exec(0), description_event_for_queue(0),
