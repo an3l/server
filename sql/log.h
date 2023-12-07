@@ -1396,7 +1396,7 @@ online_alter_cache_data *online_alter_binlog_get_cache_data(THD *thd, TABLE *tab
 binlog_cache_data* binlog_get_cache_data(binlog_cache_mngr *cache_mngr,
                                          bool use_trans_cache);
 
-extern MYSQL_PLUGIN_IMPORT MYSQL_BIN_LOG mysql_bin_log;
+extern MYSQL_PLUGIN_IMPORT MYSQL_BINARY_LOG mysql_bin_log;
 extern handlerton *binlog_hton;
 extern LOGGER logger;
 
