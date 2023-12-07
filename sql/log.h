@@ -597,6 +597,7 @@ class binlog_cache_data;
 struct rpl_gtid;
 struct wait_for_commit;
 
+
 class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 {
   /** The instrumentation key to use for @ LOCK_index. */
@@ -1011,7 +1012,7 @@ public:
   void mark_xid_done(ulong cookie, bool write_checkpoint);
   void make_log_name(char* buf, const char* log_ident);
   bool is_active(const char* log_file_name);
-  virtual bool can_purge_log(const char *log_file_name);
+  virtual bool can_purge_log(const char *log_file_name)=0;
   int update_log_index(LOG_INFO* linfo, bool need_update_threads);
   int rotate(bool force_rotate, bool* check_purge);
   void checkpoint_and_purge(ulong binlog_id);
@@ -1166,6 +1167,8 @@ public:
   my_off_t binlog_end_pos;
   char binlog_end_pos_file[FN_REFLEN];
   virtual ~MYSQL_BIN_LOG() = default;
+  friend class MYSQL_BINARY_LOG;
+  friend class MYSQL_RELAY_LOG;
 };
 
 

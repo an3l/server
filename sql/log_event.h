@@ -806,6 +806,8 @@ enum Int_event_type
 #ifdef MYSQL_SERVER
 class String;
 class MYSQL_BIN_LOG;
+class MYSQL_BINARY_LOG;
+class MYSQL_RELAY_LOG;
 class THD;
 #endif
 
