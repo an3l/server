@@ -1010,7 +1010,7 @@ public:
   void mark_xid_done(ulong cookie, bool write_checkpoint);
   void make_log_name(char* buf, const char* log_ident);
   bool is_active(const char* log_file_name);
-  bool can_purge_log(const char *log_file_name);
+  virtual bool can_purge_log(const char *log_file_name);
   int update_log_index(LOG_INFO* linfo, bool need_update_threads);
   int rotate(bool force_rotate, bool* check_purge);
   void checkpoint_and_purge(ulong binlog_id);
@@ -1173,6 +1173,10 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   MYSQL_BINARY_LOG(uint *sync_period, bool is_relay_log = 0)
     :MYSQL_BIN_LOG(sync_period, is_relay_log)
     {}
+   bool can_purge_log(const char *log_file_name) override
+   {
+      return MYSQL_BIN_LOG::can_purge_log(log_file_name);
+   }
 };
 
 
@@ -1182,6 +1186,10 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log = 1)
     :MYSQL_BIN_LOG(sync_period, is_relay_log)
     {}
+   bool can_purge_log(const char *log_file_name) override
+   {
+      return MYSQL_BIN_LOG::can_purge_log(log_file_name);
+   }
 };
 
 
