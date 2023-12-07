@@ -1178,7 +1178,6 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   MYSQL_BINARY_LOG();
   ~MYSQL_BINARY_LOG();
   MYSQL_BINARY_LOG(uint *sync_period)
-    :MYSQL_BIN_LOG(sync_period)
     {
       is_relay_log= false;
     }
@@ -1192,7 +1191,6 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   MYSQL_RELAY_LOG();
   ~MYSQL_RELAY_LOG();
   MYSQL_RELAY_LOG(uint *sync_period)
-    :MYSQL_BIN_LOG(sync_period)
     {
       is_relay_log= true;
     }
