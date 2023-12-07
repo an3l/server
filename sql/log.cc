@@ -5543,7 +5543,6 @@ err:
     LOG_INFO_FATAL      if any other than ENOENT error from
                         mysql_file_stat() or mysql_file_delete()
 */
-
 int MYSQL_BIN_LOG::real_purge_logs_by_size(ulonglong binlog_pos)
 {
   int error= 0;
@@ -5627,6 +5626,30 @@ static bool waiting_for_slave_to_change_binlog= 0;
 static ulonglong purge_sending_new_binlog_file= 0;
 static char purge_binlog_name[FN_REFLEN];
 
+
+
+MYSQL_BINARY_LOG::MYSQL_BINARY_LOG() = default;
+MYSQL_BINARY_LOG::~MYSQL_BINARY_LOG() = default;
+
+MYSQL_RELAY_LOG::MYSQL_RELAY_LOG() = default;
+MYSQL_RELAY_LOG::~MYSQL_RELAY_LOG() = default;
+
+bool
+MYSQL_BINARY_LOG::can_purge_log(const char *log_file_name_arg)
+{
+  return 1;
+  // return MYSQL_BIN_LOG::can_purge_log(log_file_name);
+}
+
+
+bool
+MYSQL_RELAY_LOG::can_purge_log(const char *log_file_name_arg)
+{
+  return 0;
+  // return MYSQL_BIN_LOG::can_purge_log(log_file_name);
+}
+
+
 bool
 MYSQL_BIN_LOG::can_purge_log(const char *log_file_name_arg)
 {
@@ -5675,6 +5698,7 @@ MYSQL_BIN_LOG::can_purge_log(const char *log_file_name_arg)
   }
   return !res;
 }
+
 #endif /* HAVE_REPLICATION */
 
 
