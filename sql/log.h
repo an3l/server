@@ -661,7 +661,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 
   /* LOCK_log and LOCK_index are inited by init_pthread_objects() */
   mysql_mutex_t LOCK_index;
-  mysql_mutex_t LOCK_xid_list;
   mysql_cond_t  COND_xid_list;
   mysql_cond_t  COND_relay_log_updated, COND_bin_log_updated;
   ulonglong bytes_written;
@@ -738,6 +737,9 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   bool write_transaction_to_binlog_events(group_commit_entry *entry);
   void trx_group_commit_leader(group_commit_entry *leader);
   bool is_xidlist_idle_nolock();
+protected:
+  MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
+  mysql_mutex_t LOCK_xid_list;
 public:
   void purge(bool all);
   int new_file_without_locking();
@@ -845,7 +847,6 @@ public:
     Tracks the number of times that the master has been reset
   */
   Atomic_counter<uint64> reset_master_count;
-  MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
   /*
     note that there's no destructor ~MYSQL_BIN_LOG() !
     The reason is that we don't want it to be automatically called
@@ -1009,7 +1010,7 @@ public:
   void mark_xid_done(ulong cookie, bool write_checkpoint);
   void make_log_name(char* buf, const char* log_ident);
   bool is_active(const char* log_file_name);
-  bool can_purge_log(const char *log_file_name);
+  virtual bool can_purge_log(const char *log_file_name) = 0;
   int update_log_index(LOG_INFO* linfo, bool need_update_threads);
   int rotate(bool force_rotate, bool* check_purge);
   void checkpoint_and_purge(ulong binlog_id);
@@ -1163,6 +1164,7 @@ public:
   */
   my_off_t binlog_end_pos;
   char binlog_end_pos_file[FN_REFLEN];
+  virtual ~MYSQL_BIN_LOG() = default;
 };
 
 
@@ -1171,6 +1173,7 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   public:
   MYSQL_BINARY_LOG(uint *sync_period, bool is_relay_log= 0)
     :MYSQL_BIN_LOG(sync_period, is_relay_log) {}
+  bool can_purge_log(const char *log_file_name) override;
 };
 
 
@@ -1179,6 +1182,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   public:
   MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log= 1)
     :MYSQL_BIN_LOG(sync_period, is_relay_log) {}
+  bool can_purge_log(const char *log_file_name) override;
 };
 
 
