@@ -5627,52 +5627,56 @@ static bool waiting_for_slave_to_change_binlog= 0;
 static ulonglong purge_sending_new_binlog_file= 0;
 static char purge_binlog_name[FN_REFLEN];
 
+
 bool
-MYSQL_BIN_LOG::can_purge_log(const char *log_file_name_arg)
+MYSQL_BINARY_LOG::can_purge_log(const char *log_file_name_arg)
 {
   THD *thd= current_thd;                        // May be NULL at startup
   bool res;
 
+  DBUG_ASSERT(!is_relay_log || binlog_xid_count_list.is_empty());
   if (is_active(log_file_name_arg) ||
-      (!is_relay_log && waiting_for_slave_to_change_binlog &&
+      (waiting_for_slave_to_change_binlog &&
        purge_sending_new_binlog_file == sending_new_binlog_file &&
        !strcmp(log_file_name_arg, purge_binlog_name)))
       return false;
 
-  DBUG_ASSERT(!is_relay_log || binlog_xid_count_list.is_empty());
-  if (!is_relay_log)
+  xid_count_per_binlog *b;
+  mysql_mutex_lock(&LOCK_xid_list);
   {
-    xid_count_per_binlog *b;
-    mysql_mutex_lock(&LOCK_xid_list);
-    {
-      I_List_iterator<xid_count_per_binlog> it(binlog_xid_count_list);
-      while ((b= it++) &&
-             0 != strncmp(log_file_name_arg+dirname_length(log_file_name_arg),
-                          b->binlog_name, b->binlog_name_len))
-        ;
-    }
-    mysql_mutex_unlock(&LOCK_xid_list);
-    if (b)
-      return false;
+    I_List_iterator<xid_count_per_binlog> it(binlog_xid_count_list);
+    while ((b= it++) &&
+            0 != strncmp(log_file_name_arg+dirname_length(log_file_name_arg),
+                        b->binlog_name, b->binlog_name_len))
+      ;
   }
+  mysql_mutex_unlock(&LOCK_xid_list);
+  if (b)
+    return false;
 
-  if (!is_relay_log)
-  {
-    waiting_for_slave_to_change_binlog= 0;
-    purge_sending_new_binlog_file= sending_new_binlog_file;
-  }
+  waiting_for_slave_to_change_binlog= 0;
+  purge_sending_new_binlog_file= sending_new_binlog_file;
   if ((res= log_in_use(log_file_name_arg,
-                       (is_relay_log ||
-                        (thd && thd->lex->sql_command == SQLCOM_PURGE)) ?
+                       (thd && thd->lex->sql_command == SQLCOM_PURGE) ?
                        0 : slave_connections_needed_for_purge)))
   {
-    if (!is_relay_log)
-    {
       waiting_for_slave_to_change_binlog= 1;
       strmake(purge_binlog_name, log_file_name_arg,
               sizeof(purge_binlog_name)-1);
-    }
   }
+  return !res;
+}
+
+
+bool
+MYSQL_RELAY_LOG::can_purge_log(const char *log_file_name_arg)
+{
+  bool res;
+  DBUG_ASSERT(is_relay_log);
+  if (is_active(log_file_name_arg))
+      return false;
+
+  res= log_in_use(log_file_name_arg, 0);
   return !res;
 }
 #endif /* HAVE_REPLICATION */
