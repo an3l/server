@@ -3742,10 +3742,8 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log)
    group_commit_trigger_lock_wait(0),
    sync_period_ptr(sync_period), sync_counter(0),
    state_file_deleted(false), binlog_state_recover_done(false),
-   is_relay_log(is_relay_log), relay_signal_cnt(0),
+   is_relay_log(is_relay_log),
    checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF),
-   relay_log_checksum_alg(BINLOG_CHECKSUM_ALG_UNDEF),
-   description_event_for_exec(0), description_event_for_queue(0),
    current_binlog_id(0), reset_master_count(0)
 {
   /*
@@ -3776,8 +3774,18 @@ void MYSQL_BIN_LOG::stop_background_thread()
 }
 
 /* this is called only once */
+void MYSQL_RELAY_LOG::cleanup()
+{
+  if (inited)
+  {
+    delete description_event_for_queue;
+    delete description_event_for_exec;
+    inited= 0;
+  }
+}
 
-void MYSQL_BIN_LOG::cleanup()
+
+void MYSQL_BINARY_LOG::cleanup()
 {
   DBUG_ENTER("cleanup");
   if (inited)
@@ -3792,8 +3800,6 @@ void MYSQL_BIN_LOG::cleanup()
     mysql_mutex_lock(&LOCK_log);
     close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
     mysql_mutex_unlock(&LOCK_log);
-    delete description_event_for_queue;
-    delete description_event_for_exec;
 
     while ((b= binlog_xid_count_list.get()))
     {
@@ -3995,6 +4001,221 @@ Event_log::write_description_event(enum_binlog_checksum_alg checksum_alg,
 }
 
 
+
+/**
+  Open a (new) relay log file.
+
+  - Open the log file and the index file. Register the new
+  file name in it
+  - When calling this when the file is in use, you must have a locks
+  on LOCK_log and LOCK_index.
+
+  @retval
+    0	ok
+  @retval
+    1	error
+*/
+bool MYSQL_RELAY_LOG::open(const char *log_name,
+                           const char *new_name,
+                           ulong next_log_number,
+                           enum cache_type io_cache_type_arg,
+                           ulong max_size_arg,
+                           bool null_created_arg,
+                           bool need_mutex)
+{
+  DBUG_ASSERT(is_relay_log);
+  File file= -1;
+  DBUG_ENTER("MYSQL_RELAY_LOG::open");
+  mysql_mutex_assert_owner(&LOCK_log);
+
+  /* We need to calculate new log file name for purge to delete old */
+  if (init_and_set_log_file_name(log_name, new_name, next_log_number,
+                                 LOG_BIN, io_cache_type_arg))
+  {
+    sql_print_error("MYSQL_BIN_LOG::open failed to generate new file name.");
+    if (!is_relay_log)
+      goto err;
+    DBUG_RETURN(1);
+  }
+
+#ifdef HAVE_REPLICATION
+  if (open_purge_index_file(TRUE) ||
+      register_create_index_entry(log_file_name) ||
+      sync_purge_index_file() ||
+      DBUG_IF("fault_injection_registering_index"))
+  {
+    /**
+        TODO:
+        Although this was introduced to appease valgrind when
+        injecting emulated faults using
+        fault_injection_registering_index it may be good to consider
+        what actually happens when open_purge_index_file succeeds but
+        register or sync fails.
+
+        Perhaps we might need the code below in MYSQL_LOG_BIN::cleanup
+        for "real life" purposes as well? 
+     */
+    DBUG_EXECUTE_IF("fault_injection_registering_index", {
+      if (my_b_inited(&purge_index_file))
+      {
+        end_io_cache(&purge_index_file);
+        my_close(purge_index_file.file, MYF(0));
+      }
+    });
+
+    sql_print_error("MYSQL_BIN_LOG::open failed to sync the index file.");
+    DBUG_RETURN(1);
+  }
+  DBUG_EXECUTE_IF("crash_create_non_critical_before_update_index", DBUG_SUICIDE(););
+#endif
+  write_error= 0;
+
+  /* open the main log file */
+  if (MYSQL_LOG::open(
+#ifdef HAVE_PSI_INTERFACE
+                      m_key_file_log,
+#endif
+                      log_name,
+                      LOG_UNKNOWN, /* Don't generate new name */
+                      0, 0, io_cache_type_arg))
+  {
+#ifdef HAVE_REPLICATION
+    close_purge_index_file();
+#endif
+    DBUG_RETURN(1);                            /* all warnings issued */
+  }
+
+  init(max_size_arg);
+
+  open_count++;
+
+  DBUG_ASSERT(log_type == LOG_BIN);
+
+  {
+    bool write_file_name_to_index_file=0;
+
+    if (!my_b_filelength(&log_file))
+    {
+      /*
+	The binary log file was empty (probably newly created)
+	This is the normal case and happens when the user doesn't specify
+	an extension for the binary log files.
+	In this case we write a standard header to it.
+      */
+      if (my_b_safe_write(&log_file, BINLOG_MAGIC,
+			  BIN_LOG_HEADER_SIZE))
+        goto err;
+      bytes_written+= BIN_LOG_HEADER_SIZE;
+      write_file_name_to_index_file= 1;
+    }
+
+    {
+      enum_binlog_checksum_alg alg;
+
+      if (relay_log_checksum_alg == BINLOG_CHECKSUM_ALG_UNDEF)
+        relay_log_checksum_alg=
+          opt_slave_sql_verify_checksum ? (enum_binlog_checksum_alg) binlog_checksum_options
+                                        : BINLOG_CHECKSUM_ALG_OFF;
+      alg= relay_log_checksum_alg;
+
+      longlong written= write_description_event(alg, encrypt_binlog,
+                                                null_created_arg, is_relay_log);
+      if (written == -1)
+        goto err;
+      bytes_written+= written;
+    }
+    if (description_event_for_queue &&
+        description_event_for_queue->binlog_version>=4)
+    {
+      /*
+        This is a relay log written to by the I/O slave thread.
+        Write the event so that others can later know the format of this relay
+        log.
+        Note that this event is very close to the original event from the
+        master (it has binlog version of the master, event types of the
+        master), so this is suitable to parse the next relay log's event. It
+        has been produced by
+        Format_description_log_event::Format_description_log_event(char* buf,).
+        Why don't we want to write the description_event_for_queue if this
+        event is for format<4 (3.23 or 4.x): this is because in that case, the
+        description_event_for_queue describes the data received from the
+        master, but not the data written to the relay log (*conversion*),
+        which is in format 4 (slave's).
+      */
+      /*
+        Set 'created' to 0, so that in next relay logs this event does not
+        trigger cleaning actions on the slave in
+        Format_description_log_event::apply_event_impl().
+      */
+      description_event_for_queue->created= 0;
+      /* Don't set log_pos in event header */
+      description_event_for_queue->set_artificial_event();
+
+      if (write_event(description_event_for_queue,
+                      description_event_for_queue->used_checksum_alg))
+        goto err;
+      bytes_written+= description_event_for_queue->data_written;
+    }
+
+    if (flush_io_cache(&log_file) ||
+        mysql_file_sync(log_file.file, MYF(MY_WME)))
+      goto err;
+
+    if (write_file_name_to_index_file)
+    {
+#ifdef HAVE_REPLICATION
+#ifdef ENABLED_DEBUG_SYNC
+      if (current_thd)
+        DEBUG_SYNC(current_thd, "binlog_open_before_update_index");
+#endif
+      DBUG_EXECUTE_IF("crash_create_critical_before_update_index", DBUG_SUICIDE(););
+#endif
+
+      DBUG_ASSERT(my_b_inited(&index_file) != 0);
+      reinit_io_cache(&index_file, WRITE_CACHE,
+                      my_b_filelength(&index_file), 0, 0);
+      /*
+        As this is a new log file, we write the file name to the index
+        file. As every time we write to the index file, we sync it.
+      */
+      if (DBUG_IF("fault_injection_updating_index") ||
+          my_b_write(&index_file, (uchar*) log_file_name,
+                     strlen(log_file_name)) ||
+          my_b_write(&index_file, (uchar*) "\n", 1) ||
+          flush_io_cache(&index_file) ||
+          mysql_file_sync(index_file.file, MYF(MY_WME)))
+        goto err;
+
+#ifdef HAVE_REPLICATION
+      DBUG_EXECUTE_IF("crash_create_after_update_index", DBUG_SUICIDE(););
+#endif
+    }
+  }
+
+  log_state= LOG_OPENED;
+
+  #ifdef HAVE_REPLICATION
+    close_purge_index_file();
+  #endif
+  /* Notify the io thread that binlog is rotated to a new file */
+  signal_relay_log_update();
+  DBUG_RETURN(0);
+
+err:
+  int tmp_errno= errno;
+#ifdef HAVE_REPLICATION
+  if (is_inited_purge_index_file())
+    purge_index_entry(NULL, NULL, need_mutex);
+  close_purge_index_file();
+#endif
+  sql_print_error(fatal_log_error, (name) ? name : log_name, tmp_errno);
+  if (file >= 0)
+    mysql_file_close(file, MYF(0));
+  close(LOG_CLOSE_INDEX);
+  DBUG_RETURN(1);
+}
+
+
 /**
   Open a (new) binlog file.
 
@@ -4009,34 +4230,32 @@ Event_log::write_description_event(enum_binlog_checksum_alg checksum_alg,
     1	error
 */
 
-bool MYSQL_BIN_LOG::open(const char *log_name,
-                         const char *new_name,
-                         ulong next_log_number,
-                         enum cache_type io_cache_type_arg,
-                         ulong max_size_arg,
-                         bool null_created_arg,
-                         bool need_mutex)
+bool MYSQL_BINARY_LOG::open(const char *log_name,
+                            const char *new_name,
+                            ulong next_log_number,
+                            enum cache_type io_cache_type_arg,
+                            ulong max_size_arg,
+                            bool null_created_arg,
+                            bool need_mutex)
 {
+  DBUG_ASSERT(!is_relay_log);
   File file= -1;
   xid_count_per_binlog *new_xid_list_entry= NULL, *b;
   DBUG_ENTER("MYSQL_BIN_LOG::open");
 
   mysql_mutex_assert_owner(&LOCK_log);
 
-  if (!is_relay_log)
+  if (!binlog_state_recover_done)
   {
-    if (!binlog_state_recover_done)
-    {
-      binlog_state_recover_done= true;
-      if (do_binlog_recovery(opt_bin_logname, false))
-        DBUG_RETURN(1);
-    }
-
-    if ((!binlog_background_thread_started &&
-         !binlog_background_thread_stop) &&
-        start_binlog_background_thread())
+    binlog_state_recover_done= true;
+    if (do_binlog_recovery(opt_bin_logname, false))
       DBUG_RETURN(1);
   }
+
+  if ((!binlog_background_thread_started &&
+        !binlog_background_thread_stop) &&
+      start_binlog_background_thread())
+    DBUG_RETURN(1);
 
   /* We need to calculate new log file name for purge to delete old */
   if (init_and_set_log_file_name(log_name, new_name, next_log_number,
@@ -4122,17 +4341,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
 
     {
       enum_binlog_checksum_alg alg;
-
-      if (is_relay_log)
-      {
-        if (relay_log_checksum_alg == BINLOG_CHECKSUM_ALG_UNDEF)
-          relay_log_checksum_alg=
-            opt_slave_sql_verify_checksum ? (enum_binlog_checksum_alg) binlog_checksum_options
-                                          : BINLOG_CHECKSUM_ALG_OFF;
-        alg= relay_log_checksum_alg;
-      }
-      else
-        alg= (enum_binlog_checksum_alg)binlog_checksum_options;
+      alg= (enum_binlog_checksum_alg)binlog_checksum_options;
 
       longlong written= write_description_event(alg, encrypt_binlog,
                                                 null_created_arg, is_relay_log);
@@ -4230,38 +4439,6 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
         bytes_written+= ev.data_written;
       }
     }
-    if (description_event_for_queue &&
-        description_event_for_queue->binlog_version>=4)
-    {
-      /*
-        This is a relay log written to by the I/O slave thread.
-        Write the event so that others can later know the format of this relay
-        log.
-        Note that this event is very close to the original event from the
-        master (it has binlog version of the master, event types of the
-        master), so this is suitable to parse the next relay log's event. It
-        has been produced by
-        Format_description_log_event::Format_description_log_event(char* buf,).
-        Why don't we want to write the description_event_for_queue if this
-        event is for format<4 (3.23 or 4.x): this is because in that case, the
-        description_event_for_queue describes the data received from the
-        master, but not the data written to the relay log (*conversion*),
-        which is in format 4 (slave's).
-      */
-      /*
-        Set 'created' to 0, so that in next relay logs this event does not
-        trigger cleaning actions on the slave in
-        Format_description_log_event::apply_event_impl().
-      */
-      description_event_for_queue->created= 0;
-      /* Don't set log_pos in event header */
-      description_event_for_queue->set_artificial_event();
-
-      if (write_event(description_event_for_queue,
-                      description_event_for_queue->used_checksum_alg))
-        goto err;
-      bytes_written+= description_event_for_queue->data_written;
-    }
     if (flush_io_cache(&log_file) ||
         mysql_file_sync(log_file.file, MYF(MY_WME)))
       goto err;
@@ -4358,11 +4535,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
   close_purge_index_file();
 #endif
 
-  /* Notify the io thread that binlog is rotated to a new file */
-  if (is_relay_log)
-    signal_relay_log_update();
-  else
-    update_binlog_end_pos();
+  update_binlog_end_pos();
   DBUG_RETURN(0);
 
 err:
@@ -5838,7 +6011,153 @@ int MYSQL_BIN_LOG::new_file_without_locking()
 
 
 /**
-  Start writing to a new log file or reopen the old file.
+  Start writing to a new relay log file or reopen the old file.
+
+  @retval
+    nonzero - error
+
+  @note
+    The new file name is stored last in the index file
+*/
+
+int MYSQL_RELAY_LOG::new_file_impl()
+{
+  int error= 0, close_on_error= FALSE;
+  char new_name[FN_REFLEN], *new_name_ptr, *old_name, *file_to_open;
+  File UNINIT_VAR(old_file);
+  DBUG_ENTER("MYSQL_RELAY_LOG::new_file_impl");
+
+  DBUG_ASSERT(log_type == LOG_BIN);
+  mysql_mutex_assert_owner(&LOCK_log);
+
+  if (!is_open())
+  {
+    DBUG_PRINT("info",("log is closed"));
+    DBUG_RETURN(error);
+  }
+  mysql_mutex_lock(&LOCK_index);
+  /*
+    If user hasn't specified an extension, generate a new log name
+    We have to do this here and not in open as we want to store the
+    new file name in the current binary log file.
+  */
+  if (unlikely((error= generate_new_name(new_name, name, 0))))
+  {
+#ifdef ENABLE_AND_FIX_HANG
+    close_on_error= TRUE;
+#endif
+    goto end2;
+  }
+  new_name_ptr=new_name;
+  {
+    /*
+      We log the whole file name for log file as the user may decide
+      to change base names at some point.
+    */
+    Rotate_log_event r(new_name + dirname_length(new_name), 0, LOG_EVENT_OFFSET,
+                       Rotate_log_event::RELAY_LOG);
+    enum_binlog_checksum_alg checksum_alg = BINLOG_CHECKSUM_ALG_UNDEF;
+    /*
+      The current relay-log's closing Rotate event must have checksum
+      value computed with an algorithm of the last relay-logged FD event.
+    */
+    checksum_alg= relay_log_checksum_alg;
+    DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
+    if ((DBUG_IF("fault_injection_new_file_rotate_event") &&
+                         (error= close_on_error= TRUE)) ||
+        (error= write_event(&r, checksum_alg)))
+    {
+      DBUG_EXECUTE_IF("fault_injection_new_file_rotate_event", errno= 2;);
+      close_on_error= TRUE;
+      my_printf_error(ER_ERROR_ON_WRITE,
+                      ER_THD_OR_DEFAULT(current_thd, ER_CANT_OPEN_FILE),
+                      MYF(ME_FATAL), name, errno);
+      goto end;
+    }
+    bytes_written+= r.data_written;
+  }
+
+  /*
+    Update needs to be signalled even if there is no rotate event
+    log rotation should give the waiting thread a signal to
+    discover EOF and move on to the next log.
+  */
+  if (unlikely((error= flush_io_cache(&log_file))))
+  {
+    close_on_error= TRUE;
+    goto end;
+  }
+
+  signal_relay_log_update();
+  old_name=name;
+  name=0;				// Don't free name
+  /*
+     Note that at this point, log_state != LOG_CLOSED
+     (important for is_open()).
+  */
+
+  /*
+     new_file() is only used for rotation (in FLUSH LOGS or because size >
+     max_binlog_size or max_relay_log_size).
+     If this is a binary log, the Format_description_log_event at the
+     beginning of the new file should have created=0 (to distinguish with the
+     Format_description_log_event written at server startup, which should
+     trigger temp tables deletion on slaves.
+  */
+
+  /* reopen index binlog file, BUG#34582 */
+  file_to_open= index_file_name;
+  error= open_index_file(index_file_name, 0, FALSE);
+  if (likely(!error))
+  {
+    /* reopen the binary log file. */
+    file_to_open= new_name_ptr;
+    error= open(old_name, new_name_ptr, 0, io_cache_type, max_size, 1, FALSE);
+  }
+
+  /* handle reopening errors */
+  if (unlikely(error))
+  {
+    my_error(ER_CANT_OPEN_FILE, MYF(ME_FATAL), file_to_open, error);
+    close_on_error= TRUE;
+  }
+
+  my_free(old_name);
+end:
+  /* In case of errors, reuse the last generated log file name */
+  if (unlikely(error))
+  {
+    DBUG_ASSERT(last_used_log_number > 0);
+    last_used_log_number--;
+  }
+
+end2:
+  if (unlikely(error && close_on_error)) /* rotate or reopen failed */
+  {
+    /* 
+      Close whatever was left opened.
+
+      We are keeping the behavior as it exists today, ie,
+      we disable logging and move on (see: BUG#51014).
+
+      TODO: as part of WL#1790 consider other approaches:
+       - kill mysql (safety);
+       - try multiple locations for opening a log file;
+       - switch server to protected/readonly mode
+       - ...
+    */
+    close(LOG_CLOSE_INDEX);
+    sql_print_error(fatal_log_error, new_name_ptr, errno);
+  }
+
+  mysql_mutex_unlock(&LOCK_index);
+
+  DBUG_RETURN(error);
+}
+
+
+/**
+  Start writing to a new binary log file or reopen the old file.
 
   @retval
     nonzero - error
@@ -5848,14 +6167,14 @@ int MYSQL_BIN_LOG::new_file_without_locking()
     binlog_space_total will be updated if binlog_space_limit is set
 */
 
-int MYSQL_BIN_LOG::new_file_impl()
+int MYSQL_BINARY_LOG::new_file_impl()
 {
   int error= 0, close_on_error= FALSE;
   char new_name[FN_REFLEN], *new_name_ptr, *old_name, *file_to_open;
   uint close_flag;
   bool delay_close= false;
   File UNINIT_VAR(old_file);
-  DBUG_ENTER("MYSQL_BIN_LOG::new_file_impl");
+  DBUG_ENTER("MYSQL_BINARY_LOG::new_file_impl");
 
   DBUG_ASSERT(log_type == LOG_BIN);
   mysql_mutex_assert_owner(&LOCK_log);
@@ -5890,17 +6209,10 @@ int MYSQL_BIN_LOG::new_file_impl()
       We log the whole file name for log file as the user may decide
       to change base names at some point.
     */
-    Rotate_log_event r(new_name + dirname_length(new_name), 0, LOG_EVENT_OFFSET,
-                       is_relay_log ? Rotate_log_event::RELAY_LOG : 0);
+    Rotate_log_event r(new_name + dirname_length(new_name), 0,
+                       LOG_EVENT_OFFSET, 0);
     enum_binlog_checksum_alg checksum_alg = BINLOG_CHECKSUM_ALG_UNDEF;
-    /*
-      The current relay-log's closing Rotate event must have checksum
-      value computed with an algorithm of the last relay-logged FD event.
-    */
-    if (is_relay_log)
-      checksum_alg= relay_log_checksum_alg;
-    else
-      checksum_alg= (enum_binlog_checksum_alg)binlog_checksum_options;
+    checksum_alg= (enum_binlog_checksum_alg)binlog_checksum_options;
     DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
     if ((DBUG_IF("fault_injection_new_file_rotate_event") &&
                          (error= close_on_error= TRUE)) ||
@@ -5926,7 +6238,9 @@ int MYSQL_BIN_LOG::new_file_impl()
     close_on_error= TRUE;
     goto end;
   }
+
   update_binlog_end_pos();
+
   old_name=name;
   name=0;				// Don't free name
   close_flag= LOG_CLOSE_TO_BE_OPENED | LOG_CLOSE_INDEX;
@@ -6078,7 +6392,7 @@ bool MYSQL_BIN_LOG::append_no_lock(Log_event* ev,
   if (my_b_append_tell(&log_file) > max_size)
     error= new_file_without_locking();
 err:
-  update_binlog_end_pos();
+  signal_relay_binlog();
   DBUG_RETURN(error);
 }
 
@@ -6139,7 +6453,9 @@ bool MYSQL_BIN_LOG::write_event_buffer(uchar* buf, uint len)
 err:
   my_safe_afree(ebuf, len);
   if (likely(!error))
-    update_binlog_end_pos();
+  {
+    signal_relay_binlog();
+  }
   DBUG_RETURN(error);
 }
 
@@ -8377,7 +8693,7 @@ bool MYSQL_BIN_LOG::write_incident(THD *thd)
                             : write_incident_already_locked(thd))) &&
         likely(!(error= flush_and_sync(0))))
     {
-      update_binlog_end_pos();
+      signal_relay_binlog();
       if (unlikely((error= rotate(false, &check_purge))))
         check_purge= false;
     }
@@ -9672,7 +9988,78 @@ int MYSQL_BIN_LOG::wait_for_update_binlog_end_pos(THD* thd,
 
 
 /**
-  Close the log file.
+  Close the relay log file.
+**/
+
+void MYSQL_RELAY_LOG::close(uint exiting)
+{
+// One can't set log_type here!
+  bool failed_to_save_state= false;
+  DBUG_ENTER("MYSQL_BIN_LOG::close");
+  DBUG_PRINT("enter",("exiting: %d", (int) exiting));
+
+  mysql_mutex_assert_owner(&LOCK_log);
+
+  if (log_state == LOG_OPENED)
+  {
+    DBUG_ASSERT(log_type == LOG_BIN);
+#ifdef HAVE_REPLICATION
+    if (exiting & LOG_CLOSE_STOP_EVENT)
+    {
+      Stop_log_event s;
+      // the checksumming rule for relay-log case is similar to Rotate
+      enum_binlog_checksum_alg checksum_alg= relay_log_checksum_alg;
+      DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
+      write_event(&s, checksum_alg);
+      bytes_written+= s.data_written;
+      flush_io_cache(&log_file);
+      signal_relay_binlog();
+    }
+#endif /* HAVE_REPLICATION */
+
+    /* don't pwrite in a file opened with O_APPEND - it doesn't work */
+    if (log_file.type == WRITE_CACHE && !(exiting & LOG_CLOSE_DELAYED_CLOSE))
+    {
+      my_off_t org_position= mysql_file_tell(log_file.file, MYF(0));
+      if (!failed_to_save_state)
+        clear_inuse_flag_when_closing(log_file.file);
+      /*
+        Restore position so that anything we have in the IO_cache is written
+        to the correct position.
+        We need the seek here, as mysql_file_pwrite() is not guaranteed to keep the
+        original position on system that doesn't support pwrite().
+      */
+      mysql_file_seek(log_file.file, org_position, MY_SEEK_SET, MYF(0));
+    }
+
+    /* this will cleanup IO_CACHE, sync and close the file */
+    MYSQL_LOG::close(exiting);
+  }
+
+  /*
+    The following test is needed even if is_open() is not set, as we may have
+    called a not complete close earlier and the index file is still open.
+  */
+
+  if ((exiting & LOG_CLOSE_INDEX) && my_b_inited(&index_file))
+  {
+    end_io_cache(&index_file);
+    if (unlikely(mysql_file_close(index_file.file, MYF(0)) < 0) &&
+        ! write_error)
+    {
+      write_error= 1;
+      sql_print_error(ER_DEFAULT(ER_ERROR_ON_WRITE), index_file_name, errno);
+    }
+  }
+  log_state= (exiting & LOG_CLOSE_TO_BE_OPENED) ? LOG_TO_BE_OPENED : LOG_CLOSED;
+  my_free(name);
+  name= NULL;
+  DBUG_VOID_RETURN;
+}
+
+
+/**
+  Close the binary log file.
 
   @param exiting     Bitmask for one or more of the following bits:
           - LOG_CLOSE_INDEX : if we should close the index file
@@ -9688,7 +10075,8 @@ int MYSQL_BIN_LOG::wait_for_update_binlog_end_pos(THD* thd,
 */
 
 void MYSQL_BIN_LOG::close(uint exiting)
-{					// One can't set log_type here!
+{
+  // One can't set log_type here!
   bool failed_to_save_state= false;
   DBUG_ENTER("MYSQL_BIN_LOG::close");
   DBUG_PRINT("enter",("exiting: %d", (int) exiting));
@@ -9703,14 +10091,13 @@ void MYSQL_BIN_LOG::close(uint exiting)
     {
       Stop_log_event s;
       // the checksumming rule for relay-log case is similar to Rotate
-      enum_binlog_checksum_alg checksum_alg= is_relay_log ?
-        relay_log_checksum_alg :
+      enum_binlog_checksum_alg checksum_alg=
         (enum_binlog_checksum_alg)binlog_checksum_options;
       DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
       write_event(&s, checksum_alg);
       bytes_written+= s.data_written;
       flush_io_cache(&log_file);
-      update_binlog_end_pos();
+      signal_relay_binlog();
 
       /*
         When we shut down server, write out the binlog state to a separate
