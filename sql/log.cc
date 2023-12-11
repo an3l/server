@@ -3737,7 +3737,6 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log)
   :reset_master_pending(0), mark_xid_done_waiting(0),
    bytes_written(0), binlog_space_total(0),
    last_used_log_number(0), file_id(1), open_count(1),
-   group_commit_queue(0), group_commit_queue_busy(FALSE),
    num_commits(0), num_group_commits(0),
    group_commit_trigger_count(0), group_commit_trigger_timeout(0),
    group_commit_trigger_lock_wait(0),
@@ -8490,7 +8489,7 @@ write_binlog_checkpoint_event_already_locked(const char *name_arg, uint len)
 */
 
 bool
-MYSQL_BIN_LOG::write_transaction_to_binlog(THD *thd,
+MYSQL_BINARY_LOG::write_transaction_to_binlog(THD *thd,
                                            binlog_cache_mngr *cache_mngr,
                                            Log_event *end_ev, bool all,
                                            bool using_stmt_cache,
@@ -8588,7 +8587,7 @@ MYSQL_BIN_LOG::write_transaction_to_binlog(THD *thd,
 */
 
 int
-MYSQL_BIN_LOG::queue_for_group_commit(group_commit_entry *orig_entry)
+MYSQL_BINARY_LOG::queue_for_group_commit(group_commit_entry *orig_entry)
 {
   group_commit_entry *entry, *orig_queue, *last;
   wait_for_commit *cur;
@@ -8911,7 +8910,7 @@ end:
 }
 
 bool
-MYSQL_BIN_LOG::write_transaction_to_binlog_events(group_commit_entry *entry)
+MYSQL_BINARY_LOG::write_transaction_to_binlog_events(group_commit_entry *entry)
 {
   int is_leader= queue_for_group_commit(entry);
 #ifdef WITH_WSREP
@@ -9062,7 +9061,7 @@ MYSQL_BIN_LOG::write_transaction_to_binlog_events(group_commit_entry *entry)
 
  */
 void
-MYSQL_BIN_LOG::trx_group_commit_leader(group_commit_entry *leader)
+MYSQL_BINARY_LOG::trx_group_commit_leader(group_commit_entry *leader)
 {
   uint xid_count= 0;
   my_off_t UNINIT_VAR(commit_offset);
@@ -9402,7 +9401,7 @@ MYSQL_BIN_LOG::trx_group_commit_leader(group_commit_entry *leader)
 
 
 int
-MYSQL_BIN_LOG::write_transaction_or_stmt(group_commit_entry *entry,
+MYSQL_BINARY_LOG::write_transaction_or_stmt(group_commit_entry *entry,
                                          uint64 commit_id)
 {
   binlog_cache_mngr *mngr= entry->cache_mngr;
@@ -9491,7 +9490,7 @@ MYSQL_BIN_LOG::write_transaction_or_stmt(group_commit_entry *entry,
 */
 
 void
-MYSQL_BIN_LOG::wait_for_sufficient_commits()
+MYSQL_BINARY_LOG::wait_for_sufficient_commits()
 {
   size_t count;
   group_commit_entry *e;
@@ -9577,7 +9576,7 @@ after_loop:
 
 
 void
-MYSQL_BIN_LOG::binlog_trigger_immediate_group_commit()
+MYSQL_BINARY_LOG::binlog_trigger_immediate_group_commit()
 {
   group_commit_entry *head;
   mysql_mutex_assert_owner(&LOCK_prepare_ordered);
