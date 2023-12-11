@@ -144,7 +144,6 @@ static const char *fatal_log_error=
   "To turn it on again: fix the cause, shutdown the MariaDB server and "
   "restart it.";
 
-
 static SHOW_VAR binlog_status_vars_detail[]=
 {
   {"commits",
@@ -170,7 +169,7 @@ static SHOW_VAR binlog_status_vars_detail[]=
  */
 static bool binlog_background_thread_started= false;
 static bool binlog_background_thread_stop= false;
-static MYSQL_BIN_LOG::xid_count_per_binlog *
+static MYSQL_BINARY_LOG::xid_count_per_binlog *
     binlog_background_thread_queue= NULL;
 
 static bool start_binlog_background_thread();
@@ -3777,9 +3776,9 @@ void MYSQL_BIN_LOG::stop_background_thread()
 
 /* this is called only once */
 
-void MYSQL_BIN_LOG::cleanup()
+void MYSQL_BINARY_LOG::cleanup()
 {
-  DBUG_ENTER("cleanup");
+  DBUG_ENTER("MYSQL_BINARY_LOG::cleanup");
   if (inited)
   {
     xid_count_per_binlog *b;
@@ -3803,7 +3802,7 @@ void MYSQL_BIN_LOG::cleanup()
       */
       DBUG_ASSERT(b->xid_count == 0);
       DBUG_ASSERT(!binlog_xid_count_list.head());
-      WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::cleanup(): Removing xid_list_entry "
+      WSREP_XID_LIST_ENTRY("MYSQL_BINARY_LOG::cleanup(): Removing xid_list_entry "
                            "for %s (%lu)", b);
       delete b;
     }
@@ -4009,7 +4008,7 @@ Event_log::write_description_event(enum_binlog_checksum_alg checksum_alg,
     1	error
 */
 
-bool MYSQL_BIN_LOG::open(const char *log_name,
+bool MYSQL_BINARY_LOG::open(const char *log_name,
                          const char *new_name,
                          ulong next_log_number,
                          enum cache_type io_cache_type_arg,
@@ -4642,9 +4641,9 @@ err:
     1   error
 */
 
-bool MYSQL_BIN_LOG::reset_logs(THD *thd, bool create_new_log,
-                               rpl_gtid *init_state, uint32 init_state_len,
-                               ulong next_log_number)
+bool MYSQL_BINARY_LOG::reset_logs(THD *thd, bool create_new_log,
+                                  rpl_gtid *init_state, uint32 init_state_len,
+                                  ulong next_log_number)
 {
   LOG_INFO linfo;
   bool error=0;
@@ -4878,7 +4877,7 @@ err:
 }
 
 
-void MYSQL_BIN_LOG::wait_for_last_checkpoint_event()
+void MYSQL_BINARY_LOG::wait_for_last_checkpoint_event()
 {
   mysql_mutex_lock(&LOCK_xid_list);
   for (;;)
@@ -5454,7 +5453,7 @@ err:
                                 mysql_file_stat() or mysql_file_delete()
 */
 
-int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time)
+int MYSQL_BINARY_LOG::purge_logs_before_date(time_t purge_time)
 {
   int error;
   char to_log[FN_REFLEN];
@@ -5740,7 +5739,7 @@ ulonglong MYSQL_BIN_LOG::get_binlog_space_total()
 }
 
 bool
-MYSQL_BIN_LOG::is_xidlist_idle()
+MYSQL_BINARY_LOG::is_xidlist_idle()
 {
   bool res;
   mysql_mutex_lock(&LOCK_xid_list);
@@ -5751,7 +5750,7 @@ MYSQL_BIN_LOG::is_xidlist_idle()
 
 
 bool
-MYSQL_BIN_LOG::is_xidlist_idle_nolock()
+MYSQL_BINARY_LOG::is_xidlist_idle_nolock()
 {
   xid_count_per_binlog *b;
 
@@ -5972,7 +5971,16 @@ int MYSQL_BIN_LOG::new_file_impl()
   {
     /* reopen the binary log file. */
     file_to_open= new_name_ptr;
-    error= open(old_name, new_name_ptr, 0, io_cache_type, max_size, 1, FALSE);
+    if (!is_relay_log)
+    {
+      MYSQL_BINARY_LOG binlog(&sync_binlog_period);
+      error=binlog.open(old_name, new_name_ptr, 0, io_cache_type, max_size, 1, FALSE);
+    }
+    else
+    {
+      MYSQL_RELAY_LOG relay_log(&sync_binlog_period);
+      error=relay_log.open(old_name, new_name_ptr, 0, io_cache_type, max_size, 1, FALSE);
+    }
   }
 
   /* handle reopening errors */
@@ -7567,7 +7575,13 @@ err:
       mysql_mutex_unlock(&LOCK_commit_ordered);
 
       if (check_purge)
-        checkpoint_and_purge(prev_binlog_id);
+      {
+        if (!is_relay_log)
+        {
+          MYSQL_BINARY_LOG binary_log(&sync_binlog_period);
+          binary_log.checkpoint_and_purge(prev_binlog_id);
+        }
+      }
     }
 
     if (unlikely(error))
@@ -7654,8 +7668,8 @@ bool general_log_write(THD *thd, enum enum_server_command command,
 static void
 binlog_checkpoint_callback(void *cookie)
 {
-  MYSQL_BIN_LOG::xid_count_per_binlog *entry=
-    (MYSQL_BIN_LOG::xid_count_per_binlog *)cookie;
+  MYSQL_BINARY_LOG::xid_count_per_binlog *entry=
+    (MYSQL_BINARY_LOG::xid_count_per_binlog *)cookie;
   /*
     For every supporting engine, we increment the xid_count and issue a
     commit_checkpoint_request(). Then we can count when all
@@ -7674,7 +7688,7 @@ binlog_checkpoint_callback(void *cookie)
   that the entry will not go away early despite LOCK_log not being held.
 */
 void
-MYSQL_BIN_LOG::do_checkpoint_request(ulong binlog_id)
+MYSQL_BINARY_LOG::do_checkpoint_request(ulong binlog_id)
 {
   xid_count_per_binlog *entry;
 
@@ -7767,7 +7781,11 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
       (to count the pending checkpoint request) - this will fix the entry in
       place until we decrement again in do_checkpoint_request().
     */
-    mark_xids_active(binlog_id, 1);
+      if (!is_relay_log)
+      {
+        MYSQL_BINARY_LOG binary_log(&sync_binlog_period);
+        binary_log.mark_xids_active(binlog_id, 1);
+      }
 
     if (unlikely((error= new_file_without_locking())))
     {
@@ -7787,7 +7805,11 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
         We failed to rotate - so we have to decrement the xid_count back that
         we incremented before attempting the rotate.
       */
-      mark_xid_done(binlog_id, false);
+      if (!is_relay_log)
+      {
+        MYSQL_BINARY_LOG binary_log(&sync_binlog_period);
+        binary_log.mark_xid_done(binlog_id, false);
+      }
     }
     else
       *check_purge= true;
@@ -7809,7 +7831,7 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
     nonzero - error in rotating routine.
 */
 
-void MYSQL_BIN_LOG::purge(bool all)
+void MYSQL_BINARY_LOG::purge(bool all)
 {
   mysql_mutex_assert_not_owner(&LOCK_log);
 #ifdef HAVE_REPLICATION
@@ -7835,7 +7857,7 @@ void MYSQL_BIN_LOG::purge(bool all)
 #endif
 }
 
-void MYSQL_BIN_LOG::checkpoint_and_purge(ulong binlog_id)
+void MYSQL_BINARY_LOG::checkpoint_and_purge(ulong binlog_id)
 {
   do_checkpoint_request(binlog_id);
   purge(0);
@@ -8004,8 +8026,13 @@ int MYSQL_BIN_LOG::rotate_and_purge(bool force_rotate,
   mysql_mutex_unlock(&LOCK_commit_ordered);
 
   if (check_purge)
-    checkpoint_and_purge(prev_binlog_id);
-
+  {
+    if (!is_relay_log)
+    {
+      MYSQL_BINARY_LOG binary_log(&sync_binlog_period);
+      binary_log.checkpoint_and_purge(prev_binlog_id);
+    }
+  }
   DBUG_RETURN(error);
 }
 
@@ -8396,7 +8423,13 @@ bool MYSQL_BIN_LOG::write_incident(THD *thd)
     mysql_mutex_unlock(&LOCK_log);
 
     if (check_purge)
-      checkpoint_and_purge(prev_binlog_id);
+    {
+      if (!is_relay_log)
+      {
+        MYSQL_BINARY_LOG binary_log(&sync_binlog_period);
+        binary_log.checkpoint_and_purge(prev_binlog_id);
+      }
+    }
   }
   else
   {
@@ -11129,11 +11162,11 @@ TC_LOG_BINLOG::log_and_order(THD *thd, my_xid xid, bool all,
   binary log.
 */
 void
-TC_LOG_BINLOG::mark_xids_active(ulong binlog_id, uint xid_count)
+MYSQL_BINARY_LOG::mark_xids_active(ulong binlog_id, uint xid_count)
 {
   xid_count_per_binlog *b;
 
-  DBUG_ENTER("TC_LOG_BINLOG::mark_xids_active");
+  DBUG_ENTER("MYSQL_BINARY_LOG::mark_xids_active");
   DBUG_PRINT("info", ("binlog_id=%lu xid_count=%u", binlog_id, xid_count));
 
   mysql_mutex_lock(&LOCK_xid_list);
@@ -11166,13 +11199,13 @@ TC_LOG_BINLOG::mark_xids_active(ulong binlog_id, uint xid_count)
   checkpoint.
 */
 void
-TC_LOG_BINLOG::mark_xid_done(ulong binlog_id, bool write_checkpoint)
+MYSQL_BINARY_LOG::mark_xid_done(ulong binlog_id, bool write_checkpoint)
 {
   xid_count_per_binlog *b;
   bool first;
   ulong current;
 
-  DBUG_ENTER("TC_LOG_BINLOG::mark_xid_done");
+  DBUG_ENTER("MYSQL_BINARY_LOG::mark_xid_done");
 
   mysql_mutex_lock(&LOCK_xid_list);
   current= current_binlog_id;
@@ -11273,7 +11306,13 @@ int TC_LOG_BINLOG::unlog(ulong cookie, my_xid xid)
     DBUG_RETURN(0);
 
   if (!BINLOG_COOKIE_IS_DUMMY(cookie))
-    mark_xid_done(BINLOG_COOKIE_GET_ID(cookie), true);
+  {
+    if (!is_relay_log)
+    {
+      MYSQL_BINARY_LOG binary_log(&sync_binlog_period);
+      binary_log.mark_xid_done(BINLOG_COOKIE_GET_ID(cookie), true);
+    }
+  }
   /*
     See comment in trx_group_commit_leader() - if rotate() gave a failure,
     we delay the return of error code to here.
@@ -11327,11 +11366,11 @@ int TC_LOG_BINLOG::unlog_xa_prepare(THD *thd, bool all)
 void
 TC_LOG_BINLOG::commit_checkpoint_notify(void *cookie)
 {
-  xid_count_per_binlog *entry= static_cast<xid_count_per_binlog *>(cookie);
+  MYSQL_BINARY_LOG::xid_count_per_binlog *entry= static_cast<MYSQL_BINARY_LOG::xid_count_per_binlog *>(cookie);
   bool found_entry= false;
   mysql_mutex_lock(&LOCK_binlog_background_thread);
   /* count the same notification kind from different engines */
-  for (xid_count_per_binlog *link= binlog_background_thread_queue;
+  for (MYSQL_BINARY_LOG::xid_count_per_binlog *link= binlog_background_thread_queue;
        link && !found_entry; link= link->next_in_queue)
   {
     if ((found_entry= (entry == link)))
@@ -11362,7 +11401,7 @@ pthread_handler_t
 binlog_background_thread(void *arg __attribute__((unused)))
 {
   bool stop;
-  MYSQL_BIN_LOG::xid_count_per_binlog *queue, *next;
+  MYSQL_BINARY_LOG::xid_count_per_binlog *queue, *next;
   THD *thd;
   my_thread_init();
   DBUG_ENTER("binlog_background_thread");

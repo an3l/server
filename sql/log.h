@@ -682,49 +682,11 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
     LOCK_log.
   */
   int new_file_impl();
-  void do_checkpoint_request(ulong binlog_id);
-  bool is_xidlist_idle_nolock();
 protected:
   MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
   mysql_mutex_t LOCK_xid_list;
 public:
-  void purge(bool all);
   int new_file_without_locking();
-  /*
-    A list of struct xid_count_per_binlog is used to keep track of how many
-    XIDs are in prepared, but not committed, state in each binlog. And how
-    many commit_checkpoint_request()'s are pending.
-
-    When count drops to zero in a binlog after rotation, it means that there
-    are no more XIDs in prepared state, so that binlog is no longer needed
-    for XA crash recovery, and we can log a new binlog checkpoint event.
-
-    The list is protected against simultaneous access from multiple
-    threads by LOCK_xid_list.
-  */
-  struct xid_count_per_binlog : public ilink {
-    char *binlog_name;
-    uint binlog_name_len;
-    ulong binlog_id;
-    /* Total prepared XIDs and pending checkpoint requests in this binlog. */
-    long xid_count;
-    long notify_count;
-    /* For linking in requests to the binlog background thread. */
-    xid_count_per_binlog *next_in_queue;
-    xid_count_per_binlog(char *log_file_name, uint log_file_name_len)
-      :binlog_id(0), xid_count(0), notify_count(0)
-    {
-      binlog_name_len= log_file_name_len;
-      binlog_name= (char *) my_malloc(PSI_INSTRUMENT_ME, binlog_name_len, MYF(MY_ZEROFILL));
-      if (binlog_name)
-        memcpy(binlog_name, log_file_name, binlog_name_len);
-    }
-    ~xid_count_per_binlog()
-    {
-      my_free(binlog_name);
-    }
-  };
-  I_List<xid_count_per_binlog> binlog_xid_count_list;
   mysql_mutex_t LOCK_binlog_background_thread;
   mysql_cond_t COND_binlog_background_thread;
   mysql_cond_t COND_binlog_background_thread_end;
@@ -828,7 +790,6 @@ public:
     return this;
   }
 
-  int open(const char *opt_name);
   void close();
   virtual int generate_new_name(char *new_name, const char *log_name,
                                 ulong next_log_number);
@@ -911,14 +872,6 @@ public:
   void wait_for_update_relay_log(THD* thd);
   void init(ulong max_size);
   void init_pthread_objects();
-  void cleanup();
-  bool open(const char *log_name,
-            const char *new_name,
-            ulong next_log_number,
-	    enum cache_type io_cache_type_arg,
-	    ulong max_size,
-            bool null_created,
-            bool need_mutex);
   bool open_index_file(const char *index_file_name_arg,
                        const char *log_name, bool need_mutex);
   /* Use this to start writing a new log file */
@@ -945,15 +898,11 @@ public:
   bool write_event_buffer(uchar* buf,uint len);
   bool append(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
   bool append_no_lock(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
-
-  void mark_xids_active(ulong cookie, uint xid_count);
-  void mark_xid_done(ulong cookie, bool write_checkpoint);
   void make_log_name(char* buf, const char* log_ident);
   bool is_active(const char* log_file_name);
   virtual bool can_purge_log(const char *log_file_name) = 0;
   int update_log_index(LOG_INFO* linfo, bool need_update_threads);
   int rotate(bool force_rotate, bool* check_purge);
-  void checkpoint_and_purge(ulong binlog_id);
   int rotate_and_purge(bool force_rotate, DYNAMIC_ARRAY* drop_gtid_domain= NULL);
   /**
      Flush binlog cache and synchronize to disk.
@@ -972,7 +921,6 @@ public:
   int purge_logs(const char *to_log, bool included,
                  bool need_mutex, bool need_update_threads,
                  ulonglong *decrease_log_space);
-  int purge_logs_before_date(time_t purge_time);
   int purge_first_log(Relay_log_info* rli, bool included);
   int count_binlog_space();
   void count_binlog_space_with_lock()
@@ -1004,10 +952,6 @@ public:
   int register_create_index_entry(const char* entry);
   int purge_index_entry(THD *thd, ulonglong *decrease_log_space,
                         bool need_mutex);
-  bool reset_logs(THD* thd, bool create_new_log,
-                  rpl_gtid *init_state, uint32 init_state_len,
-                  ulong next_log_number);
-  void wait_for_last_checkpoint_event();
   void close(uint exiting);
   void clear_inuse_flag_when_closing(File file);
 
@@ -1030,7 +974,6 @@ public:
   inline IO_CACHE *get_index_file() { return &index_file;}
   inline uint32 get_open_count() { return open_count; }
   void set_status_variables(THD *thd);
-  bool is_xidlist_idle();
   bool write_gtid_event(THD *thd, bool standalone, bool is_transactional,
                         uint64 commit_id,
                         bool has_xid= false, bool ro_1pc= false);
@@ -1105,6 +1048,17 @@ public:
   my_off_t binlog_end_pos;
   char binlog_end_pos_file[FN_REFLEN];
   virtual ~MYSQL_BIN_LOG() = default;
+  int open(const char *opt_name);
+  virtual bool open(const char *log_name,
+            const char *new_name,
+            ulong next_log_number,
+            enum cache_type io_cache_type_arg,
+            ulong max_size,
+            bool null_created,
+            bool need_mutex) = 0;
+  virtual bool reset_logs(THD* thd, bool create_new_log,
+                          rpl_gtid *init_state, uint32 init_state_len,
+                          ulong next_log_number)= 0;
   friend class MYSQL_BINARY_LOG;
 };
 
@@ -1160,6 +1114,8 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   int write_transaction_or_stmt(group_commit_entry *entry, uint64 commit_id);
   int queue_for_group_commit(group_commit_entry *entry);
   void trx_group_commit_leader(group_commit_entry *leader);
+  bool is_xidlist_idle_nolock();
+  void do_checkpoint_request(ulong binlog_id);
   public:
   MYSQL_BINARY_LOG(uint *sync_period, bool is_relay_log= 0)
     :MYSQL_BIN_LOG(sync_period, is_relay_log)
@@ -1167,6 +1123,41 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
     group_commit_queue= 0;
     group_commit_queue_busy= FALSE;
   }
+  /*
+    A list of struct xid_count_per_binlog is used to keep track of how many
+    XIDs are in prepared, but not committed, state in each binlog. And how
+    many commit_checkpoint_request()'s are pending.
+
+    When count drops to zero in a binlog after rotation, it means that there
+    are no more XIDs in prepared state, so that binlog is no longer needed
+    for XA crash recovery, and we can log a new binlog checkpoint event.
+
+    The list is protected against simultaneous access from multiple
+    threads by LOCK_xid_list.
+  */
+  struct xid_count_per_binlog : public ilink {
+    char *binlog_name;
+    uint binlog_name_len;
+    ulong binlog_id;
+    /* Total prepared XIDs and pending checkpoint requests in this binlog. */
+    long xid_count;
+    long notify_count;
+    /* For linking in requests to the binlog background thread. */
+    xid_count_per_binlog *next_in_queue;
+    xid_count_per_binlog(char *log_file_name, uint log_file_name_len)
+      :binlog_id(0), xid_count(0), notify_count(0)
+    {
+      binlog_name_len= log_file_name_len;
+      binlog_name= (char *) my_malloc(PSI_INSTRUMENT_ME, binlog_name_len, MYF(MY_ZEROFILL));
+      if (binlog_name)
+        memcpy(binlog_name, log_file_name, binlog_name_len);
+    }
+    ~xid_count_per_binlog()
+    {
+      my_free(binlog_name);
+    }
+  };
+  I_List<xid_count_per_binlog> binlog_xid_count_list;
   bool can_purge_log(const char *log_file_name) override;
   bool write_transaction_to_binlog_events(group_commit_entry *entry);
   bool write_transaction_to_binlog(THD *thd, binlog_cache_mngr *cache_mngr,
@@ -1175,6 +1166,25 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
                                    bool is_ro_1pc);
   void wait_for_sufficient_commits();
   void binlog_trigger_immediate_group_commit();
+  void wait_for_last_checkpoint_event();
+  bool is_xidlist_idle();
+  void purge(bool all);
+  void checkpoint_and_purge(ulong binlog_id);
+  int purge_logs_before_date(time_t purge_time);
+  void cleanup();
+  using MYSQL_BIN_LOG::open;
+  bool open(const char *log_name,
+            const char *new_name,
+            ulong next_log_number,
+            enum cache_type io_cache_type_arg,
+            ulong max_size,
+            bool null_created,
+            bool need_mutex) override;
+  bool reset_logs(THD* thd, bool create_new_log,
+                  rpl_gtid *init_state, uint32 init_state_len,
+                  ulong next_log_number) override;
+  void mark_xids_active(ulong cookie, uint xid_count);
+  void mark_xid_done(ulong cookie, bool write_checkpoint);
 };
 
 
@@ -1184,6 +1194,31 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log= 1)
     :MYSQL_BIN_LOG(sync_period, is_relay_log) {}
   bool can_purge_log(const char *log_file_name) override;
+  using MYSQL_BIN_LOG::open;
+  bool open(const char *log_name,
+            const char *new_name,
+            ulong next_log_number,
+            enum cache_type io_cache_type_arg,
+            ulong max_size,
+            bool null_created,
+            bool need_mutex) override
+  {
+    // temporary solution
+    MYSQL_BINARY_LOG b(&sync_binlog_period);
+    return b.open(log_name, new_name, next_log_number,
+                  io_cache_type_arg, max_size,
+                  null_created, need_mutex);
+
+  }
+  bool reset_logs(THD* thd, bool create_new_log,
+                  rpl_gtid *init_state, uint32 init_state_len,
+                  ulong next_log_number) override
+  {
+    // temporary solution
+    MYSQL_BINARY_LOG b(&sync_binlog_period);
+    return b.reset_logs(thd, create_new_log, init_state,
+                        init_state_len, next_log_number);
+  }
 };
 
 

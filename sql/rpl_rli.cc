@@ -114,7 +114,6 @@ Relay_log_info::~Relay_log_info()
   mysql_cond_destroy(&start_cond);
   mysql_cond_destroy(&stop_cond);
   mysql_cond_destroy(&log_space_cond);
-  relay_log.cleanup();
   DBUG_VOID_RETURN;
 }
 
