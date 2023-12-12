@@ -1156,7 +1156,6 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log= 1)
     :MYSQL_BIN_LOG(sync_period, is_relay_log) 
   {
-    relay_signal_cnt= 0;
     relay_log_checksum_alg= BINLOG_CHECKSUM_ALG_UNDEF;
     description_event_for_exec= 0;
     description_event_for_queue= 0;

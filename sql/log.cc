@@ -3742,7 +3742,7 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log)
    group_commit_trigger_lock_wait(0),
    sync_period_ptr(sync_period), sync_counter(0),
    state_file_deleted(false), binlog_state_recover_done(false),
-   is_relay_log(is_relay_log),
+   is_relay_log(is_relay_log), relay_signal_cnt(0),
    checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF),
    current_binlog_id(0), reset_master_count(0)
 {
@@ -6037,12 +6037,12 @@ int MYSQL_BIN_LOG::new_file_without_locking()
 
 int MYSQL_RELAY_LOG::new_file_impl()
 {
-int error= 0, close_on_error= FALSE;
-  char new_name[FN_REFLEN], *new_name_ptr, *old_name, *file_to_open;
+  int error= 0, close_on_error= FALSE;
+  char new_name[FN_REFLEN];
+  char *new_name_ptr, *old_name, *file_to_open;
   uint close_flag;
-  bool delay_close= false;
   File UNINIT_VAR(old_file);
-  DBUG_ENTER("MYSQL_BIN_LOG::new_file_impl");
+  DBUG_ENTER("MYSQL_RELAY_LOG::new_file_impl");
 
   DBUG_ASSERT(log_type == LOG_BIN);
   mysql_mutex_assert_owner(&LOCK_log);
@@ -6052,17 +6052,15 @@ int error= 0, close_on_error= FALSE;
     DBUG_PRINT("info",("log is closed"));
     DBUG_RETURN(error);
   }
-
   mysql_mutex_lock(&LOCK_index);
-
   /* Reuse old name if not binlog and not update log */
   new_name_ptr= name;
-
   /*
     If user hasn't specified an extension, generate a new log name
     We have to do this here and not in open as we want to store the
     new file name in the current binary log file.
   */
+  DBUG_ASSERT(name != NULL);
   if (unlikely((error= generate_new_name(new_name, name, 0))))
   {
 #ifdef ENABLE_AND_FIX_HANG
@@ -6071,23 +6069,19 @@ int error= 0, close_on_error= FALSE;
     goto end2;
   }
   new_name_ptr=new_name;
-
   {
     /*
       We log the whole file name for log file as the user may decide
       to change base names at some point.
     */
     Rotate_log_event r(new_name + dirname_length(new_name), 0, LOG_EVENT_OFFSET,
-                       is_relay_log ? Rotate_log_event::RELAY_LOG : 0);
+                       Rotate_log_event::RELAY_LOG);
     enum_binlog_checksum_alg checksum_alg = BINLOG_CHECKSUM_ALG_UNDEF;
     /*
       The current relay-log's closing Rotate event must have checksum
       value computed with an algorithm of the last relay-logged FD event.
     */
-    if (is_relay_log)
-      checksum_alg= relay_log_checksum_alg;
-    else
-      checksum_alg= (enum_binlog_checksum_alg)binlog_checksum_options;
+    checksum_alg= relay_log_checksum_alg;
     DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
     if ((DBUG_IF("fault_injection_new_file_rotate_event") &&
                          (error= close_on_error= TRUE)) ||
@@ -6113,31 +6107,12 @@ int error= 0, close_on_error= FALSE;
     close_on_error= TRUE;
     goto end;
   }
-  update_binlog_end_pos();
+
+  signal_relay_log_update();
   old_name=name;
   name=0;				// Don't free name
   close_flag= LOG_CLOSE_TO_BE_OPENED | LOG_CLOSE_INDEX;
-  if (!is_relay_log)
-  {
-    /*
-      We need to keep the old binlog file open (and marked as in-use) until
-      the new one is fully created and synced to disk and index. Otherwise we
-      leave a window where if we crash, there is no binlog file marked as
-      crashed for server restart to detect the need for recovery.
-    */
-    old_file= log_file.file;
-    close_flag|= LOG_CLOSE_DELAYED_CLOSE;
-    delay_close= true;
-    if (binlog_space_limit)
-      binlog_space_total+= binlog_end_pos;
-  }
   close(close_flag);
-  if (checksum_alg_reset != BINLOG_CHECKSUM_ALG_UNDEF)
-  {
-    DBUG_ASSERT(!is_relay_log);
-    DBUG_ASSERT(binlog_checksum_options != checksum_alg_reset);
-    binlog_checksum_options= checksum_alg_reset;
-  }
   /*
      Note that at this point, log_state != LOG_CLOSED
      (important for is_open()).
@@ -6170,7 +6145,6 @@ int error= 0, close_on_error= FALSE;
   }
 
   my_free(old_name);
-
 end:
   /* In case of errors, reuse the last generated log file name */
   if (unlikely(error))
@@ -6180,12 +6154,6 @@ end:
   }
 
 end2:
-  if (delay_close)
-  {
-    clear_inuse_flag_when_closing(old_file);
-    mysql_file_close(old_file, MYF(MY_WME));
-  }
-
   if (unlikely(error && close_on_error)) /* rotate or reopen failed */
   {
     /* 
@@ -6208,140 +6176,6 @@ end2:
 
   DBUG_RETURN(error);
 }
-// int MYSQL_RELAY_LOG::new_file_impl()
-// {
-//   int error= 0, close_on_error= FALSE;
-//   char new_name[FN_REFLEN], *new_name_ptr, *old_name;
-//   File UNINIT_VAR(old_file);
-//   DBUG_ENTER("MYSQL_RELAY_LOG::new_file_impl");
-
-//   DBUG_ASSERT(log_type == LOG_BIN);
-//   mysql_mutex_assert_owner(&LOCK_log);
-
-//   if (!is_open())
-//   {
-//     DBUG_PRINT("info",("log is closed"));
-//     DBUG_RETURN(error);
-//   }
-//   mysql_mutex_lock(&LOCK_index);
-//   /*
-//     If user hasn't specified an extension, generate a new log name
-//     We have to do this here and not in open as we want to store the
-//     new file name in the current binary log file.
-//   */
-//   if (unlikely((error= generate_new_name(new_name, name, 0))))
-//   {
-// #ifdef ENABLE_AND_FIX_HANG
-//     close_on_error= TRUE;
-// #endif
-//     goto end2;
-//   }
-//   new_name_ptr=new_name;
-//   {
-//     /*
-//       We log the whole file name for log file as the user may decide
-//       to change base names at some point.
-//     */
-//     Rotate_log_event r(new_name + dirname_length(new_name), 0, LOG_EVENT_OFFSET,
-//                        Rotate_log_event::RELAY_LOG);
-//     enum_binlog_checksum_alg checksum_alg = BINLOG_CHECKSUM_ALG_UNDEF;
-//     /*
-//       The current relay-log's closing Rotate event must have checksum
-//       value computed with an algorithm of the last relay-logged FD event.
-//     */
-//     checksum_alg= relay_log_checksum_alg;
-//     DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
-//     if ((DBUG_IF("fault_injection_new_file_rotate_event") &&
-//                          (error= close_on_error= TRUE)) ||
-//         (error= write_event(&r, checksum_alg)))
-//     {
-//       DBUG_EXECUTE_IF("fault_injection_new_file_rotate_event", errno= 2;);
-//       close_on_error= TRUE;
-//       my_printf_error(ER_ERROR_ON_WRITE,
-//                       ER_THD_OR_DEFAULT(current_thd, ER_CANT_OPEN_FILE),
-//                       MYF(ME_FATAL), name, errno);
-//       goto end;
-//     }
-//     bytes_written+= r.data_written;
-//   }
-
-//   /*
-//     Update needs to be signalled even if there is no rotate event
-//     log rotation should give the waiting thread a signal to
-//     discover EOF and move on to the next log.
-//   */
-//   if (unlikely((error= flush_io_cache(&log_file))))
-//   {
-//     close_on_error= TRUE;
-//     goto end;
-//   }
-
-//   signal_relay_log_update();
-//   old_name=name;
-//   name=0;				// Don't free name
-//   /*
-//      Note that at this point, log_state != LOG_CLOSED
-//      (important for is_open()).
-//   */
-
-//   /*
-//      new_file() is only used for rotation (in FLUSH LOGS or because size >
-//      max_binlog_size or max_relay_log_size).
-//      If this is a binary log, the Format_description_log_event at the
-//      beginning of the new file should have created=0 (to distinguish with the
-//      Format_description_log_event written at server startup, which should
-//      trigger temp tables deletion on slaves.
-//   */
-
-//   /* reopen index binlog file, BUG#34582 */
-//   // file_to_open= index_file_name;
-//   // error= open_index_file(index_file_name, 0, FALSE);
-//   // if (likely(!error))
-//   // {
-//   //   /* reopen the binary log file. */
-//   //   file_to_open= new_name_ptr;
-//   //   error= open(old_name, new_name_ptr, 0, io_cache_type, max_size, 1, FALSE);
-//   // }
-
-//   // /* handle reopening errors */
-//   // if (unlikely(error))
-//   // {
-//   //   my_error(ER_CANT_OPEN_FILE, MYF(ME_FATAL), file_to_open, error);
-//   //   close_on_error= TRUE;
-//   // }
-
-//   my_free(old_name);
-// end:
-//   /* In case of errors, reuse the last generated log file name */
-//   if (unlikely(error))
-//   {
-//     DBUG_ASSERT(last_used_log_number > 0);
-//     last_used_log_number--;
-//   }
-
-// // end2:
-// //   if (unlikely(error && close_on_error)) /* rotate or reopen failed */
-// //   {
-// //     /* 
-// //       Close whatever was left opened.
-
-// //       We are keeping the behavior as it exists today, ie,
-// //       we disable logging and move on (see: BUG#51014).
-
-// //       TODO: as part of WL#1790 consider other approaches:
-// //        - kill mysql (safety);
-// //        - try multiple locations for opening a log file;
-// //        - switch server to protected/readonly mode
-// //        - ...
-// //     */
-// //     close(LOG_CLOSE_INDEX);
-// //     sql_print_error(fatal_log_error, new_name_ptr, errno);
-// //   }
-
-//   mysql_mutex_unlock(&LOCK_index);
-
-//   DBUG_RETURN(error);
-// }
 
 
 /**
