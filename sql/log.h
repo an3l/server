@@ -945,9 +945,6 @@ public:
   int register_create_index_entry(const char* entry);
   int purge_index_entry(THD *thd, ulonglong *decrease_log_space,
                         bool need_mutex);
-  bool reset_logs(THD* thd, bool create_new_log,
-                  rpl_gtid *init_state, uint32 init_state_len,
-                  ulong next_log_number);
   void wait_for_last_checkpoint_event();
   void clear_inuse_flag_when_closing(File file);
 
@@ -1061,6 +1058,9 @@ public:
   */
   virtual int new_file_impl() = 0;
   virtual void signal_relay_binlog() = 0;
+  virtual bool reset_logs(THD* thd, bool create_new_log,
+                          rpl_gtid *init_state, uint32 init_state_len,
+                          ulong next_log_number) = 0;
   virtual void close(uint exiting);
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
@@ -1140,6 +1140,9 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   {
     update_binlog_end_pos();
   }
+  bool reset_logs(THD* thd, bool create_new_log,
+                  rpl_gtid *init_state, uint32 init_state_len,
+                  ulong next_log_number) override;
   bool write_transaction_to_binlog_events(group_commit_entry *entry);
   bool write_transaction_to_binlog(THD *thd, binlog_cache_mngr *cache_mngr,
                                    Log_event *end_ev, bool all,
@@ -1219,6 +1222,9 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   Format_description_log_event *description_event_for_exec,
     *description_event_for_queue;
   void cleanup() override;
+  bool reset_logs(THD* thd, bool create_new_log,
+                  rpl_gtid *init_state, uint32 init_state_len,
+                  ulong next_log_number) override;
   using MYSQL_BIN_LOG::close;
   void close(uint exiting) override;
 
