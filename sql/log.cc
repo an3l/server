@@ -5714,10 +5714,10 @@ err:
 }
 
 /**
-  Remove all logs before the given file date from disk and from the
+  Remove all binary logs before the given file date from disk and from the
   index file.
 
-  @param thd		Thread pointer
+  @param thd        Thread pointer
   @param purge_time	Delete all log files before given date.
 
   @note
@@ -5727,12 +5727,12 @@ err:
   @retval
     0				ok
   @retval
-    LOG_INFO_PURGE_NO_ROTATE	Binary file that can't be rotated
+    LOG_INFO_PURGE_NO_ROTATE    Binary file that can't be rotated
     LOG_INFO_FATAL              if any other than ENOENT error from
                                 mysql_file_stat() or mysql_file_delete()
 */
 
-int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time)
+int MYSQL_BINARY_LOG::purge_logs_before_date(time_t purge_time)
 {
   int error;
   char to_log[FN_REFLEN];
@@ -5821,7 +5821,7 @@ err:
                         mysql_file_stat() or mysql_file_delete()
 */
 
-int MYSQL_BIN_LOG::real_purge_logs_by_size(ulonglong binlog_pos)
+int MYSQL_BINARY_LOG::real_purge_logs_by_size(ulonglong binlog_pos)
 {
   int error= 0;
   LOG_INFO log_info;
@@ -7680,7 +7680,7 @@ MYSQL_BIN_LOG::check_strict_gtid_sequence(uint32 domain_id,
   (this should happen only if the event is a Table_map).
 */
 
-bool MYSQL_BIN_LOG::write(Log_event *event_info, my_bool *with_annotate)
+bool MYSQL_BINARY_LOG::write(Log_event *event_info, my_bool *with_annotate)
 {
   THD *thd= event_info->thd;
   bool error= 1;
@@ -8100,7 +8100,7 @@ binlog_checkpoint_callback(void *cookie)
   that the entry will not go away early despite LOCK_log not being held.
 */
 void
-MYSQL_BIN_LOG::do_checkpoint_request(ulong binlog_id)
+MYSQL_BINARY_LOG::do_checkpoint_request(ulong binlog_id)
 {
   xid_count_per_binlog *entry;
 
@@ -8154,7 +8154,7 @@ MYSQL_BIN_LOG::do_checkpoint_request(ulong binlog_id)
   @retval
     nonzero - error in rotating routine.
 */
-int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
+int MYSQL_BINARY_LOG::rotate(bool force_rotate, bool* check_purge)
 {
   int error= 0;
   ulonglong binlog_pos;
@@ -8235,7 +8235,7 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
     nonzero - error in rotating routine.
 */
 
-void MYSQL_BIN_LOG::purge(bool all)
+void MYSQL_BINARY_LOG::purge(bool all)
 {
   mysql_mutex_assert_not_owner(&LOCK_log);
 #ifdef HAVE_REPLICATION
@@ -8261,7 +8261,7 @@ void MYSQL_BIN_LOG::purge(bool all)
 #endif
 }
 
-void MYSQL_BIN_LOG::checkpoint_and_purge(ulong binlog_id)
+void MYSQL_BINARY_LOG::checkpoint_and_purge(ulong binlog_id)
 {
   do_checkpoint_request(binlog_id);
   purge(0);
@@ -8390,8 +8390,8 @@ end:
   @retval
     nonzero - error in rotating routine.
 */
-int MYSQL_BIN_LOG::rotate_and_purge(bool force_rotate,
-                                    DYNAMIC_ARRAY *domain_drop_lex)
+int MYSQL_BINARY_LOG::rotate_and_purge(bool force_rotate,
+                                       DYNAMIC_ARRAY *domain_drop_lex)
 {
   int err_gtid=0, error= 0;
   ulong prev_binlog_id;
@@ -8786,7 +8786,7 @@ bool MYSQL_BIN_LOG::write_incident_already_locked(THD *thd)
 }
 
 
-bool MYSQL_BIN_LOG::write_incident(THD *thd)
+bool MYSQL_BINARY_LOG::write_incident(THD *thd)
 {
   uint error= 0;
   my_off_t offset;

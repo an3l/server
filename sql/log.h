@@ -676,13 +676,11 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   }
 
   int write_to_file(IO_CACHE *cache);
-  void do_checkpoint_request(ulong binlog_id);
   bool is_xidlist_idle_nolock();
 protected:
   MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
   mysql_mutex_t LOCK_xid_list;
 public:
-  void purge(bool all);
   int new_file_without_locking();
   /*
     A list of struct xid_count_per_binlog is used to keep track of how many
@@ -865,11 +863,7 @@ public:
                        const char *log_name, bool need_mutex);
   /* Use this to start writing a new log file */
   int new_file();
-
-  bool write(Log_event* event_info,
-             my_bool *with_annotate= 0); // binary log write
   bool write_incident_already_locked(THD *thd);
-  bool write_incident(THD *thd);
   void write_binlog_checkpoint_event_already_locked(const char *name, uint len);
   bool write_table_map(THD *thd, TABLE *table, bool with_annotate);
   void start_union_events(THD *thd, query_id_t query_id_param);
@@ -893,9 +887,6 @@ public:
   void make_log_name(char* buf, const char* log_ident);
   bool is_active(const char* log_file_name);
   int update_log_index(LOG_INFO* linfo, bool need_update_threads);
-  int rotate(bool force_rotate, bool* check_purge);
-  void checkpoint_and_purge(ulong binlog_id);
-  int rotate_and_purge(bool force_rotate, DYNAMIC_ARRAY* drop_gtid_domain= NULL);
   /**
      Flush binlog cache and synchronize to disk.
 
@@ -913,7 +904,6 @@ public:
   int purge_logs(const char *to_log, bool included,
                  bool need_mutex, bool need_update_threads,
                  ulonglong *decrease_log_space);
-  int purge_logs_before_date(time_t purge_time);
   int purge_first_log(Relay_log_info* rli, bool included);
   int count_binlog_space();
   void count_binlog_space_with_lock()
@@ -924,14 +914,6 @@ public:
   }
   void reset_binlog_space_total() { binlog_space_total= 0; }
   ulonglong get_binlog_space_total();
-  int real_purge_logs_by_size(ulonglong binlog_pos);
-  inline int purge_logs_by_size(ulonglong binlog_pos)
-  {
-    if (!binlog_space_total || is_relay_log || ! binlog_space_limit ||
-        binlog_space_total + binlog_pos <= binlog_space_limit)
-      return 0;
-    return real_purge_logs_by_size(binlog_pos);
-  }
   int set_purge_index_file_name(const char *base_file_name);
   int open_purge_index_file(bool destroy);
   bool truncate_and_remove_binlogs(const char *truncate_file,
@@ -1150,6 +1132,23 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
                                    bool is_ro_1pc);
   void wait_for_sufficient_commits();
   void binlog_trigger_immediate_group_commit();
+  void purge(bool all);
+  int purge_logs_before_date(time_t purge_time);
+  int real_purge_logs_by_size(ulonglong binlog_pos);
+  inline int purge_logs_by_size(ulonglong binlog_pos)
+  {
+    if (!binlog_space_total || ! binlog_space_limit ||
+        binlog_space_total + binlog_pos <= binlog_space_limit)
+      return 0;
+    return real_purge_logs_by_size(binlog_pos);
+  }
+  int rotate(bool force_rotate, bool* check_purge);
+  int rotate_and_purge(bool force_rotate, DYNAMIC_ARRAY* drop_gtid_domain= NULL);
+  bool write(Log_event* event_info,
+            my_bool *with_annotate= 0); // binary log write
+  void do_checkpoint_request(ulong binlog_id);
+  bool write_incident(THD *thd);
+  void checkpoint_and_purge(ulong binlog_id);
 };
 
 
