@@ -730,6 +730,7 @@ public:
 
   /* This is relay log */
   bool is_relay_log;
+  ulong relay_signal_cnt;  // update of the counter is checked by heartbeat
   enum enum_binlog_checksum_alg checksum_alg_reset; // to contain a new value when binlog is rotated
   /*
     Binlog position of last commit (or non-transactional write) to the binlog.
@@ -819,12 +820,27 @@ public:
     mysql_cond_broadcast(&COND_bin_log_updated);
     DBUG_VOID_RETURN;
   }
+  /* Handle signaling that relay has been updated */
+  void signal_relay_log_update()
+  {
+    mysql_mutex_assert_owner(&LOCK_log);
+    DBUG_ASSERT(is_relay_log);
+    DBUG_ENTER("MYSQL_BIN_LOG::signal_relay_log_update");
+    relay_signal_cnt++;
+    mysql_cond_broadcast(&COND_relay_log_updated);
+    DBUG_VOID_RETURN;
+  }
   void update_binlog_end_pos()
   {
-      lock_binlog_end_pos();
-      binlog_end_pos= my_b_safe_tell(&log_file);
-      signal_bin_log_update();
-      unlock_binlog_end_pos();
+      if (is_relay_log)
+        signal_relay_log_update();
+      else
+      {
+        lock_binlog_end_pos();
+        binlog_end_pos= my_b_safe_tell(&log_file);
+        signal_bin_log_update();
+        unlock_binlog_end_pos();
+      }
   }
   void update_binlog_end_pos(my_off_t pos)
   {
@@ -1159,7 +1175,6 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   {
     signal_relay_log_update();
   }
-  ulong relay_signal_cnt;  // update of the counter is checked by heartbeat
   /*
     Holds the last seen in Relay-Log FD's checksum alg value.
     The initial value comes from the slave's local FD that heads
@@ -1204,17 +1219,6 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   */
   Format_description_log_event *description_event_for_exec,
     *description_event_for_queue;
-  /* Handle signaling that relay has been updated */
-  void signal_relay_log_update()
-  {
-    mysql_mutex_assert_owner(&LOCK_log);
-    DBUG_ASSERT(is_relay_log);
-    DBUG_ENTER("MYSQL_BIN_LOG::signal_relay_log_update");
-    relay_signal_cnt++;
-    mysql_cond_broadcast(&COND_relay_log_updated);
-    DBUG_VOID_RETURN;
-  }
-
   void cleanup() override;
   using MYSQL_BIN_LOG::close;
   void close(uint exiting) override;
