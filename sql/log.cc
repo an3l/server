@@ -3776,6 +3776,7 @@ void MYSQL_BIN_LOG::stop_background_thread()
 /* this is called only once */
 void MYSQL_RELAY_LOG::cleanup()
 {
+  DBUG_ASSERT(is_relay_log);
   if (inited)
   {
     inited= 0;
@@ -3803,13 +3804,13 @@ void MYSQL_RELAY_LOG::cleanup()
 void MYSQL_BINARY_LOG::cleanup()
 {
   DBUG_ENTER("cleanup");
+  DBUG_ASSERT(!is_relay_log);
   if (inited)
   {
     xid_count_per_binlog *b;
 
     /* Wait for the binlog background thread to stop. */
-    if (!is_relay_log)
-      stop_background_thread();
+    stop_background_thread();
 
     inited= 0;
     mysql_mutex_lock(&LOCK_log);
@@ -3847,8 +3848,7 @@ void MYSQL_BINARY_LOG::cleanup()
     We can't do that automatically as we need to do this before
     safemalloc is shut down
   */
-  if (!is_relay_log)
-    rpl_global_gtid_binlog_state.free();
+  rpl_global_gtid_binlog_state.free();
   DBUG_VOID_RETURN;
 }
 
@@ -4048,8 +4048,6 @@ bool MYSQL_RELAY_LOG::open(const char *log_name,
                                  LOG_BIN, io_cache_type_arg))
   {
     sql_print_error("MYSQL_BIN_LOG::open failed to generate new file name.");
-    if (!is_relay_log)
-      goto err;
     DBUG_RETURN(1);
   }
 
@@ -4277,9 +4275,7 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
                                  LOG_BIN, io_cache_type_arg))
   {
     sql_print_error("MYSQL_BIN_LOG::open failed to generate new file name.");
-    if (!is_relay_log)
-      goto err;
-    DBUG_RETURN(1);
+    goto err;
   }
 
 #ifdef HAVE_REPLICATION
@@ -4364,95 +4360,93 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
         goto err;
       bytes_written+= written;
 
-      if (!is_relay_log)
-      {
-        char buf[FN_REFLEN];
+      char buf[FN_REFLEN];
 
-        /*
-          Output a Gtid_list_log_event at the start of the binlog file.
+      /*
+        Output a Gtid_list_log_event at the start of the binlog file.
 
-          This is used to quickly determine which GTIDs are found in binlog
-          files earlier than this one, and which are found in this (or later)
-          binlogs.
+        This is used to quickly determine which GTIDs are found in binlog
+        files earlier than this one, and which are found in this (or later)
+        binlogs.
 
-          The list gives a mapping from (domain_id, server_id) -> seq_no (so
-          this means that there is at most one entry for every unique pair
-          (domain_id, server_id) in the list). It indicates that this seq_no is
-          the last one found in an earlier binlog file for this (domain_id,
-          server_id) combination - so any higher seq_no should be search for
-          from this binlog file, or a later one.
+        The list gives a mapping from (domain_id, server_id) -> seq_no (so
+        this means that there is at most one entry for every unique pair
+        (domain_id, server_id) in the list). It indicates that this seq_no is
+        the last one found in an earlier binlog file for this (domain_id,
+        server_id) combination - so any higher seq_no should be search for
+        from this binlog file, or a later one.
 
-          This allows to locate the binlog file containing a given GTID by
-          scanning backwards, reading just the Gtid_list_log_event at the
-          start of each file, and scanning only the relevant binlog file when
-          found, not all binlog files.
+        This allows to locate the binlog file containing a given GTID by
+        scanning backwards, reading just the Gtid_list_log_event at the
+        start of each file, and scanning only the relevant binlog file when
+        found, not all binlog files.
 
-          The existence of a given entry (domain_id, server_id, seq_no)
-          guarantees only that this seq_no will not be found in this or any
-          later binlog file. It does not guarantee that it can be found it an
-          earlier binlog file, for example the file may have been purged.
+        The existence of a given entry (domain_id, server_id, seq_no)
+        guarantees only that this seq_no will not be found in this or any
+        later binlog file. It does not guarantee that it can be found it an
+        earlier binlog file, for example the file may have been purged.
 
-          If there is no entry for a given (domain_id, server_id) pair, then
-          it means that no such GTID exists in any earlier binlog. It is
-          permissible to remove such pair from future Gtid_list_log_events
-          if all previous binlog files containing such GTIDs have been purged
-          (though such optimization is not performed at the time of this
-          writing). So if there is no entry for given GTID it means that such
-          GTID should be search for in this or later binlog file, same as if
-          there had been an entry (domain_id, server_id, 0).
-        */
+        If there is no entry for a given (domain_id, server_id) pair, then
+        it means that no such GTID exists in any earlier binlog. It is
+        permissible to remove such pair from future Gtid_list_log_events
+        if all previous binlog files containing such GTIDs have been purged
+        (though such optimization is not performed at the time of this
+        writing). So if there is no entry for given GTID it means that such
+        GTID should be search for in this or later binlog file, same as if
+        there had been an entry (domain_id, server_id, 0).
+      */
 
-        Gtid_list_log_event gl_ev(&rpl_global_gtid_binlog_state, 0);
-        if (write_event(&gl_ev))
-          goto err;
+      Gtid_list_log_event gl_ev(&rpl_global_gtid_binlog_state, 0);
+      if (write_event(&gl_ev))
+        goto err;
 
-        /* Output a binlog checkpoint event at the start of the binlog file. */
+      /* Output a binlog checkpoint event at the start of the binlog file. */
 
-        /*
-          Construct an entry in the binlog_xid_count_list for the new binlog
-          file (we will not link it into the list until we know the new file
-          is successfully created; otherwise we would have to remove it again
-          if creation failed, which gets tricky since other threads may have
-          seen the entry in the meantime - and we do not want to hold
-          LOCK_xid_list for long periods of time).
+      /*
+        Construct an entry in the binlog_xid_count_list for the new binlog
+        file (we will not link it into the list until we know the new file
+        is successfully created; otherwise we would have to remove it again
+        if creation failed, which gets tricky since other threads may have
+        seen the entry in the meantime - and we do not want to hold
+        LOCK_xid_list for long periods of time).
 
-          Write the current binlog checkpoint into the log, so XA recovery will
-          know from where to start recovery.
-        */
-        size_t off= dirname_length(log_file_name);
-        uint len= static_cast<uint>(strlen(log_file_name) - off);
-        new_xid_list_entry= new xid_count_per_binlog(log_file_name+off, len);
-        if (!new_xid_list_entry)
-          goto err;
+        Write the current binlog checkpoint into the log, so XA recovery will
+        know from where to start recovery.
+      */
+      size_t off= dirname_length(log_file_name);
+      uint len= static_cast<uint>(strlen(log_file_name) - off);
+      new_xid_list_entry= new xid_count_per_binlog(log_file_name+off, len);
+      if (!new_xid_list_entry)
+        goto err;
 
-        /*
-          Find the name for the Initial binlog checkpoint.
+      /*
+        Find the name for the Initial binlog checkpoint.
 
-          Normally this will just be the first entry, as we delete entries
-          when their count drops to zero. But we scan the list to handle any
-          corner case, eg. for the first binlog file opened after startup, the
-          list will be empty.
-        */
-        mysql_mutex_lock(&LOCK_xid_list);
-        I_List_iterator<xid_count_per_binlog> it(binlog_xid_count_list);
-        while ((b= it++) && b->xid_count == 0)
-          ;
-        mysql_mutex_unlock(&LOCK_xid_list);
-        if (!b)
-          b= new_xid_list_entry;
-        if (b->binlog_name)
-          strmake(buf, b->binlog_name, b->binlog_name_len);
-        else
-          goto err;
-        Binlog_checkpoint_log_event ev(buf, len);
-        DBUG_EXECUTE_IF("crash_before_write_checkpoint_event",
-                        flush_io_cache(&log_file);
-                        mysql_file_sync(log_file.file, MYF(MY_WME));
-                        DBUG_SUICIDE(););
-        if (write_event(&ev))
-          goto err;
-        bytes_written+= ev.data_written;
-      }
+        Normally this will just be the first entry, as we delete entries
+        when their count drops to zero. But we scan the list to handle any
+        corner case, eg. for the first binlog file opened after startup, the
+        list will be empty.
+      */
+      mysql_mutex_lock(&LOCK_xid_list);
+      I_List_iterator<xid_count_per_binlog> it(binlog_xid_count_list);
+      while ((b= it++) && b->xid_count == 0)
+        ;
+      mysql_mutex_unlock(&LOCK_xid_list);
+      if (!b)
+        b= new_xid_list_entry;
+      if (b->binlog_name)
+        strmake(buf, b->binlog_name, b->binlog_name_len);
+      else
+        goto err;
+      Binlog_checkpoint_log_event ev(buf, len);
+      DBUG_EXECUTE_IF("crash_before_write_checkpoint_event",
+                      flush_io_cache(&log_file);
+                      mysql_file_sync(log_file.file, MYF(MY_WME));
+                      DBUG_SUICIDE(););
+      if (write_event(&ev))
+        goto err;
+      bytes_written+= ev.data_written;
+
     }
     if (flush_io_cache(&log_file) ||
         mysql_file_sync(log_file.file, MYF(MY_WME)))
@@ -4460,16 +4454,14 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
 
     my_off_t offset= my_b_tell(&log_file);
 
-    if (!is_relay_log)
-    {
-      /* update binlog_end_pos so that it can be read by after sync hook */
-      reset_binlog_end_pos(log_file_name, offset);
 
-      mysql_mutex_lock(&LOCK_commit_ordered);
-      strmake_buf(last_commit_pos_file, log_file_name);
-      last_commit_pos_offset= offset;
-      mysql_mutex_unlock(&LOCK_commit_ordered);
-    }
+    /* update binlog_end_pos so that it can be read by after sync hook */
+    reset_binlog_end_pos(log_file_name, offset);
+
+    mysql_mutex_lock(&LOCK_commit_ordered);
+    strmake_buf(last_commit_pos_file, log_file_name);
+    last_commit_pos_offset= offset;
+    mysql_mutex_unlock(&LOCK_commit_ordered);
 
     if (write_file_name_to_index_file)
     {
@@ -4502,46 +4494,43 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
     }
   }
 
-  if (!is_relay_log)
+  /*
+    Now the file was created successfully, so we can link in the entry for
+    the new binlog file in binlog_xid_count_list.
+  */
+  mysql_mutex_lock(&LOCK_xid_list);
+  ++current_binlog_id;
+  new_xid_list_entry->binlog_id= current_binlog_id;
+  /* Remove any initial entries with no pending XIDs.  */
+  while ((b= binlog_xid_count_list.head()) && b->xid_count == 0)
   {
-    /*
-      Now the file was created successfully, so we can link in the entry for
-      the new binlog file in binlog_xid_count_list.
-    */
-    mysql_mutex_lock(&LOCK_xid_list);
-    ++current_binlog_id;
-    new_xid_list_entry->binlog_id= current_binlog_id;
-    /* Remove any initial entries with no pending XIDs.  */
-    while ((b= binlog_xid_count_list.head()) && b->xid_count == 0)
-    {
-      WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::open(): Removing xid_list_entry for "
-                           "%s (%lu)", b);
-      delete binlog_xid_count_list.get();
-    }
-    mysql_cond_broadcast(&COND_xid_list);
-    WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::open(): Adding new xid_list_entry for "
-                         "%s (%lu)", new_xid_list_entry);
-    binlog_xid_count_list.push_back(new_xid_list_entry);
-    mysql_mutex_unlock(&LOCK_xid_list);
+    WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::open(): Removing xid_list_entry for "
+                          "%s (%lu)", b);
+    delete binlog_xid_count_list.get();
+  }
+  mysql_cond_broadcast(&COND_xid_list);
+  WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::open(): Adding new xid_list_entry for "
+                        "%s (%lu)", new_xid_list_entry);
+  binlog_xid_count_list.push_back(new_xid_list_entry);
+  mysql_mutex_unlock(&LOCK_xid_list);
 
-    /*
-      Now that we have synced a new binlog file with an initial Gtid_list
-      event, it is safe to delete the binlog state file. We will write out
-      a new, updated file at shutdown, and if we crash before we can recover
-      the state from the newly written binlog file.
+  /*
+    Now that we have synced a new binlog file with an initial Gtid_list
+    event, it is safe to delete the binlog state file. We will write out
+    a new, updated file at shutdown, and if we crash before we can recover
+    the state from the newly written binlog file.
 
-      Since the state file will contain out-of-date data as soon as the first
-      new GTID is binlogged, it is better to remove it, to avoid any risk of
-      accidentally reading incorrect data later.
-    */
-    if (!state_file_deleted)
-    {
-      char buf[FN_REFLEN];
-      fn_format(buf, opt_bin_logname, mysql_data_home, ".state",
-                MY_UNPACK_FILENAME);
-      my_delete(buf, MY_SYNC_DIR);
-      state_file_deleted= true;
-    }
+    Since the state file will contain out-of-date data as soon as the first
+    new GTID is binlogged, it is better to remove it, to avoid any risk of
+    accidentally reading incorrect data later.
+  */
+  if (!state_file_deleted)
+  {
+    char buf[FN_REFLEN];
+    fn_format(buf, opt_bin_logname, mysql_data_home, ".state",
+              MY_UNPACK_FILENAME);
+    my_delete(buf, MY_SYNC_DIR);
+    state_file_deleted= true;
   }
 
   log_state= LOG_OPENED;
@@ -6199,6 +6188,7 @@ int MYSQL_BINARY_LOG::new_file_impl()
   DBUG_ENTER("MYSQL_BINARY_LOG::new_file_impl");
 
   DBUG_ASSERT(log_type == LOG_BIN);
+  DBUG_ASSERT(!is_relay_log);
   mysql_mutex_assert_owner(&LOCK_log);
 
   if (!is_open())
@@ -6266,20 +6256,17 @@ int MYSQL_BINARY_LOG::new_file_impl()
   old_name=name;
   name=0;				// Don't free name
   close_flag= LOG_CLOSE_TO_BE_OPENED | LOG_CLOSE_INDEX;
-  if (!is_relay_log)
-  {
-    /*
-      We need to keep the old binlog file open (and marked as in-use) until
-      the new one is fully created and synced to disk and index. Otherwise we
-      leave a window where if we crash, there is no binlog file marked as
-      crashed for server restart to detect the need for recovery.
-    */
-    old_file= log_file.file;
-    close_flag|= LOG_CLOSE_DELAYED_CLOSE;
-    delay_close= true;
-    if (binlog_space_limit)
-      binlog_space_total+= binlog_end_pos;
-  }
+  /*
+    We need to keep the old binlog file open (and marked as in-use) until
+    the new one is fully created and synced to disk and index. Otherwise we
+    leave a window where if we crash, there is no binlog file marked as
+    crashed for server restart to detect the need for recovery.
+  */
+  old_file= log_file.file;
+  close_flag|= LOG_CLOSE_DELAYED_CLOSE;
+  delay_close= true;
+  if (binlog_space_limit)
+    binlog_space_total+= binlog_end_pos;
   close(close_flag);
   if (checksum_alg_reset != BINLOG_CHECKSUM_ALG_UNDEF)
   {
