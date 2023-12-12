@@ -5219,7 +5219,7 @@ void MYSQL_BIN_LOG::wait_for_last_checkpoint_event()
 
 #ifdef HAVE_REPLICATION
 
-int MYSQL_BIN_LOG::purge_first_log(Relay_log_info* rli, bool included)
+int MYSQL_RELAY_LOG::purge_first_log(Relay_log_info* rli, bool included)
 {
   int error, errcode;
   char *to_purge_if_included= NULL;
@@ -6506,7 +6506,7 @@ err:
   DBUG_RETURN(error);
 }
 
-bool MYSQL_BIN_LOG::write_event_buffer(uchar* buf, uint len)
+bool MYSQL_RELAY_LOG::write_event_buffer(uchar* buf, uint len)
 {
   bool error= 1;
   uchar *ebuf= 0;
@@ -6592,7 +6592,7 @@ bool MYSQL_BIN_LOG::flush_and_sync(bool *synced)
   return err;
 }
 
-void MYSQL_BIN_LOG::start_union_events(THD *thd, query_id_t query_id_param)
+void MYSQL_BINARY_LOG::start_union_events(THD *thd, query_id_t query_id_param)
 {
   DBUG_ASSERT(!thd->binlog_evt_union.do_union);
   thd->binlog_evt_union.do_union= TRUE;
@@ -6601,13 +6601,13 @@ void MYSQL_BIN_LOG::start_union_events(THD *thd, query_id_t query_id_param)
   thd->binlog_evt_union.first_query_id= query_id_param;
 }
 
-void MYSQL_BIN_LOG::stop_union_events(THD *thd)
+void MYSQL_BINARY_LOG::stop_union_events(THD *thd)
 {
   DBUG_ASSERT(thd->binlog_evt_union.do_union);
   thd->binlog_evt_union.do_union= FALSE;
 }
 
-bool MYSQL_BIN_LOG::is_query_in_union(THD *thd, query_id_t query_id_param)
+bool MYSQL_BINARY_LOG::is_query_in_union(THD *thd, query_id_t query_id_param)
 {
   return (thd->binlog_evt_union.do_union && 
           query_id_param >= thd->binlog_evt_union.first_query_id);
@@ -7094,7 +7094,7 @@ bool THD::binlog_write_table_maps()
     nonzero if an error pops up when writing the table map event.
 */
 
-bool MYSQL_BIN_LOG::write_table_map(THD *thd, TABLE *table, bool with_annotate)
+bool MYSQL_BINARY_LOG::write_table_map(THD *thd, TABLE *table, bool with_annotate)
 {
   int error= 1;
   bool is_transactional= table->file->row_logging_has_trans;
@@ -8769,7 +8769,7 @@ int query_error_code(THD *thd, bool not_killed)
 }
 
 
-bool MYSQL_BIN_LOG::write_incident_already_locked(THD *thd)
+bool MYSQL_BINARY_LOG::write_incident_already_locked(THD *thd)
 {
   uint error= 0;
   DBUG_ENTER("MYSQL_BIN_LOG::write_incident_already_locked");
@@ -11399,9 +11399,9 @@ int TC_LOG::using_heuristic_recover()
   @retval false            error
 
 */
-bool MYSQL_BIN_LOG::truncate_and_remove_binlogs(const char *file_name,
-                                                my_off_t pos,
-                                                rpl_gtid *ptr_gtid)
+bool MYSQL_BINARY_LOG::truncate_and_remove_binlogs(const char *file_name,
+                                                   my_off_t pos,
+                                                   rpl_gtid *ptr_gtid)
 {
   int error= 0;
 #ifdef HAVE_REPLICATION
@@ -11532,6 +11532,8 @@ end:
 #endif
   return error > 0;
 }
+
+
 int TC_LOG_BINLOG::open(const char *opt_name)
 {
   int      error= 1;
@@ -12100,7 +12102,7 @@ public:
     a truncated tail get rolled back, otherwise they are committed.
     Both decisions are contingent on safety to truncate.
   */
-  bool complete(MYSQL_BIN_LOG *log, HASH &xids);
+  bool complete(MYSQL_BINARY_LOG *log, HASH &xids);
 
   /*
     decides on commit of xid passed through member argument.
@@ -12195,7 +12197,7 @@ public:
                           enum_binlog_checksum_alg fd_checksum_alg);
 };
 
-bool Recovery_context::complete(MYSQL_BIN_LOG *log, HASH &xids)
+bool Recovery_context::complete(MYSQL_BINARY_LOG *log, HASH &xids)
 {
   if (!do_truncate || is_safe_to_truncate())
   {
@@ -12800,7 +12802,7 @@ int TC_LOG_BINLOG::recover(LOG_INFO *linfo, const char *last_log_name,
 #ifndef HAVE_REPLICATION
       if (ha_recover_complete(&xids))
 #else
-      if (ctx.complete(this, xids))
+      if (ctx.complete((MYSQL_BINARY_LOG *)this, xids))
 #endif
         goto err2;
     }

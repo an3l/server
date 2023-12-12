@@ -787,6 +787,7 @@ public:
   void commit_checkpoint_notify(void *cookie);
   int recover(LOG_INFO *linfo, const char *last_log_name, IO_CACHE *first_log,
               Format_description_log_event *fdle, bool do_xa);
+  void write_binlog_checkpoint_event_already_locked(const char *name, uint len); // TC_LOG_BINLOG::unlog
   int do_binlog_recovery(const char *opt_name, bool do_xa_recovery);
 #if !defined(MYSQL_CLIENT)
   static int remove_pending_rows_event(THD *thd, binlog_cache_data *cache_data);
@@ -863,22 +864,12 @@ public:
                        const char *log_name, bool need_mutex);
   /* Use this to start writing a new log file */
   int new_file();
-  bool write_incident_already_locked(THD *thd);
-  void write_binlog_checkpoint_event_already_locked(const char *name, uint len);
-  bool write_table_map(THD *thd, TABLE *table, bool with_annotate);
-  void start_union_events(THD *thd, query_id_t query_id_param);
-  void stop_union_events(THD *thd);
-  bool is_query_in_union(THD *thd, query_id_t query_id_param);
-
   using Event_log::write_event;
-
   bool write_event(Log_event *ev, enum enum_binlog_checksum_alg checksum_alg)
   {
     return write_event(ev, checksum_alg, 0, &log_file);
   }
   bool write_event(Log_event *ev);
-
-  bool write_event_buffer(uchar* buf,uint len);
   bool append(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
   bool append_no_lock(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
 
@@ -904,7 +895,6 @@ public:
   int purge_logs(const char *to_log, bool included,
                  bool need_mutex, bool need_update_threads,
                  ulonglong *decrease_log_space);
-  int purge_first_log(Relay_log_info* rli, bool included);
   int count_binlog_space();
   void count_binlog_space_with_lock()
   {
@@ -916,9 +906,6 @@ public:
   ulonglong get_binlog_space_total();
   int set_purge_index_file_name(const char *base_file_name);
   int open_purge_index_file(bool destroy);
-  bool truncate_and_remove_binlogs(const char *truncate_file,
-                                   my_off_t truncate_pos,
-                                   rpl_gtid *gtid);
   bool is_inited_purge_index_file();
   int close_purge_index_file();
   int clean_purge_index_file();
@@ -1149,6 +1136,15 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   void do_checkpoint_request(ulong binlog_id);
   bool write_incident(THD *thd);
   void checkpoint_and_purge(ulong binlog_id);
+  bool write_incident_already_locked(THD *thd);
+  bool write_table_map(THD *thd, TABLE *table, bool with_annotate);
+  void start_union_events(THD *thd, query_id_t query_id_param);
+  void stop_union_events(THD *thd);
+  bool is_query_in_union(THD *thd, query_id_t query_id_param);
+  bool truncate_and_remove_binlogs(const char *truncate_file,
+                                   my_off_t truncate_pos,
+                                   rpl_gtid *gtid);
+
 };
 
 
@@ -1226,7 +1222,8 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
                   ulong next_log_number) override;
   using MYSQL_BIN_LOG::close;
   void close(uint exiting) override;
-
+  bool write_event_buffer(uchar* buf,uint len);
+  int purge_first_log(Relay_log_info* rli, bool included);
 };
 
 
