@@ -1154,10 +1154,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
             ulong max_size,
             bool null_created,
             bool need_mutex) override;
-  int new_file_impl() override
-  {
-    return 0;
-  }
+  int new_file_impl() override;
   void signal_relay_binlog() override
   {
     signal_relay_log_update();
