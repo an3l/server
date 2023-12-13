@@ -776,7 +776,6 @@ public:
     return this;
   }
 
-  int open(const char *opt_name);
   void close();
   virtual int generate_new_name(char *new_name, const char *log_name,
                                 ulong next_log_number);
@@ -785,10 +784,9 @@ public:
   int unlog(ulong cookie, my_xid xid);
   int unlog_xa_prepare(THD *thd, bool all);
   void commit_checkpoint_notify(void *cookie);
-  int recover(LOG_INFO *linfo, const char *last_log_name, IO_CACHE *first_log,
-              Format_description_log_event *fdle, bool do_xa);
+
   void write_binlog_checkpoint_event_already_locked(const char *name, uint len); // TC_LOG_BINLOG::unlog
-  int do_binlog_recovery(const char *opt_name, bool do_xa_recovery);
+
 #if !defined(MYSQL_CLIENT)
   static int remove_pending_rows_event(THD *thd, binlog_cache_data *cache_data);
 
@@ -895,15 +893,6 @@ public:
   int purge_logs(const char *to_log, bool included,
                  bool need_mutex, bool need_update_threads,
                  ulonglong *decrease_log_space);
-  int count_binlog_space();
-  void count_binlog_space_with_lock()
-  {
-    mysql_mutex_lock(&LOCK_index);
-    count_binlog_space();
-    mysql_mutex_unlock(&LOCK_index);
-  }
-  void reset_binlog_space_total() { binlog_space_total= 0; }
-  ulonglong get_binlog_space_total();
   int set_purge_index_file_name(const char *base_file_name);
   int open_purge_index_file(bool destroy);
   bool is_inited_purge_index_file();
@@ -914,7 +903,6 @@ public:
   int register_create_index_entry(const char* entry);
   int purge_index_entry(THD *thd, ulonglong *decrease_log_space,
                         bool need_mutex);
-  void wait_for_last_checkpoint_event();
   void clear_inuse_flag_when_closing(File file);
 
   // iterating through the log index file
@@ -927,15 +915,12 @@ public:
   inline char* get_index_fname() { return index_file_name;}
   inline char* get_log_fname() { return log_file_name; }
   using MYSQL_LOG::get_log_lock;
-  inline mysql_cond_t* get_bin_log_cond() { return &COND_bin_log_updated; }
   inline IO_CACHE* get_log_file() { return &log_file; }
-  inline uint64 get_reset_master_count() { return reset_master_count; }
 
   inline void lock_index() { mysql_mutex_lock(&LOCK_index);}
   inline void unlock_index() { mysql_mutex_unlock(&LOCK_index);}
   inline IO_CACHE *get_index_file() { return &index_file;}
   inline uint32 get_open_count() { return open_count; }
-  void set_status_variables(THD *thd);
   bool is_xidlist_idle();
   bool write_gtid_event(THD *thd, bool standalone, bool is_transactional,
                         uint64 commit_id,
@@ -1012,6 +997,7 @@ public:
   char binlog_end_pos_file[FN_REFLEN];
   virtual ~MYSQL_BIN_LOG() = default;
   virtual bool can_purge_log(const char *log_file_name) = 0;
+  virtual int open(const char *opt_name)=0;
   virtual bool open(const char *log_name,
                     const char *new_name,
                     ulong next_log_number,
@@ -1096,7 +1082,7 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   }
   bool can_purge_log(const char *log_file_name) override;
   void cleanup() override;
-  using MYSQL_BIN_LOG::open;
+  int open(const char *opt_name) override;
   bool open(const char *log_name,
             const char *new_name,
             ulong next_log_number,
@@ -1144,7 +1130,22 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   bool truncate_and_remove_binlogs(const char *truncate_file,
                                    my_off_t truncate_pos,
                                    rpl_gtid *gtid);
-
+  int recover(LOG_INFO *linfo, const char *last_log_name, IO_CACHE *first_log,
+              Format_description_log_event *fdle, bool do_xa);
+  int do_binlog_recovery(const char *opt_name, bool do_xa_recovery);
+  int count_binlog_space();
+  void count_binlog_space_with_lock()
+  {
+    mysql_mutex_lock(&LOCK_index);
+    count_binlog_space();
+    mysql_mutex_unlock(&LOCK_index);
+  }
+  void reset_binlog_space_total() { binlog_space_total= 0; }
+  ulonglong get_binlog_space_total();
+  void wait_for_last_checkpoint_event();
+  inline mysql_cond_t* get_bin_log_cond() { return &COND_bin_log_updated; }
+  inline uint64 get_reset_master_count() { return reset_master_count; }
+  void set_status_variables(THD *thd);
 };
 
 
@@ -1159,7 +1160,8 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
     description_event_for_queue= 0;
   }
   bool can_purge_log(const char *log_file_name) override;
-  using MYSQL_BIN_LOG::open;
+  //using MYSQL_BIN_LOG::open;
+  int open(const char *opt_name) override { return 0;}
   bool open(const char *log_name,
             const char *new_name,
             ulong next_log_number,

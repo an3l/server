@@ -5156,7 +5156,7 @@ err:
 }
 
 
-void MYSQL_BIN_LOG::wait_for_last_checkpoint_event()
+void MYSQL_BINARY_LOG::wait_for_last_checkpoint_event()
 {
   mysql_mutex_lock(&LOCK_xid_list);
   for (;;)
@@ -5970,12 +5970,12 @@ MYSQL_RELAY_LOG::can_purge_log(const char *log_file_name_arg)
                         mysql_file_stat() or mysql_file_delete()
 */
 
-int MYSQL_BIN_LOG::count_binlog_space()
+int MYSQL_BINARY_LOG::count_binlog_space()
 {
   int error;
   LOG_INFO log_info;
   DBUG_ENTER("count_binlog_space");
-  if (is_relay_log || !binlog_space_limit)
+  if (!binlog_space_limit)
     DBUG_RETURN(0);
 
   binlog_space_total = 0;
@@ -6004,7 +6004,7 @@ done:
 }
 
 
-ulonglong MYSQL_BIN_LOG::get_binlog_space_total()
+ulonglong MYSQL_BINARY_LOG::get_binlog_space_total()
 {
   ulonglong used_space= 0;
   mysql_mutex_lock(&LOCK_log);
@@ -11534,7 +11534,7 @@ end:
 }
 
 
-int TC_LOG_BINLOG::open(const char *opt_name)
+int MYSQL_BINARY_LOG::open(const char *opt_name)
 {
   int      error= 1;
   DBUG_ENTER("TC_LOG_BINLOG::open");
@@ -12542,7 +12542,7 @@ int Recovery_context::next_binlog_or_round(int& round,
                    logged and thus don't have to be redone).
 */
 
-int TC_LOG_BINLOG::recover(LOG_INFO *linfo, const char *last_log_name,
+int MYSQL_BINARY_LOG::recover(LOG_INFO *linfo, const char *last_log_name,
                            IO_CACHE *first_log,
                            Format_description_log_event *fdle, bool do_xa)
 {
@@ -12834,9 +12834,8 @@ err1:
 }
 
 
-
 int
-MYSQL_BIN_LOG::do_binlog_recovery(const char *opt_name, bool do_xa_recovery)
+MYSQL_BINARY_LOG::do_binlog_recovery(const char *opt_name, bool do_xa_recovery)
 {
   LOG_INFO log_info;
   const char *errmsg;
@@ -13063,7 +13062,7 @@ set_binlog_snapshot_file(const char *src)
   This is called only under LOCK_all_status_vars, so we can fill in a static array.
 */
 void
-TC_LOG_BINLOG::set_status_variables(THD *thd)
+MYSQL_BINARY_LOG::set_status_variables(THD *thd)
 {
   binlog_cache_mngr *cache_mngr;
 
