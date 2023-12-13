@@ -651,7 +651,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   ulong last_used_log_number;
   // current file sequence number for load data infile binary logging
   uint file_id;
-  uint open_count;				// For replication
   int readers_count;
   mysql_cond_t COND_queue_busy;
   /* Total number of committed transactions. */
@@ -676,7 +675,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   }
 
   int write_to_file(IO_CACHE *cache);
-  bool is_xidlist_idle_nolock();
 protected:
   MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
   mysql_mutex_t LOCK_xid_list;
@@ -919,24 +917,6 @@ public:
   inline void lock_index() { mysql_mutex_lock(&LOCK_index);}
   inline void unlock_index() { mysql_mutex_unlock(&LOCK_index);}
   inline IO_CACHE *get_index_file() { return &index_file;}
-  inline uint32 get_open_count() { return open_count; }
-  bool is_xidlist_idle();
-  bool write_gtid_event(THD *thd, bool standalone, bool is_transactional,
-                        uint64 commit_id,
-                        bool has_xid= false, bool ro_1pc= false);
-  int read_state_from_file();
-  int write_state_to_file();
-  int get_most_recent_gtid_list(rpl_gtid **list, uint32 *size);
-  bool append_state_pos(String *str);
-  bool append_state(String *str);
-  bool is_empty_state();
-  bool find_in_binlog_state(uint32 domain_id, uint32 server_id,
-                            rpl_gtid *out_gtid);
-  bool lookup_domain_in_binlog_state(uint32 domain_id, rpl_gtid *out_gtid);
-  int bump_seq_no_counter_if_needed(uint32 domain_id, uint64 seq_no);
-  bool check_strict_gtid_sequence(uint32 domain_id, uint32 server_id,
-                                  uint64 seq_no, bool no_error= false);
-
   /**
    * used when opening new file, and binlog_end_pos moves backwards
    */
@@ -1004,6 +984,7 @@ public:
                     ulong max_size,
                     bool null_created,
                     bool need_mutex) = 0;
+  virtual void close(uint exiting) = 0;
   virtual void cleanup() = 0;
   /*
     This is used to start writing to a new log file. The difference from
@@ -1015,7 +996,6 @@ public:
   virtual bool reset_logs(THD* thd, bool create_new_log,
                           rpl_gtid *init_state, uint32 init_state_len,
                           ulong next_log_number) = 0;
-  virtual void close(uint exiting);
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
 };
@@ -1072,6 +1052,7 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   int write_transaction_or_stmt(group_commit_entry *entry, uint64 commit_id);
   int queue_for_group_commit(group_commit_entry *entry);
   void trx_group_commit_leader(group_commit_entry *leader);
+  bool is_xidlist_idle_nolock();
   public:
   MYSQL_BINARY_LOG(uint *sync_period, bool is_relay_log= 0)
     :MYSQL_BIN_LOG(sync_period, is_relay_log)
@@ -1089,6 +1070,8 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
             ulong max_size,
             bool null_created,
             bool need_mutex) override;
+  using MYSQL_BIN_LOG::close;
+  void close(uint exiting) override;
   int new_file_impl() override;
   void signal_relay_binlog() override
   {
@@ -1145,18 +1128,37 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   inline mysql_cond_t* get_bin_log_cond() { return &COND_bin_log_updated; }
   inline uint64 get_reset_master_count() { return reset_master_count; }
   void set_status_variables(THD *thd);
+  bool write_gtid_event(THD *thd, bool standalone, bool is_transactional,
+                        uint64 commit_id,
+                        bool has_xid= false, bool ro_1pc= false);
+  bool is_xidlist_idle();
+  int read_state_from_file();
+  int write_state_to_file();
+  int get_most_recent_gtid_list(rpl_gtid **list, uint32 *size);
+  bool append_state_pos(String *str);
+  bool append_state(String *str);
+  bool is_empty_state();
+
+  bool find_in_binlog_state(uint32 domain_id, uint32 server_id,
+                            rpl_gtid *out_gtid);
+  bool lookup_domain_in_binlog_state(uint32 domain_id, rpl_gtid *out_gtid);
+  int bump_seq_no_counter_if_needed(uint32 domain_id, uint64 seq_no);
+  bool check_strict_gtid_sequence(uint32 domain_id, uint32 server_id,
+                                  uint64 seq_no, bool no_error= false);
 };
 
 
 class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
 {
+  uint open_count;				// For replication
   public:
   MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log= 1)
-    :MYSQL_BIN_LOG(sync_period, is_relay_log) 
+    :MYSQL_BIN_LOG(sync_period, is_relay_log)
   {
     relay_log_checksum_alg= BINLOG_CHECKSUM_ALG_UNDEF;
     description_event_for_exec= 0;
     description_event_for_queue= 0;
+    open_count= 1;
   }
   bool can_purge_log(const char *log_file_name) override;
   //using MYSQL_BIN_LOG::open;
@@ -1226,6 +1228,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   bool write_event_buffer(uchar* buf,uint len);
   int purge_first_log(Relay_log_info* rli, bool included);
   void wait_for_update_relay_log(THD* thd);
+  inline uint32 get_open_count() { return open_count; }
 };
 
 

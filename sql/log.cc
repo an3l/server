@@ -3736,7 +3736,7 @@ const char *MYSQL_LOG::generate_name(const char *log_name,
 MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log)
   :reset_master_pending(0), mark_xid_done_waiting(0),
    bytes_written(0), binlog_space_total(0),
-   last_used_log_number(0), file_id(1), open_count(1),
+   last_used_log_number(0), file_id(1),
    num_commits(0), num_group_commits(0),
    group_commit_trigger_count(0), group_commit_trigger_timeout(0),
    group_commit_trigger_lock_wait(0),
@@ -4327,8 +4327,6 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
   }
 
   init(max_size_arg);
-
-  open_count++;
 
   DBUG_ASSERT(log_type == LOG_BIN);
 
@@ -6018,7 +6016,7 @@ ulonglong MYSQL_BINARY_LOG::get_binlog_space_total()
 }
 
 bool
-MYSQL_BIN_LOG::is_xidlist_idle()
+MYSQL_BINARY_LOG::is_xidlist_idle()
 {
   bool res;
   mysql_mutex_lock(&LOCK_xid_list);
@@ -6029,7 +6027,7 @@ MYSQL_BIN_LOG::is_xidlist_idle()
 
 
 bool
-MYSQL_BIN_LOG::is_xidlist_idle_nolock()
+MYSQL_BINARY_LOG::is_xidlist_idle_nolock()
 {
   xid_count_per_binlog *b;
 
@@ -6131,7 +6129,6 @@ int MYSQL_RELAY_LOG::new_file_impl()
   char new_name[FN_REFLEN];
   char *new_name_ptr, *old_name, *file_to_open;
   uint close_flag;
-  File UNINIT_VAR(old_file);
   DBUG_ENTER("MYSQL_RELAY_LOG::new_file_impl");
 
   DBUG_ASSERT(log_type == LOG_BIN);
@@ -7416,9 +7413,9 @@ Event_log::prepare_pending_rows_event(THD *thd, TABLE* table,
 /* Generate a new global transaction ID, and write it to the binlog */
 
 bool
-MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
-                                bool is_transactional, uint64 commit_id,
-                                bool has_xid, bool is_ro_1pc)
+MYSQL_BINARY_LOG::write_gtid_event(THD *thd, bool standalone,
+                                   bool is_transactional, uint64 commit_id,
+                                   bool has_xid, bool is_ro_1pc)
 {
   rpl_gtid gtid;
   uint32 domain_id;
@@ -7495,7 +7492,7 @@ MYSQL_BIN_LOG::write_gtid_event(THD *thd, bool standalone,
 
 
 int
-MYSQL_BIN_LOG::write_state_to_file()
+MYSQL_BINARY_LOG::write_state_to_file()
 {
   File file_no;
   IO_CACHE cache;
@@ -7548,7 +7545,7 @@ end:
     1 for other error.
 */
 int
-MYSQL_BIN_LOG::read_state_from_file()
+MYSQL_BINARY_LOG::read_state_from_file()
 {
   File file_no;
   IO_CACHE cache;
@@ -7600,36 +7597,36 @@ end:
 
 
 int
-MYSQL_BIN_LOG::get_most_recent_gtid_list(rpl_gtid **list, uint32 *size)
+MYSQL_BINARY_LOG::get_most_recent_gtid_list(rpl_gtid **list, uint32 *size)
 {
   return rpl_global_gtid_binlog_state.get_most_recent_gtid_list(list, size);
 }
 
 
 bool
-MYSQL_BIN_LOG::append_state_pos(String *str)
+MYSQL_BINARY_LOG::append_state_pos(String *str)
 {
   return rpl_global_gtid_binlog_state.append_pos(str);
 }
 
 
 bool
-MYSQL_BIN_LOG::append_state(String *str)
+MYSQL_BINARY_LOG::append_state(String *str)
 {
   return rpl_global_gtid_binlog_state.append_state(str);
 }
 
 
 bool
-MYSQL_BIN_LOG::is_empty_state()
+MYSQL_BINARY_LOG::is_empty_state()
 {
   return (rpl_global_gtid_binlog_state.count() == 0);
 }
 
 
 bool
-MYSQL_BIN_LOG::find_in_binlog_state(uint32 domain_id, uint32 server_id_arg,
-                                    rpl_gtid *out_gtid)
+MYSQL_BINARY_LOG::find_in_binlog_state(uint32 domain_id, uint32 server_id_arg,
+                                       rpl_gtid *out_gtid)
 {
   rpl_gtid *gtid;
   if ((gtid= rpl_global_gtid_binlog_state.find(domain_id, server_id_arg)))
@@ -7639,8 +7636,8 @@ MYSQL_BIN_LOG::find_in_binlog_state(uint32 domain_id, uint32 server_id_arg,
 
 
 bool
-MYSQL_BIN_LOG::lookup_domain_in_binlog_state(uint32 domain_id,
-                                             rpl_gtid *out_gtid)
+MYSQL_BINARY_LOG::lookup_domain_in_binlog_state(uint32 domain_id,
+                                                rpl_gtid *out_gtid)
 {
   rpl_gtid *found_gtid;
 
@@ -7655,17 +7652,17 @@ MYSQL_BIN_LOG::lookup_domain_in_binlog_state(uint32 domain_id,
 
 
 int
-MYSQL_BIN_LOG::bump_seq_no_counter_if_needed(uint32 domain_id, uint64 seq_no)
+MYSQL_BINARY_LOG::bump_seq_no_counter_if_needed(uint32 domain_id, uint64 seq_no)
 {
   return rpl_global_gtid_binlog_state.bump_seq_no_if_needed(domain_id, seq_no);
 }
 
 
 bool
-MYSQL_BIN_LOG::check_strict_gtid_sequence(uint32 domain_id,
-                                          uint32 server_id_arg,
-                                          uint64 seq_no,
-                                          bool no_error)
+MYSQL_BINARY_LOG::check_strict_gtid_sequence(uint32 domain_id,
+                                             uint32 server_id_arg,
+                                             uint64 seq_no,
+                                             bool no_error)
 {
   return rpl_global_gtid_binlog_state.check_strict_sequence(domain_id,
                                                             server_id_arg,
@@ -10105,7 +10102,7 @@ void MYSQL_RELAY_LOG::close(uint exiting)
 {
 // One can't set log_type here!
   bool failed_to_save_state= false;
-  DBUG_ENTER("MYSQL_BIN_LOG::close");
+  DBUG_ENTER("MYSQL_RELAY_LOG::close");
   DBUG_PRINT("enter",("exiting: %d", (int) exiting));
 
   mysql_mutex_assert_owner(&LOCK_log);
@@ -10184,11 +10181,11 @@ void MYSQL_RELAY_LOG::close(uint exiting)
     The internal structures are not freed until cleanup() is called
 */
 
-void MYSQL_BIN_LOG::close(uint exiting)
+void MYSQL_BINARY_LOG::close(uint exiting)
 {
   // One can't set log_type here!
   bool failed_to_save_state= false;
-  DBUG_ENTER("MYSQL_BIN_LOG::close");
+  DBUG_ENTER("MYSQL_BINARY_LOG::close");
   DBUG_PRINT("enter",("exiting: %d", (int) exiting));
 
   mysql_mutex_assert_owner(&LOCK_log);
@@ -10217,7 +10214,7 @@ void MYSQL_BIN_LOG::close(uint exiting)
         Note that this must be written and synced to disk before marking the
         last binlog file as "not crashed".
       */
-      if (!is_relay_log && write_state_to_file())
+      if (write_state_to_file())
       {
         sql_print_error("Failed to save binlog GTID state during shutdown. "
                         "Binlog will be marked as crashed, so that crash "
