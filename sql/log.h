@@ -649,7 +649,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
     return *sync_period_ptr;
   }
 protected:
-  MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
+  MYSQL_BIN_LOG(uint *sync_period);
   mysql_mutex_t LOCK_xid_list;
 public:
   int new_file_without_locking();
@@ -687,6 +687,7 @@ public:
       my_free(binlog_name);
     }
   };
+  bool is_relay_log;
   I_List<xid_count_per_binlog> binlog_xid_count_list;
   mysql_mutex_t LOCK_binlog_background_thread;
   mysql_cond_t COND_binlog_background_thread;
@@ -695,8 +696,6 @@ public:
   using MYSQL_LOG::generate_name;
   using MYSQL_LOG::is_open;
 
-  /* This is relay log */
-  bool is_relay_log;
   ulong relay_signal_cnt;  // update of the counter is checked by heartbeat
   enum enum_binlog_checksum_alg checksum_alg_reset; // to contain a new value when binlog is rotated
   /*
@@ -842,7 +841,7 @@ public:
     LOCK_log.
   */
   virtual int new_file_impl() = 0;
-  virtual void signal_relay_binlog() = 0;
+  virtual void signal_relay_or_binlog_update() = 0;
   virtual bool reset_logs(THD* thd, bool create_new_log,
                           rpl_gtid *init_state, uint32 init_state_len,
                           ulong next_log_number) = 0;
@@ -944,9 +943,10 @@ public:
     Tracks the number of times that the master has been reset
   */
   Atomic_counter<uint64> reset_master_count;
-  MYSQL_BINARY_LOG(uint *sync_period, bool is_relay_log= 0)
-    :MYSQL_BIN_LOG(sync_period, is_relay_log)
+  MYSQL_BINARY_LOG(uint *sync_period)
+    :MYSQL_BIN_LOG(sync_period)
   {
+    is_relay_log= 0;
     group_commit_queue= 0;
     group_commit_queue_busy= FALSE;
     reset_master_pending= 0;
@@ -976,10 +976,7 @@ public:
   using MYSQL_BIN_LOG::close;
   void close(uint exiting) override;
   int new_file_impl() override;
-  void signal_relay_binlog() override
-  {
-    update_binlog_end_pos();
-  }
+  void signal_relay_or_binlog_update() override { update_binlog_end_pos(); }
   bool reset_logs(THD* thd, bool create_new_log,
                   rpl_gtid *init_state, uint32 init_state_len,
                   ulong next_log_number) override;
@@ -1110,7 +1107,6 @@ public:
   void signal_bin_log_update()
   {
     mysql_mutex_assert_owner(&LOCK_binlog_end_pos);
-    DBUG_ASSERT(!is_relay_log);
     DBUG_ENTER("MYSQL_BIN_LOG::signal_bin_log_update");
     mysql_cond_broadcast(&COND_bin_log_updated);
     DBUG_VOID_RETURN;
@@ -1122,9 +1118,10 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
 {
   uint open_count;				// For replication
   public:
-  MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log= 1)
-    :MYSQL_BIN_LOG(sync_period, is_relay_log)
+  MYSQL_RELAY_LOG(uint *sync_period)
+    :MYSQL_BIN_LOG(sync_period)
   {
+    is_relay_log= 1;
     relay_log_checksum_alg= BINLOG_CHECKSUM_ALG_UNDEF;
     description_event_for_exec= 0;
     description_event_for_queue= 0;
@@ -1141,10 +1138,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
             bool null_created,
             bool need_mutex) override;
   int new_file_impl() override;
-  void signal_relay_binlog() override
-  {
-    signal_relay_log_update();
-  }
+  void signal_relay_or_binlog_update() override { signal_relay_log_update(); }
   /*
     Holds the last seen in Relay-Log FD's checksum alg value.
     The initial value comes from the slave's local FD that heads
@@ -1217,7 +1211,6 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   void signal_relay_log_update()
   {
     mysql_mutex_assert_owner(&LOCK_log);
-    DBUG_ASSERT(is_relay_log);
     DBUG_ENTER("MYSQL_BIN_LOG::signal_relay_log_update");
     relay_signal_cnt++;
     mysql_cond_broadcast(&COND_relay_log_updated);

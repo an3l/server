@@ -3733,12 +3733,12 @@ const char *MYSQL_LOG::generate_name(const char *log_name,
 #define WSREP_XID_LIST_ENTRY(X, Y) do { } while(0)
 #endif
 
-MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log)
+MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
   :
    bytes_written(0),
    last_used_log_number(0),
    sync_period_ptr(sync_period), sync_counter(0),
-   is_relay_log(is_relay_log), relay_signal_cnt(0),
+   relay_signal_cnt(0),
    checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF)
 {
   /*
@@ -3771,7 +3771,6 @@ void MYSQL_BINARY_LOG::stop_background_thread()
 /* this is called only once */
 void MYSQL_RELAY_LOG::cleanup()
 {
-  DBUG_ASSERT(is_relay_log);
   if (inited)
   {
     inited= 0;
@@ -3799,7 +3798,6 @@ void MYSQL_RELAY_LOG::cleanup()
 void MYSQL_BINARY_LOG::cleanup()
 {
   DBUG_ENTER("cleanup");
-  DBUG_ASSERT(!is_relay_log);
   if (inited)
   {
     xid_count_per_binlog *b;
@@ -4033,7 +4031,6 @@ bool MYSQL_RELAY_LOG::open(const char *log_name,
                            bool null_created_arg,
                            bool need_mutex)
 {
-  DBUG_ASSERT(is_relay_log);
   File file= -1;
   DBUG_ENTER("MYSQL_RELAY_LOG::open");
   mysql_mutex_assert_owner(&LOCK_log);
@@ -4127,7 +4124,7 @@ bool MYSQL_RELAY_LOG::open(const char *log_name,
       alg= relay_log_checksum_alg;
 
       longlong written= write_description_event(alg, encrypt_binlog,
-                                                null_created_arg, is_relay_log);
+                                                null_created_arg, true);
       if (written == -1)
         goto err;
       bytes_written+= written;
@@ -4246,7 +4243,6 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
                             bool null_created_arg,
                             bool need_mutex)
 {
-  DBUG_ASSERT(!is_relay_log);
   File file= -1;
   xid_count_per_binlog *new_xid_list_entry= NULL, *b;
   DBUG_ENTER("MYSQL_BIN_LOG::open");
@@ -4821,7 +4817,7 @@ bool MYSQL_BINARY_LOG::reset_logs(THD *thd, bool create_new_log,
   int err;
   const char* save_name;
   DBUG_ENTER("reset_logs");
-  DBUG_ASSERT(!is_relay_log &&  thd != NULL);
+  DBUG_ASSERT(thd != NULL);
 
   if (init_state && !is_empty_state())
   {
@@ -5061,7 +5057,6 @@ bool MYSQL_RELAY_LOG::reset_logs(THD *thd, bool create_new_log,
   int err;
   const char* save_name;
   DBUG_ENTER("reset_logs");
-  DBUG_ASSERT(is_relay_log);
   /*
     We need to get both locks to be sure that no one is trying to
     write to the index log file.
@@ -5942,7 +5937,6 @@ bool
 MYSQL_RELAY_LOG::can_purge_log(const char *log_file_name_arg)
 {
   bool res;
-  DBUG_ASSERT(is_relay_log);
   if (is_active(log_file_name_arg))
       return false;
 
@@ -6281,7 +6275,6 @@ int MYSQL_BINARY_LOG::new_file_impl()
   DBUG_ENTER("MYSQL_BINARY_LOG::new_file_impl");
 
   DBUG_ASSERT(log_type == LOG_BIN);
-  DBUG_ASSERT(!is_relay_log);
   mysql_mutex_assert_owner(&LOCK_log);
 
   if (!is_open())
@@ -6363,7 +6356,6 @@ int MYSQL_BINARY_LOG::new_file_impl()
   close(close_flag);
   if (checksum_alg_reset != BINLOG_CHECKSUM_ALG_UNDEF)
   {
-    DBUG_ASSERT(!is_relay_log);
     DBUG_ASSERT(binlog_checksum_options != checksum_alg_reset);
     binlog_checksum_options= checksum_alg_reset;
   }
@@ -6494,7 +6486,7 @@ bool MYSQL_BIN_LOG::append_no_lock(Log_event* ev,
   if (my_b_append_tell(&log_file) > max_size)
     error= new_file_without_locking();
 err:
-  signal_relay_binlog();
+  signal_relay_or_binlog_update();
   DBUG_RETURN(error);
 }
 
@@ -7916,7 +7908,6 @@ err:
     {
       my_off_t offset= my_b_tell(file);
       bool check_purge= false;
-      DBUG_ASSERT(!is_relay_log);
 
       if (likely(!error))
       {
