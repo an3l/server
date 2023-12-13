@@ -170,7 +170,7 @@ static SHOW_VAR binlog_status_vars_detail[]=
  */
 static bool binlog_background_thread_started= false;
 static bool binlog_background_thread_stop= false;
-static MYSQL_BIN_LOG::xid_count_per_binlog *
+static MYSQL_BINARY_LOG::xid_count_per_binlog *
     binlog_background_thread_queue= NULL;
 
 static bool start_binlog_background_thread();
@@ -8061,8 +8061,8 @@ bool general_log_write(THD *thd, enum enum_server_command command,
 static void
 binlog_checkpoint_callback(void *cookie)
 {
-  MYSQL_BIN_LOG::xid_count_per_binlog *entry=
-    (MYSQL_BIN_LOG::xid_count_per_binlog *)cookie;
+  MYSQL_BINARY_LOG::xid_count_per_binlog *entry=
+    (MYSQL_BINARY_LOG::xid_count_per_binlog *)cookie;
   /*
     For every supporting engine, we increment the xid_count and issue a
     commit_checkpoint_request(). Then we can count when all
@@ -11805,7 +11805,7 @@ int TC_LOG_BINLOG::unlog_xa_prepare(THD *thd, bool all)
 
 
 void
-TC_LOG_BINLOG::commit_checkpoint_notify(void *cookie)
+MYSQL_BINARY_LOG::commit_checkpoint_notify(void *cookie)
 {
   xid_count_per_binlog *entry= static_cast<xid_count_per_binlog *>(cookie);
   bool found_entry= false;
@@ -11842,7 +11842,7 @@ pthread_handler_t
 binlog_background_thread(void *arg __attribute__((unused)))
 {
   bool stop;
-  MYSQL_BIN_LOG::xid_count_per_binlog *queue, *next;
+  MYSQL_BINARY_LOG::xid_count_per_binlog *queue, *next;
   THD *thd;
   my_thread_init();
   DBUG_ENTER("binlog_background_thread");

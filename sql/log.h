@@ -653,42 +653,7 @@ protected:
   mysql_mutex_t LOCK_xid_list;
 public:
   int new_file_without_locking();
-  /*
-    A list of struct xid_count_per_binlog is used to keep track of how many
-    XIDs are in prepared, but not committed, state in each binlog. And how
-    many commit_checkpoint_request()'s are pending.
-
-    When count drops to zero in a binlog after rotation, it means that there
-    are no more XIDs in prepared state, so that binlog is no longer needed
-    for XA crash recovery, and we can log a new binlog checkpoint event.
-
-    The list is protected against simultaneous access from multiple
-    threads by LOCK_xid_list.
-  */
-  struct xid_count_per_binlog : public ilink {
-    char *binlog_name;
-    uint binlog_name_len;
-    ulong binlog_id;
-    /* Total prepared XIDs and pending checkpoint requests in this binlog. */
-    long xid_count;
-    long notify_count;
-    /* For linking in requests to the binlog background thread. */
-    xid_count_per_binlog *next_in_queue;
-    xid_count_per_binlog(char *log_file_name, uint log_file_name_len)
-      :binlog_id(0), xid_count(0), notify_count(0)
-    {
-      binlog_name_len= log_file_name_len;
-      binlog_name= (char *) my_malloc(PSI_INSTRUMENT_ME, binlog_name_len, MYF(MY_ZEROFILL));
-      if (binlog_name)
-        memcpy(binlog_name, log_file_name, binlog_name_len);
-    }
-    ~xid_count_per_binlog()
-    {
-      my_free(binlog_name);
-    }
-  };
   bool is_relay_log;
-  I_List<xid_count_per_binlog> binlog_xid_count_list;
   mysql_mutex_t LOCK_binlog_background_thread;
   mysql_cond_t COND_binlog_background_thread;
   mysql_cond_t COND_binlog_background_thread_end;
@@ -744,7 +709,6 @@ public:
   int log_and_order(THD *thd, my_xid xid, bool all,
                     bool need_prepare_ordered, bool need_commit_ordered);
   int unlog_xa_prepare(THD *thd, bool all);
-  void commit_checkpoint_notify(void *cookie);
 #if !defined(MYSQL_CLIENT)
   static int remove_pending_rows_event(THD *thd, binlog_cache_data *cache_data);
 
@@ -846,6 +810,7 @@ public:
                           rpl_gtid *init_state, uint32 init_state_len,
                           ulong next_log_number) = 0;
   virtual int unlog(ulong cookie, my_xid xid) = 0;
+  virtual void commit_checkpoint_notify(void *cookie)= 0;
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
 };
@@ -927,6 +892,41 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   bool is_xidlist_idle_nolock();
 public:
   /*
+    A list of struct xid_count_per_binlog is used to keep track of how many
+    XIDs are in prepared, but not committed, state in each binlog. And how
+    many commit_checkpoint_request()'s are pending.
+
+    When count drops to zero in a binlog after rotation, it means that there
+    are no more XIDs in prepared state, so that binlog is no longer needed
+    for XA crash recovery, and we can log a new binlog checkpoint event.
+
+    The list is protected against simultaneous access from multiple
+    threads by LOCK_xid_list.
+  */
+  struct xid_count_per_binlog : public ilink {
+    char *binlog_name;
+    uint binlog_name_len;
+    ulong binlog_id;
+    /* Total prepared XIDs and pending checkpoint requests in this binlog. */
+    long xid_count;
+    long notify_count;
+    /* For linking in requests to the binlog background thread. */
+    xid_count_per_binlog *next_in_queue;
+    xid_count_per_binlog(char *log_file_name, uint log_file_name_len)
+      :binlog_id(0), xid_count(0), notify_count(0)
+    {
+      binlog_name_len= log_file_name_len;
+      binlog_name= (char *) my_malloc(PSI_INSTRUMENT_ME, binlog_name_len, MYF(MY_ZEROFILL));
+      if (binlog_name)
+        memcpy(binlog_name, log_file_name, binlog_name_len);
+    }
+    ~xid_count_per_binlog()
+    {
+      my_free(binlog_name);
+    }
+  };
+  I_List<xid_count_per_binlog> binlog_xid_count_list;
+  /*
     Binlog position of end of the binlog.
     Access to this is protected by LOCK_binlog_end_pos
 
@@ -981,6 +981,7 @@ public:
                   rpl_gtid *init_state, uint32 init_state_len,
                   ulong next_log_number) override;
   int unlog(ulong cookie, my_xid xid) override;
+  void commit_checkpoint_notify(void *cookie) override;
   void stop_background_thread();
   void write_binlog_checkpoint_event_already_locked(const char *name, uint len);
   bool write_transaction_to_binlog_events(group_commit_entry *entry);
@@ -1190,6 +1191,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   using MYSQL_BIN_LOG::close;
   void close(uint exiting) override;
   int unlog(ulong cookie, my_xid xid) override { return 0; }
+  void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
   bool write_event_buffer(uchar* buf,uint len);
   int purge_first_log(Relay_log_info* rli, bool included);
   void wait_for_update_relay_log(THD* thd);
