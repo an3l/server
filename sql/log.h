@@ -647,22 +647,13 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   {
     return *sync_period_ptr;
   }
+  bool is_relay_log;
+  int new_file_without_locking();
 protected:
   MYSQL_BIN_LOG(uint *sync_period);
 public:
-  int new_file_without_locking();
-  bool is_relay_log;
   using MYSQL_LOG::generate_name;
   using MYSQL_LOG::is_open;
-
-  ulong relay_signal_cnt;  // update of the counter is checked by heartbeat
-  enum enum_binlog_checksum_alg checksum_alg_reset; // to contain a new value when binlog is rotated
-  /*
-    Binlog position of last commit (or non-transactional write) to the binlog.
-    Access to this is protected by LOCK_commit_ordered.
-  */
-  char last_commit_pos_file[FN_REFLEN];
-  my_off_t last_commit_pos_offset;
   /*
     note that there's no destructor ~MYSQL_BIN_LOG() !
     The reason is that we don't want it to be automatically called
@@ -887,6 +878,27 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   void trx_group_commit_leader(group_commit_entry *leader);
   bool is_xidlist_idle_nolock();
 public:
+  MYSQL_BINARY_LOG(uint *sync_period)
+    :MYSQL_BIN_LOG(sync_period)
+  {
+    is_relay_log= 0;
+    group_commit_queue= 0;
+    group_commit_queue_busy= FALSE;
+    reset_master_pending= 0;
+    mark_xid_done_waiting= 0;
+    current_binlog_id= 0;
+    reset_master_count= 0;
+    binlog_space_total= 0;
+    state_file_deleted= FALSE;
+    binlog_state_recover_done= FALSE;
+    num_commits= 0;
+    num_group_commits= 0;
+    group_commit_trigger_count= 0;
+    group_commit_trigger_timeout= 0;
+    group_commit_trigger_lock_wait= 0;
+    file_id= 1;
+    checksum_alg_reset= BINLOG_CHECKSUM_ALG_UNDEF;
+  }
   /*
     A list of struct xid_count_per_binlog is used to keep track of how many
     XIDs are in prepared, but not committed, state in each binlog. And how
@@ -942,26 +954,13 @@ public:
     Tracks the number of times that the master has been reset
   */
   Atomic_counter<uint64> reset_master_count;
-  MYSQL_BINARY_LOG(uint *sync_period)
-    :MYSQL_BIN_LOG(sync_period)
-  {
-    is_relay_log= 0;
-    group_commit_queue= 0;
-    group_commit_queue_busy= FALSE;
-    reset_master_pending= 0;
-    mark_xid_done_waiting= 0;
-    current_binlog_id= 0;
-    reset_master_count= 0;
-    binlog_space_total= 0;
-    state_file_deleted= FALSE;
-    binlog_state_recover_done= FALSE;
-    num_commits= 0;
-    num_group_commits= 0;
-    group_commit_trigger_count= 0;
-    group_commit_trigger_timeout= 0;
-    group_commit_trigger_lock_wait= 0;
-    file_id= 1;
-  }
+  /*
+    Binlog position of last commit (or non-transactional write) to the binlog.
+    Access to this is protected by LOCK_commit_ordered.
+  */
+  char last_commit_pos_file[FN_REFLEN];
+  my_off_t last_commit_pos_offset;
+  enum enum_binlog_checksum_alg checksum_alg_reset; // to contain a new value when binlog is rotated
   bool can_purge_log(const char *log_file_name) override;
   void cleanup() override;
   int open(const char *opt_name) override;
@@ -1117,7 +1116,8 @@ public:
 
 class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
 {
-  uint open_count;				// For replication
+  uint open_count;         // For replication
+  ulong relay_signal_cnt;  // update of the counter is checked by heartbeat
   public:
   MYSQL_RELAY_LOG(uint *sync_period)
     :MYSQL_BIN_LOG(sync_period)
@@ -1127,6 +1127,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
     description_event_for_exec= 0;
     description_event_for_queue= 0;
     open_count= 1;
+    relay_signal_cnt= 0;
   }
   bool can_purge_log(const char *log_file_name) override;
   //using MYSQL_BIN_LOG::open;

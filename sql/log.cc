@@ -3734,12 +3734,8 @@ const char *MYSQL_LOG::generate_name(const char *log_name,
 #endif
 
 MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
-  :
-   bytes_written(0),
-   last_used_log_number(0),
-   sync_period_ptr(sync_period), sync_counter(0),
-   relay_signal_cnt(0),
-   checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF)
+  :bytes_written(0), last_used_log_number(0),
+   sync_period_ptr(sync_period), sync_counter(0)
 {
   /*
     We don't want to initialize locks here as such initialization depends on
