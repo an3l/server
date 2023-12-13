@@ -10049,7 +10049,7 @@ binlog_report_wait_for(THD *thd1, THD *thd2)
     THD::enter_cond() (see NOTES in sql_class.h).
 */
 
-void MYSQL_BIN_LOG::wait_for_update_relay_log(THD* thd)
+void MYSQL_RELAY_LOG::wait_for_update_relay_log(THD* thd)
 {
   PSI_stage_info old_stage;
   DBUG_ENTER("wait_for_update_relay_log");

@@ -855,7 +855,6 @@ public:
     unlock_binlog_end_pos();
   }
 
-  void wait_for_update_relay_log(THD* thd);
   void init(ulong max_size);
   void init_pthread_objects();
   bool open_index_file(const char *index_file_name_arg,
@@ -1226,6 +1225,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   void close(uint exiting) override;
   bool write_event_buffer(uchar* buf,uint len);
   int purge_first_log(Relay_log_info* rli, bool included);
+  void wait_for_update_relay_log(THD* thd);
 };
 
 
