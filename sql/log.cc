@@ -3752,7 +3752,7 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log)
   bzero((char*) &purge_index_file, sizeof(purge_index_file));
 }
 
-void MYSQL_BIN_LOG::stop_background_thread()
+void MYSQL_BINARY_LOG::stop_background_thread()
 {
   if (binlog_background_thread_started)
   {
@@ -6555,9 +6555,7 @@ bool MYSQL_RELAY_LOG::write_event_buffer(uchar* buf, uint len)
 err:
   my_safe_afree(ebuf, len);
   if (likely(!error))
-  {
-    signal_relay_binlog();
-  }
+    signal_relay_log_update();
   DBUG_RETURN(error);
 }
 
@@ -8795,7 +8793,7 @@ bool MYSQL_BINARY_LOG::write_incident(THD *thd)
                             : write_incident_already_locked(thd))) &&
         likely(!(error= flush_and_sync(0))))
     {
-      signal_relay_binlog();
+      update_binlog_end_pos();
       if (unlikely((error= rotate(false, &check_purge))))
         check_purge= false;
     }
@@ -8841,7 +8839,7 @@ bool MYSQL_BINARY_LOG::write_incident(THD *thd)
 }
 
 void
-MYSQL_BIN_LOG::
+MYSQL_BINARY_LOG::
 write_binlog_checkpoint_event_already_locked(const char *name_arg, uint len)
 {
   my_off_t offset;
@@ -10071,8 +10069,8 @@ void MYSQL_RELAY_LOG::wait_for_update_relay_log(THD* thd)
     LOCK_log is released by the caller.
 */
 
-int MYSQL_BIN_LOG::wait_for_update_binlog_end_pos(THD* thd,
-                                                  struct timespec *timeout)
+int MYSQL_BINARY_LOG::wait_for_update_binlog_end_pos(THD* thd,
+                                                     struct timespec *timeout)
 {
   int ret= 0;
   DBUG_ENTER("wait_for_update_binlog_end_pos");
@@ -10115,7 +10113,7 @@ void MYSQL_RELAY_LOG::close(uint exiting)
       write_event(&s, checksum_alg);
       bytes_written+= s.data_written;
       flush_io_cache(&log_file);
-      signal_relay_binlog();
+      signal_relay_log_update();
     }
 #endif /* HAVE_REPLICATION */
 
@@ -10199,7 +10197,7 @@ void MYSQL_BINARY_LOG::close(uint exiting)
       write_event(&s, checksum_alg);
       bytes_written+= s.data_written;
       flush_io_cache(&log_file);
-      signal_relay_binlog();
+      update_binlog_end_pos();
 
       /*
         When we shut down server, write out the binlog state to a separate
@@ -11620,7 +11618,7 @@ TC_LOG_BINLOG::log_and_order(THD *thd, my_xid xid, bool all,
   binary log.
 */
 void
-TC_LOG_BINLOG::mark_xids_active(ulong binlog_id, uint xid_count)
+MYSQL_BINARY_LOG::mark_xids_active(ulong binlog_id, uint xid_count)
 {
   xid_count_per_binlog *b;
 
