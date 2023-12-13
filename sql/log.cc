@@ -3734,17 +3734,12 @@ const char *MYSQL_LOG::generate_name(const char *log_name,
 #endif
 
 MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log)
-  :reset_master_pending(0), mark_xid_done_waiting(0),
-   bytes_written(0), binlog_space_total(0),
-   last_used_log_number(0), file_id(1),
-   num_commits(0), num_group_commits(0),
-   group_commit_trigger_count(0), group_commit_trigger_timeout(0),
-   group_commit_trigger_lock_wait(0),
+  :
+   bytes_written(0),
+   last_used_log_number(0),
    sync_period_ptr(sync_period), sync_counter(0),
-   state_file_deleted(false), binlog_state_recover_done(false),
    is_relay_log(is_relay_log), relay_signal_cnt(0),
-   checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF),
-   current_binlog_id(0), reset_master_count(0)
+   checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF)
 {
   /*
     We don't want to initialize locks here as such initialization depends on
@@ -4557,7 +4552,7 @@ err:
 }
 
 
-int MYSQL_BIN_LOG::get_current_log(LOG_INFO* linfo)
+int MYSQL_BINARY_LOG::get_current_log(LOG_INFO* linfo)
 {
   mysql_mutex_lock(&LOCK_log);
   int ret = raw_get_current_log(linfo);
@@ -4565,7 +4560,7 @@ int MYSQL_BIN_LOG::get_current_log(LOG_INFO* linfo)
   return ret;
 }
 
-int MYSQL_BIN_LOG::raw_get_current_log(LOG_INFO* linfo)
+int MYSQL_BINARY_LOG::raw_get_current_log(LOG_INFO* linfo)
 {
   mysql_mutex_assert_owner(&LOCK_log);
   strmake_buf(linfo->log_file_name, log_file_name);
@@ -8432,7 +8427,7 @@ int MYSQL_BINARY_LOG::rotate_and_purge(bool force_rotate,
   DBUG_RETURN(error);
 }
 
-uint MYSQL_BIN_LOG::next_file_id()
+uint MYSQL_BINARY_LOG::next_file_id()
 {
   uint res;
   mysql_mutex_lock(&LOCK_log);
@@ -11662,13 +11657,13 @@ TC_LOG_BINLOG::mark_xids_active(ulong binlog_id, uint xid_count)
   checkpoint.
 */
 void
-TC_LOG_BINLOG::mark_xid_done(ulong binlog_id, bool write_checkpoint)
+MYSQL_BINARY_LOG::mark_xid_done(ulong binlog_id, bool write_checkpoint)
 {
   xid_count_per_binlog *b;
   bool first;
   ulong current;
 
-  DBUG_ENTER("TC_LOG_BINLOG::mark_xid_done");
+  DBUG_ENTER("MYSQL_BINARY_LOG::mark_xid_done");
 
   mysql_mutex_lock(&LOCK_xid_list);
   current= current_binlog_id;
@@ -11762,7 +11757,7 @@ TC_LOG_BINLOG::mark_xid_done(ulong binlog_id, bool write_checkpoint)
   DBUG_VOID_RETURN;
 }
 
-int TC_LOG_BINLOG::unlog(ulong cookie, my_xid xid)
+int MYSQL_BINARY_LOG::unlog(ulong cookie, my_xid xid)
 {
   DBUG_ENTER("TC_LOG_BINLOG::unlog");
   if (!xid)
