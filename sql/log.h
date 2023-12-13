@@ -611,7 +611,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 
   /* LOCK_log and LOCK_index are inited by init_pthread_objects() */
   mysql_mutex_t LOCK_index;
-  mysql_cond_t  COND_xid_list;
   mysql_cond_t  COND_relay_log_updated, COND_bin_log_updated;
   ulonglong bytes_written;
   IO_CACHE index_file;
@@ -650,14 +649,9 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   }
 protected:
   MYSQL_BIN_LOG(uint *sync_period);
-  mysql_mutex_t LOCK_xid_list;
 public:
   int new_file_without_locking();
   bool is_relay_log;
-  mysql_mutex_t LOCK_binlog_background_thread;
-  mysql_cond_t COND_binlog_background_thread;
-  mysql_cond_t COND_binlog_background_thread_end;
-
   using MYSQL_LOG::generate_name;
   using MYSQL_LOG::is_open;
 
@@ -731,7 +725,6 @@ public:
   }
   void set_max_size(ulong max_size_arg);
   void init(ulong max_size);
-  void init_pthread_objects();
   bool open_index_file(const char *index_file_name_arg,
                        const char *log_name, bool need_mutex);
   /* Use this to start writing a new log file */
@@ -811,6 +804,7 @@ public:
                           ulong next_log_number) = 0;
   virtual int unlog(ulong cookie, my_xid xid) = 0;
   virtual void commit_checkpoint_notify(void *cookie)= 0;
+  virtual void init_pthread_objects() = 0;
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
 };
@@ -886,6 +880,8 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   ulonglong binlog_space_total;
   bool state_file_deleted;
   bool binlog_state_recover_done;
+  mysql_cond_t  COND_xid_list;
+  mysql_mutex_t LOCK_xid_list;
   int write_transaction_or_stmt(group_commit_entry *entry, uint64 commit_id);
   int queue_for_group_commit(group_commit_entry *entry);
   void trx_group_commit_leader(group_commit_entry *leader);
@@ -926,6 +922,9 @@ public:
     }
   };
   I_List<xid_count_per_binlog> binlog_xid_count_list;
+  mysql_mutex_t LOCK_binlog_background_thread;
+  mysql_cond_t COND_binlog_background_thread;
+  mysql_cond_t COND_binlog_background_thread_end;
   /*
     Binlog position of end of the binlog.
     Access to this is protected by LOCK_binlog_end_pos
@@ -982,6 +981,7 @@ public:
                   ulong next_log_number) override;
   int unlog(ulong cookie, my_xid xid) override;
   void commit_checkpoint_notify(void *cookie) override;
+  void init_pthread_objects() override;
   void stop_background_thread();
   void write_binlog_checkpoint_event_already_locked(const char *name, uint len);
   bool write_transaction_to_binlog_events(group_commit_entry *entry);
@@ -1192,6 +1192,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   void close(uint exiting) override;
   int unlog(ulong cookie, my_xid xid) override { return 0; }
   void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
+  void init_pthread_objects() override;
   bool write_event_buffer(uchar* buf,uint len);
   int purge_first_log(Relay_log_info* rli, bool included);
   void wait_for_update_relay_log(THD* thd);

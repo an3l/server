@@ -3782,15 +3782,10 @@ void MYSQL_RELAY_LOG::cleanup()
 
     mysql_mutex_destroy(&LOCK_log);
     mysql_mutex_destroy(&LOCK_index);
-    mysql_mutex_destroy(&LOCK_xid_list);
-    mysql_mutex_destroy(&LOCK_binlog_background_thread);
     mysql_mutex_destroy(&LOCK_binlog_end_pos);
     mysql_cond_destroy(&COND_relay_log_updated);
     mysql_cond_destroy(&COND_bin_log_updated);
     mysql_cond_destroy(&COND_queue_busy);
-    mysql_cond_destroy(&COND_xid_list);
-    mysql_cond_destroy(&COND_binlog_background_thread);
-    mysql_cond_destroy(&COND_binlog_background_thread_end);
   }
 }
 
@@ -3856,7 +3851,7 @@ void MYSQL_BIN_LOG::init(ulong max_size_arg)
 }
 
 
-void MYSQL_BIN_LOG::init_pthread_objects()
+void MYSQL_BINARY_LOG::init_pthread_objects()
 {
   Event_log::init_pthread_objects();
   mysql_mutex_init(m_key_LOCK_index, &LOCK_index, MY_MUTEX_INIT_SLOW);
@@ -3874,6 +3869,18 @@ void MYSQL_BIN_LOG::init_pthread_objects()
                   &COND_binlog_background_thread, 0);
   mysql_cond_init(key_BINLOG_COND_binlog_background_thread_end,
                   &COND_binlog_background_thread_end, 0);
+}
+
+
+void MYSQL_RELAY_LOG::init_pthread_objects()
+{
+  Event_log::init_pthread_objects();
+  mysql_mutex_init(m_key_LOCK_index, &LOCK_index, MY_MUTEX_INIT_SLOW);
+  mysql_mutex_setflags(&LOCK_index, MYF_NO_DEADLOCK_DETECTION);
+
+  mysql_cond_init(m_key_relay_log_update, &COND_relay_log_updated, 0);
+  mysql_cond_init(m_key_bin_log_update, &COND_bin_log_updated, 0);
+  mysql_cond_init(m_key_COND_queue_busy, &COND_queue_busy, 0);
 }
 
 
