@@ -651,6 +651,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   int new_file_without_locking();
 protected:
   MYSQL_BIN_LOG(uint *sync_period);
+  bool emulate_valgrind_faults();
 public:
   using MYSQL_LOG::generate_name;
   using MYSQL_LOG::is_open;

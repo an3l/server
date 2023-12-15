@@ -3691,7 +3691,7 @@ err:
 
 /**
   @todo
-  The following should be using fn_format();  We just need to
+  The following should be using fn_format(); We just need to
   first change fn_format() to cut the file name if it's too long.
 */
 const char *MYSQL_LOG::generate_name(const char *log_name,
@@ -4010,6 +4010,40 @@ Event_log::write_description_event(enum_binlog_checksum_alg checksum_alg,
 }
 
 
+bool MYSQL_BIN_LOG::emulate_valgrind_faults()
+{
+#ifdef HAVE_REPLICATION
+  if (open_purge_index_file(TRUE) ||
+      register_create_index_entry(log_file_name) ||
+      sync_purge_index_file() ||
+      DBUG_IF("fault_injection_registering_index"))
+  {
+    /**
+        TODO:
+        Although this was introduced to appease valgrind when
+        injecting emulated faults using
+        fault_injection_registering_index it may be good to consider
+        what actually happens when open_purge_index_file succeeds but
+        register or sync fails.
+
+        Perhaps we might need the code below in MYSQL_LOG_BIN::cleanup
+        for "real life" purposes as well?
+     */
+    DBUG_EXECUTE_IF("fault_injection_registering_index", {
+      if (my_b_inited(&purge_index_file))
+      {
+        end_io_cache(&purge_index_file);
+        my_close(purge_index_file.file, MYF(0));
+      }
+    });
+
+    sql_print_error("MYSQL_BIN_LOG::open failed to sync the index file.");
+    return 1;
+  }
+  return 0;
+#endif
+}
+
 
 /**
   Open a (new) relay log file.
@@ -4044,36 +4078,9 @@ bool MYSQL_RELAY_LOG::open(const char *log_name,
     DBUG_RETURN(1);
   }
 
-#ifdef HAVE_REPLICATION
-  if (open_purge_index_file(TRUE) ||
-      register_create_index_entry(log_file_name) ||
-      sync_purge_index_file() ||
-      DBUG_IF("fault_injection_registering_index"))
-  {
-    /**
-        TODO:
-        Although this was introduced to appease valgrind when
-        injecting emulated faults using
-        fault_injection_registering_index it may be good to consider
-        what actually happens when open_purge_index_file succeeds but
-        register or sync fails.
-
-        Perhaps we might need the code below in MYSQL_LOG_BIN::cleanup
-        for "real life" purposes as well? 
-     */
-    DBUG_EXECUTE_IF("fault_injection_registering_index", {
-      if (my_b_inited(&purge_index_file))
-      {
-        end_io_cache(&purge_index_file);
-        my_close(purge_index_file.file, MYF(0));
-      }
-    });
-
-    sql_print_error("MYSQL_BIN_LOG::open failed to sync the index file.");
+  if (emulate_valgrind_faults())
     DBUG_RETURN(1);
-  }
   DBUG_EXECUTE_IF("crash_create_non_critical_before_update_index", DBUG_SUICIDE(););
-#endif
   write_error= 0;
 
   /* open the main log file */
@@ -4103,13 +4110,13 @@ bool MYSQL_RELAY_LOG::open(const char *log_name,
     if (!my_b_filelength(&log_file))
     {
       /*
-	The binary log file was empty (probably newly created)
-	This is the normal case and happens when the user doesn't specify
-	an extension for the binary log files.
-	In this case we write a standard header to it.
+        The binary log file was empty (probably newly created)
+        This is the normal case and happens when the user doesn't specify
+        an extension for the binary log files.
+        In this case we write a standard header to it.
       */
       if (my_b_safe_write(&log_file, BINLOG_MAGIC,
-			  BIN_LOG_HEADER_SIZE))
+                          BIN_LOG_HEADER_SIZE))
         goto err;
       bytes_written+= BIN_LOG_HEADER_SIZE;
       write_file_name_to_index_file= 1;
@@ -4270,37 +4277,9 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
     goto err;
   }
 
-#ifdef HAVE_REPLICATION
-  if (open_purge_index_file(TRUE) ||
-      register_create_index_entry(log_file_name) ||
-      sync_purge_index_file() ||
-      DBUG_IF("fault_injection_registering_index"))
-  {
-    /**
-        TODO:
-        Although this was introduced to appease valgrind when
-        injecting emulated faults using
-        fault_injection_registering_index it may be good to consider
-        what actually happens when open_purge_index_file succeeds but
-        register or sync fails.
-
-        Perhaps we might need the code below in MYSQL_LOG_BIN::cleanup
-        for "real life" purposes as well? 
-     */
-    DBUG_EXECUTE_IF("fault_injection_registering_index", {
-      if (my_b_inited(&purge_index_file))
-      {
-        end_io_cache(&purge_index_file);
-        my_close(purge_index_file.file, MYF(0));
-      }
-    });
-
-    sql_print_error("MYSQL_BIN_LOG::open failed to sync the index file.");
+  if (emulate_valgrind_faults())
     DBUG_RETURN(1);
-  }
   DBUG_EXECUTE_IF("crash_create_non_critical_before_update_index", DBUG_SUICIDE(););
-#endif
-
   write_error= 0;
 
   /* open the main log file */
@@ -4328,13 +4307,13 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
     if (!my_b_filelength(&log_file))
     {
       /*
-	The binary log file was empty (probably newly created)
-	This is the normal case and happens when the user doesn't specify
-	an extension for the binary log files.
-	In this case we write a standard header to it.
+        The binary log file was empty (probably newly created)
+        This is the normal case and happens when the user doesn't specify
+        an extension for the binary log files.
+        In this case we write a standard header to it.
       */
       if (my_b_safe_write(&log_file, BINLOG_MAGIC,
-			  BIN_LOG_HEADER_SIZE))
+                          BIN_LOG_HEADER_SIZE))
         goto err;
       bytes_written+= BIN_LOG_HEADER_SIZE;
       write_file_name_to_index_file= 1;
@@ -5947,12 +5926,10 @@ MYSQL_BINARY_LOG::can_purge_log(const char *log_file_name_arg)
 bool
 MYSQL_RELAY_LOG::can_purge_log(const char *log_file_name_arg)
 {
-  bool res;
   if (is_active(log_file_name_arg))
       return false;
 
-  res= log_in_use(log_file_name_arg, 0);
-  return !res;
+  return !log_in_use(log_file_name_arg, 0);
 }
 #endif /* HAVE_REPLICATION */
 
