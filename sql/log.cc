@@ -4089,7 +4089,7 @@ bool MYSQL_RELAY_LOG::open(const char *log_name,
                            bool null_created_arg,
                            bool need_mutex)
 {
-  File file= -1;
+  
   DBUG_ENTER("MYSQL_RELAY_LOG::open");
   mysql_mutex_assert_owner(&LOCK_log);
 
@@ -4229,8 +4229,6 @@ err:
   close_purge_index_file();
 #endif
   sql_print_error(fatal_log_error, (name) ? name : log_name, tmp_errno);
-  if (file >= 0)
-    mysql_file_close(file, MYF(0));
   close(LOG_CLOSE_INDEX);
   DBUG_RETURN(1);
 }
@@ -4258,7 +4256,6 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
                             bool null_created_arg,
                             bool need_mutex)
 {
-  File file= -1;
   xid_count_per_binlog *new_xid_list_entry= NULL, *b;
   DBUG_ENTER("MYSQL_BIN_LOG::open");
 
@@ -4511,8 +4508,6 @@ err:
   sql_print_error(fatal_log_error, (name) ? name : log_name, tmp_errno);
   if (new_xid_list_entry)
     delete new_xid_list_entry;
-  if (file >= 0)
-    mysql_file_close(file, MYF(0));
   close(LOG_CLOSE_INDEX);
   DBUG_RETURN(1);
 }
