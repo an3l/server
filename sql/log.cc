@@ -4012,7 +4012,6 @@ Event_log::write_description_event(enum_binlog_checksum_alg checksum_alg,
 
 bool MYSQL_BIN_LOG::emulate_valgrind_faults()
 {
-#ifdef HAVE_REPLICATION
   if (open_purge_index_file(TRUE) ||
       register_create_index_entry(log_file_name) ||
       sync_purge_index_file() ||
@@ -4041,7 +4040,31 @@ bool MYSQL_BIN_LOG::emulate_valgrind_faults()
     return 1;
   }
   return 0;
+}
+
+
+bool MYSQL_BIN_LOG::emulate_fault_injection()
+{
+#ifdef ENABLED_DEBUG_SYNC
+  if (current_thd)
+    DEBUG_SYNC(current_thd, "binlog_open_before_update_index");
 #endif
+  DBUG_EXECUTE_IF("crash_create_critical_before_update_index", DBUG_SUICIDE(););
+  DBUG_ASSERT(my_b_inited(&index_file) != 0);
+  reinit_io_cache(&index_file, WRITE_CACHE,
+                  my_b_filelength(&index_file), 0, 0);
+  /*
+    As this is a new log file, we write the file name to the index
+    file. As every time we write to the index file, we sync it.
+  */
+  if (DBUG_IF("fault_injection_updating_index") ||
+      my_b_write(&index_file, (uchar*) log_file_name,
+                  strlen(log_file_name)) ||
+      my_b_write(&index_file, (uchar*) "\n", 1) ||
+      flush_io_cache(&index_file) ||
+      mysql_file_sync(index_file.file, MYF(MY_WME)))
+    return 1;
+  return 0;
 }
 
 
@@ -4078,9 +4101,13 @@ bool MYSQL_RELAY_LOG::open(const char *log_name,
     DBUG_RETURN(1);
   }
 
+
+#ifdef HAVE_REPLICATION
   if (emulate_valgrind_faults())
     DBUG_RETURN(1);
   DBUG_EXECUTE_IF("crash_create_non_critical_before_update_index", DBUG_SUICIDE(););
+#endif
+
   write_error= 0;
 
   /* open the main log file */
@@ -4177,29 +4204,9 @@ bool MYSQL_RELAY_LOG::open(const char *log_name,
     if (write_file_name_to_index_file)
     {
 #ifdef HAVE_REPLICATION
-#ifdef ENABLED_DEBUG_SYNC
-      if (current_thd)
-        DEBUG_SYNC(current_thd, "binlog_open_before_update_index");
-#endif
-      DBUG_EXECUTE_IF("crash_create_critical_before_update_index", DBUG_SUICIDE(););
-#endif
-
-      DBUG_ASSERT(my_b_inited(&index_file) != 0);
-      reinit_io_cache(&index_file, WRITE_CACHE,
-                      my_b_filelength(&index_file), 0, 0);
-      /*
-        As this is a new log file, we write the file name to the index
-        file. As every time we write to the index file, we sync it.
-      */
-      if (DBUG_IF("fault_injection_updating_index") ||
-          my_b_write(&index_file, (uchar*) log_file_name,
-                     strlen(log_file_name)) ||
-          my_b_write(&index_file, (uchar*) "\n", 1) ||
-          flush_io_cache(&index_file) ||
-          mysql_file_sync(index_file.file, MYF(MY_WME)))
+      if (emulate_fault_injection())
         goto err;
 
-#ifdef HAVE_REPLICATION
       DBUG_EXECUTE_IF("crash_create_after_update_index", DBUG_SUICIDE(););
 #endif
     }
@@ -4277,9 +4284,12 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
     goto err;
   }
 
+#ifdef HAVE_REPLICATION
   if (emulate_valgrind_faults())
     DBUG_RETURN(1);
   DBUG_EXECUTE_IF("crash_create_non_critical_before_update_index", DBUG_SUICIDE(););
+#endif
+
   write_error= 0;
 
   /* open the main log file */
@@ -4435,29 +4445,9 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
     if (write_file_name_to_index_file)
     {
 #ifdef HAVE_REPLICATION
-#ifdef ENABLED_DEBUG_SYNC
-      if (current_thd)
-        DEBUG_SYNC(current_thd, "binlog_open_before_update_index");
-#endif
-      DBUG_EXECUTE_IF("crash_create_critical_before_update_index", DBUG_SUICIDE(););
-#endif
-
-      DBUG_ASSERT(my_b_inited(&index_file) != 0);
-      reinit_io_cache(&index_file, WRITE_CACHE,
-                      my_b_filelength(&index_file), 0, 0);
-      /*
-        As this is a new log file, we write the file name to the index
-        file. As every time we write to the index file, we sync it.
-      */
-      if (DBUG_IF("fault_injection_updating_index") ||
-          my_b_write(&index_file, (uchar*) log_file_name,
-                     strlen(log_file_name)) ||
-          my_b_write(&index_file, (uchar*) "\n", 1) ||
-          flush_io_cache(&index_file) ||
-          mysql_file_sync(index_file.file, MYF(MY_WME)))
+      if (emulate_fault_injection())
         goto err;
 
-#ifdef HAVE_REPLICATION
       DBUG_EXECUTE_IF("crash_create_after_update_index", DBUG_SUICIDE(););
 #endif
     }
@@ -4470,15 +4460,15 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
   mysql_mutex_lock(&LOCK_xid_list);
   ++current_binlog_id;
   new_xid_list_entry->binlog_id= current_binlog_id;
-  /* Remove any initial entries with no pending XIDs.  */
+  /* Remove any initial entries with no pending XIDs. */
   while ((b= binlog_xid_count_list.head()) && b->xid_count == 0)
   {
-    WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::open(): Removing xid_list_entry for "
+    WSREP_XID_LIST_ENTRY("MYSQL_BINARY_LOG::open(): Removing xid_list_entry for "
                           "%s (%lu)", b);
     delete binlog_xid_count_list.get();
   }
   mysql_cond_broadcast(&COND_xid_list);
-  WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::open(): Adding new xid_list_entry for "
+  WSREP_XID_LIST_ENTRY("MYSQL_BINARY_LOG::open(): Adding new xid_list_entry for "
                         "%s (%lu)", new_xid_list_entry);
   binlog_xid_count_list.push_back(new_xid_list_entry);
   mysql_mutex_unlock(&LOCK_xid_list);
