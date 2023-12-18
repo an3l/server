@@ -4759,7 +4759,7 @@ err:
 
   The new index file will only contain this file.
 
-  @param thd		  Thread id. This can be zero in case of resetting 
+  @param thd              Thread id. This can be zero in case of resetting
                           relay logs
   @param create_new_log   1 if we should start writing to a new log file
   @param next_log_number  min number of next log file to use, if possible.
@@ -4768,7 +4768,7 @@ err:
     If not called from slave thread, write start event to new log
 
   @retval
-    0	ok
+    0   ok
   @retval
     1   error
 */
@@ -4781,7 +4781,7 @@ bool MYSQL_BINARY_LOG::reset_logs(THD *thd, bool create_new_log,
   bool error=0;
   int err;
   const char* save_name;
-  DBUG_ENTER("reset_logs");
+  DBUG_ENTER("MYSQL_BINARY_LOG::reset_logs");
   DBUG_ASSERT(thd != NULL);
 
   if (init_state && !is_empty_state())
@@ -4999,7 +4999,7 @@ err:
 
   The new index file will only contain this file.
 
-  @param thd		  Thread id. This can be zero in case of resetting 
+  @param thd              Thread id. This can be zero in case of resetting
                           relay logs
   @param create_new_log   1 if we should start writing to a new log file
   @param next_log_number  min number of next log file to use, if possible.
@@ -5008,7 +5008,7 @@ err:
     If not called from slave thread, write start event to new log
 
   @retval
-    0	ok
+    0   ok
   @retval
     1   error
 */
@@ -5021,7 +5021,7 @@ bool MYSQL_RELAY_LOG::reset_logs(THD *thd, bool create_new_log,
   bool error=0;
   int err;
   const char* save_name;
-  DBUG_ENTER("reset_logs");
+  DBUG_ENTER("MYSQL_RELAY_LOG::reset_logs");
   /*
     We need to get both locks to be sure that no one is trying to
     write to the index log file.
@@ -5030,7 +5030,7 @@ bool MYSQL_RELAY_LOG::reset_logs(THD *thd, bool create_new_log,
   mysql_mutex_lock(&LOCK_index);
   /* Save variables so that we can reopen the log */
   save_name=name;
-  name=0;					// Protect against free
+  name=0;                                       // Protect against free
   close(LOG_CLOSE_TO_BE_OPENED);
 
   last_used_log_number= 0;                      // Reset log number cache
@@ -5143,10 +5143,10 @@ void MYSQL_BINARY_LOG::wait_for_last_checkpoint_event()
   - Protects index file with LOCK_index
   - Delete relevant relay log files
   - Copy all file names after these ones to the front of the index file
-  - If the OS has truncate, truncate the file, else fill it with \n'
+  - If the OS has truncate, truncate the file, else fill it with '\n'
   - Read the next file name from the index file and store in rli->linfo
 
-  @param rli	       Relay log information
+  @param rli	        Relay log information
   @param included     If false, all relay logs that are strictly before
                       rli->group_relay_log_name are deleted ; if true, the
                       latter is deleted too (i.e. all relay logs
@@ -5154,11 +5154,11 @@ void MYSQL_BINARY_LOG::wait_for_last_checkpoint_event()
 
   @note
     - This is only called from the slave SQL thread when it has read
-    all commands from a relay log and want to switch to a new relay log.
+      all commands from a relay log and want to switch to a new relay log.
     - When this happens, we can be in an active transaction as
-    a transaction can span over two relay logs
-    (although it is always written as a single block to the master's binary
-    log, hence cannot span over two master's binary logs).
+      a transaction can span over two relay logs
+      (although it is always written as a single block to the master's binary
+      log, hence cannot span over two master's binary logs).
 
   @retval
     0			ok
@@ -5178,7 +5178,7 @@ int MYSQL_RELAY_LOG::purge_first_log(Relay_log_info* rli, bool included)
   char *to_purge_if_included= NULL;
   inuse_relaylog *ir;
   ulonglong log_space_reclaimed= 0;
-  DBUG_ENTER("purge_first_log");
+  DBUG_ENTER("MYSQL_RELAY_LOG::purge_first_log");
 
   DBUG_ASSERT(is_open());
   DBUG_ASSERT(rli->slave_running == MYSQL_SLAVE_RUN_NOT_CONNECT);
@@ -5281,6 +5281,7 @@ err:
   DBUG_RETURN(error);
 }
 
+
 /**
   Update log index_file.
 */
@@ -5330,7 +5331,7 @@ int MYSQL_BIN_LOG::purge_logs(const char *to_log,
   bool exit_loop= 0;
   LOG_INFO log_info;
   THD *thd= current_thd;
-  DBUG_ENTER("purge_logs");
+  DBUG_ENTER("MYSQL_BIN_LOG::purge_logs");
   DBUG_PRINT("info",("to_log= %s",to_log));
 
   if (need_mutex)
@@ -5399,6 +5400,7 @@ err:
     mysql_mutex_unlock(&LOCK_index);
   DBUG_RETURN(error);
 }
+
 
 int MYSQL_BIN_LOG::set_purge_index_file_name(const char *base_file_name)
 {
@@ -5692,7 +5694,7 @@ int MYSQL_BINARY_LOG::purge_logs_before_date(time_t purge_time)
   LOG_INFO log_info;
   MY_STAT stat_area;
   THD *thd= current_thd;
-  DBUG_ENTER("purge_logs_before_date");
+  DBUG_ENTER("MYSQL_BINARY_LOG::purge_logs_before_date");
 
   mysql_mutex_lock(&LOCK_index);
   to_log[0]= 0;
@@ -5705,7 +5707,7 @@ int MYSQL_BINARY_LOG::purge_logs_before_date(time_t purge_time)
     if (!mysql_file_stat(m_key_file_log,
                          log_info.log_file_name, &stat_area, MYF(0)))
     {
-      if (my_errno == ENOENT) 
+      if (my_errno == ENOENT)
       {
         /*
           It's not fatal if we can't stat a log file that does not exist.
@@ -5781,7 +5783,7 @@ int MYSQL_BINARY_LOG::real_purge_logs_by_size(ulonglong binlog_pos)
   MY_STAT stat_area;
   char to_log[FN_REFLEN];
   ulonglong found_space= 0;
-  DBUG_ENTER("real_purge_logs_by_size");
+  DBUG_ENTER("MYSQL_BINARY_LOG::real_purge_logs_by_size");
 
   mysql_mutex_lock(&LOCK_index);
 
