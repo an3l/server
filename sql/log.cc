@@ -4774,8 +4774,8 @@ err:
 */
 
 bool MYSQL_BINARY_LOG::reset_logs(THD *thd, bool create_new_log,
-                               rpl_gtid *init_state, uint32 init_state_len,
-                               ulong next_log_number)
+                                  rpl_gtid *init_state, uint32 init_state_len,
+                                  ulong next_log_number)
 {
   LOG_INFO linfo;
   bool error=0;
