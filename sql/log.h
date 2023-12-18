@@ -288,6 +288,7 @@ typedef struct st_log_info
 
 class Log_event;
 class Rows_log_event;
+class Rotate_log_event;
 
 enum enum_log_type { LOG_UNKNOWN, LOG_NORMAL, LOG_BIN };
 enum enum_log_state { LOG_OPENED, LOG_CLOSED, LOG_TO_BE_OPENED };
@@ -653,6 +654,10 @@ protected:
   MYSQL_BIN_LOG(uint *sync_period);
   bool emulate_valgrind_faults();
   bool emulate_fault_injection();
+  bool emulate_fault_injection_new_event(enum_binlog_checksum_alg checksum_alg,
+                                        int *error,
+                                        Rotate_log_event *r,
+                                        int *close_on_error);
 public:
   using MYSQL_LOG::generate_name;
   using MYSQL_LOG::is_open;

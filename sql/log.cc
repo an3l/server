@@ -6075,6 +6075,26 @@ int MYSQL_BIN_LOG::new_file_without_locking()
 }
 
 
+bool MYSQL_BIN_LOG::emulate_fault_injection_new_event(
+                                          enum_binlog_checksum_alg checksum_alg,
+                                          int *error,
+                                          Rotate_log_event *r,
+                                          int *close_on_error)
+{
+  DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
+  if ((DBUG_IF("fault_injection_new_file_rotate_event") &&
+                        (*error= *close_on_error= TRUE)) ||
+      (*error= write_event(r, checksum_alg)))
+  {
+    DBUG_EXECUTE_IF("fault_injection_new_file_rotate_event", errno= 2;);
+    *close_on_error= TRUE;
+    my_printf_error(ER_ERROR_ON_WRITE,
+                    ER_THD_OR_DEFAULT(current_thd, ER_CANT_OPEN_FILE),
+                    MYF(ME_FATAL), name, errno);
+    return TRUE;
+  }
+  return FALSE;
+}
 /**
   Start writing to a new relay log file or reopen the old file.
 
@@ -6131,18 +6151,9 @@ int MYSQL_RELAY_LOG::new_file_impl()
       value computed with an algorithm of the last relay-logged FD event.
     */
     checksum_alg= relay_log_checksum_alg;
-    DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
-    if ((DBUG_IF("fault_injection_new_file_rotate_event") &&
-                         (error= close_on_error= TRUE)) ||
-        (error= write_event(&r, checksum_alg)))
-    {
-      DBUG_EXECUTE_IF("fault_injection_new_file_rotate_event", errno= 2;);
-      close_on_error= TRUE;
-      my_printf_error(ER_ERROR_ON_WRITE,
-                      ER_THD_OR_DEFAULT(current_thd, ER_CANT_OPEN_FILE),
-                      MYF(ME_FATAL), name, errno);
+    if (emulate_fault_injection_new_event(checksum_alg, &error, &r,
+                                          &close_on_error))
       goto end;
-    }
     bytes_written+= r.data_written;
   }
 
@@ -6284,18 +6295,9 @@ int MYSQL_BINARY_LOG::new_file_impl()
                        LOG_EVENT_OFFSET, 0);
     enum_binlog_checksum_alg checksum_alg = BINLOG_CHECKSUM_ALG_UNDEF;
     checksum_alg= (enum_binlog_checksum_alg)binlog_checksum_options;
-    DBUG_ASSERT(checksum_alg != BINLOG_CHECKSUM_ALG_UNDEF);
-    if ((DBUG_IF("fault_injection_new_file_rotate_event") &&
-                         (error= close_on_error= TRUE)) ||
-        (error= write_event(&r, checksum_alg)))
-    {
-      DBUG_EXECUTE_IF("fault_injection_new_file_rotate_event", errno= 2;);
-      close_on_error= TRUE;
-      my_printf_error(ER_ERROR_ON_WRITE,
-                      ER_THD_OR_DEFAULT(current_thd, ER_CANT_OPEN_FILE),
-                      MYF(ME_FATAL), name, errno);
+    if (emulate_fault_injection_new_event(checksum_alg, &error, &r,
+                                          &close_on_error))
       goto end;
-    }
     bytes_written+= r.data_written;
   }
 
