@@ -4257,7 +4257,7 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
                             bool need_mutex)
 {
   xid_count_per_binlog *new_xid_list_entry= NULL, *b;
-  DBUG_ENTER("MYSQL_BIN_LOG::open");
+  DBUG_ENTER("MYSQL_BINARY_LOG::open");
 
   mysql_mutex_assert_owner(&LOCK_log);
 
@@ -4277,7 +4277,7 @@ bool MYSQL_BINARY_LOG::open(const char *log_name,
   if (init_and_set_log_file_name(log_name, new_name, next_log_number,
                                  LOG_BIN, io_cache_type_arg))
   {
-    sql_print_error("MYSQL_BIN_LOG::open failed to generate new file name.");
+    sql_print_error("MYSQL_BINARY_LOG::open failed to generate new file name.");
     goto err;
   }
 
@@ -11494,7 +11494,7 @@ end:
 int MYSQL_BINARY_LOG::open(const char *opt_name)
 {
   int      error= 1;
-  DBUG_ENTER("TC_LOG_BINLOG::open");
+  DBUG_ENTER("MYSQL_BINARY_LOG::open");
 
   DBUG_ASSERT(total_ha_2pc > 1);
   DBUG_ASSERT(opt_name);
