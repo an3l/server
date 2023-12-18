@@ -4588,27 +4588,27 @@ err:
 /**
   Find the position in the log-index-file for the given log name.
 
-  @param linfo		Store here the found log file name and position to
-                       the NEXT log file name in the index file.
-  @param log_name	Filename to find in the index file.
-                       Is a null pointer if we want to read the first entry
-  @param need_lock	Set this to 1 if the parent doesn't already have a
-                       lock on LOCK_index
+  @param linfo        Store here the found log file name and position to
+                      the NEXT log file name in the index file.
+  @param log_name     Filename to find in the index file.
+                      Is a null pointer if we want to read the first entry
+  @param need_lock    Set this to 1 if the parent doesn't already have a
+                      lock on LOCK_index
 
   @note
     On systems without the truncate function the file will end with one or
     more empty lines.  These will be ignored when reading the file.
 
   @retval
-    0			ok
+    0                     ok
   @retval
-    LOG_INFO_EOF	        End of log-index-file found
+    LOG_INFO_EOF          End of log-index-file found
   @retval
-    LOG_INFO_IO		Got IO error while reading file
+    LOG_INFO_IO           Got IO error while reading file
 */
 
 int MYSQL_BIN_LOG::find_log_pos(LOG_INFO *linfo, const char *log_name,
-			    bool need_lock)
+                                bool need_lock)
 {
   int error= 0;
   char *full_fname= linfo->log_file_name;
