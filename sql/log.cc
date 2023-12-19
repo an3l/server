@@ -3764,23 +3764,29 @@ void MYSQL_BINARY_LOG::stop_background_thread()
   }
 }
 
+
+void MYSQL_BIN_LOG::close_log()
+{
+  mysql_mutex_lock(&LOCK_log);
+  close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
+  mysql_mutex_unlock(&LOCK_log);
+  mysql_mutex_destroy(&LOCK_log);
+  mysql_mutex_destroy(&LOCK_index);
+  mysql_mutex_destroy(&LOCK_binlog_end_pos);
+  mysql_cond_destroy(&COND_relay_log_updated);
+  mysql_cond_destroy(&COND_queue_busy);
+}
+
+
 /* this is called only once */
 void MYSQL_RELAY_LOG::cleanup()
 {
   if (inited)
   {
     inited= 0;
-    mysql_mutex_lock(&LOCK_log);
-    close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
-    mysql_mutex_unlock(&LOCK_log);
+    close_log();
     delete description_event_for_queue;
     delete description_event_for_exec;
-
-    mysql_mutex_destroy(&LOCK_log);
-    mysql_mutex_destroy(&LOCK_index);
-    mysql_mutex_destroy(&LOCK_binlog_end_pos);
-    mysql_cond_destroy(&COND_relay_log_updated);
-    mysql_cond_destroy(&COND_queue_busy);
   }
 }
 
@@ -3791,15 +3797,10 @@ void MYSQL_BINARY_LOG::cleanup()
   if (inited)
   {
     xid_count_per_binlog *b;
-
     /* Wait for the binlog background thread to stop. */
     stop_background_thread();
-
     inited= 0;
-    mysql_mutex_lock(&LOCK_log);
-    close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
-    mysql_mutex_unlock(&LOCK_log);
-
+    close_log();
     while ((b= binlog_xid_count_list.get()))
     {
       /*
@@ -3812,15 +3813,9 @@ void MYSQL_BINARY_LOG::cleanup()
                            "for %s (%lu)", b);
       delete b;
     }
-
-    mysql_mutex_destroy(&LOCK_log);
-    mysql_mutex_destroy(&LOCK_index);
     mysql_mutex_destroy(&LOCK_xid_list);
     mysql_mutex_destroy(&LOCK_binlog_background_thread);
-    mysql_mutex_destroy(&LOCK_binlog_end_pos);
-    mysql_cond_destroy(&COND_relay_log_updated);
     mysql_cond_destroy(&COND_bin_log_updated);
-    mysql_cond_destroy(&COND_queue_busy);
     mysql_cond_destroy(&COND_xid_list);
     mysql_cond_destroy(&COND_binlog_background_thread);
     mysql_cond_destroy(&COND_binlog_background_thread_end);

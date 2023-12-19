@@ -649,6 +649,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   }
   bool is_relay_log;
   int new_file_without_locking();
+  void close_log();
 protected:
   MYSQL_BIN_LOG(uint *sync_period);
 public:
