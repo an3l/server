@@ -773,6 +773,7 @@ public:
   inline void unlock_index() { mysql_mutex_unlock(&LOCK_index);}
   inline IO_CACHE *get_index_file() { return &index_file;}
   virtual ~MYSQL_BIN_LOG() = default;
+  virtual void init_pthread_objects();
   virtual bool can_purge_log(const char *log_file_name) = 0;
   virtual int open(const char *opt_name)=0;
   virtual bool open(const char *log_name,
@@ -796,7 +797,6 @@ public:
                           ulong next_log_number) = 0;
   virtual int unlog(ulong cookie, my_xid xid) = 0;
   virtual void commit_checkpoint_notify(void *cookie)= 0;
-  virtual void init_pthread_objects() = 0;
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
 };
@@ -1195,7 +1195,7 @@ class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
   void close(uint exiting) override;
   int unlog(ulong cookie, my_xid xid) override { return 0; }
   void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
-  void init_pthread_objects() override;
+  // void init_pthread_objects() override { MYSQL_BIN_LOG::init_pthread_objects(); }
   bool write_event_buffer(uchar* buf,uint len);
   int purge_first_log(Relay_log_info* rli, bool included);
   void wait_for_update_relay_log(THD* thd);
