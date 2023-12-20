@@ -610,44 +610,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 
   PSI_cond_key m_key_COND_queue_busy;
 
-  struct group_commit_entry
-  {
-    struct group_commit_entry *next;
-    THD *thd;
-    binlog_cache_mngr *cache_mngr;
-    bool using_stmt_cache;
-    bool using_trx_cache;
-    /*
-      Extra events (COMMIT/ROLLBACK/XID, and possibly INCIDENT) to be
-      written during group commit. The incident_event is only valid if
-      trx_data->has_incident() is true.
-    */
-    Log_event *end_event;
-    Log_event *incident_event;
-    /* Set during group commit to record any per-thread error. */
-    int error;
-    int commit_errno;
-    IO_CACHE *error_cache;
-    /* This is the `all' parameter for ha_commit_ordered(). */
-    bool all;
-    /*
-      True if we need to increment xid_count in trx_group_commit_leader() and
-      decrement in unlog() (this is needed if there is a participating engine
-      that does not implement the commit_checkpoint_request() handlerton
-      method).
-    */
-    bool need_unlog;
-    /*
-      Fields used to pass the necessary information to the last thread in a
-      group commit, only used when opt_optimize_thread_scheduling is not set.
-    */
-    bool check_purge;
-    /* Flag used to optimise around wait_for_prior_commit. */
-    bool queued_by_other;
-    ulong binlog_id;
-    bool ro_1pc;  // passes the binlog_cache_mngr::ro_1pc value to Gtid ctor
-  };
-
   /*
     When this is set, a RESET MASTER is in progress.
 
@@ -658,9 +620,9 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   */
   uint reset_master_pending;
   ulong mark_xid_done_waiting;
-
   /* LOCK_log and LOCK_index are inited by init_pthread_objects() */
   mysql_mutex_t LOCK_index;
+  mysql_mutex_t LOCK_xid_list;
   mysql_cond_t  COND_xid_list;
   mysql_cond_t  COND_relay_log_updated, COND_bin_log_updated;
   ulonglong bytes_written;
@@ -688,27 +650,8 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
     closely with current_binlog_id
   */
   ulong last_used_log_number;
-  // current file sequence number for load data infile binary logging
-  uint file_id;
   uint open_count;				// For replication
-  int readers_count;
-  /* Queue of transactions queued up to participate in group commit. */
-  group_commit_entry *group_commit_queue;
-  /*
-    Condition variable to mark that the group commit queue is busy.
-    Used when each thread does it's own commit_ordered() (when
-    binlog_optimize_thread_scheduling=1).
-    Used with the LOCK_commit_ordered mutex.
-  */
-  my_bool group_commit_queue_busy;
   mysql_cond_t COND_queue_busy;
-  /* Total number of committed transactions. */
-  ulonglong num_commits;
-  /* Number of group commits done. */
-  ulonglong num_group_commits;
-  /* The reason why the group commit was grouped */
-  ulonglong group_commit_trigger_count, group_commit_trigger_timeout;
-  ulonglong group_commit_trigger_lock_wait;
 
   /* pointer to the sync period variable, for binlog this will be
      sync_binlog_period, for relay log this will be
@@ -732,14 +675,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   */
   int new_file_impl();
   void do_checkpoint_request(ulong binlog_id);
-  int write_transaction_or_stmt(group_commit_entry *entry, uint64 commit_id);
-  int queue_for_group_commit(group_commit_entry *entry);
-  bool write_transaction_to_binlog_events(group_commit_entry *entry);
-  void trx_group_commit_leader(group_commit_entry *leader);
   bool is_xidlist_idle_nolock();
-protected:
-  MYSQL_BIN_LOG(uint *sync_period, bool is_relay_log);
-  mysql_mutex_t LOCK_xid_list;
 public:
   void purge(bool all);
   int new_file_without_locking();
@@ -847,6 +783,7 @@ public:
     Tracks the number of times that the master has been reset
   */
   Atomic_counter<uint64> reset_master_count;
+  MYSQL_BIN_LOG(uint *sync_period);
   /*
     note that there's no destructor ~MYSQL_BIN_LOG() !
     The reason is that we don't want it to be automatically called
@@ -961,8 +898,6 @@ public:
     unlock_binlog_end_pos();
   }
 
-  void wait_for_sufficient_commits();
-  void binlog_trigger_immediate_group_commit();
   void wait_for_update_relay_log(THD* thd);
   void init(ulong max_size);
   void init_pthread_objects();
@@ -981,10 +916,6 @@ public:
 
   bool write(Log_event* event_info,
              my_bool *with_annotate= 0); // binary log write
-  bool write_transaction_to_binlog(THD *thd, binlog_cache_mngr *cache_mngr,
-                                   Log_event *end_ev, bool all,
-                                   bool using_stmt_cache, bool using_trx_cache,
-                                   bool is_ro_1pc);
 
   bool write_incident_already_locked(THD *thd);
   bool write_incident(THD *thd);
@@ -1079,7 +1010,6 @@ public:
   int find_next_log(LOG_INFO* linfo, bool need_mutex);
   int get_current_log(LOG_INFO* linfo);
   int raw_get_current_log(LOG_INFO* linfo);
-  uint next_file_id();
   inline char* get_index_fname() { return index_file_name;}
   inline char* get_log_fname() { return log_file_name; }
   using MYSQL_LOG::get_log_lock;
@@ -1166,15 +1096,96 @@ public:
   */
   my_off_t binlog_end_pos;
   char binlog_end_pos_file[FN_REFLEN];
-  virtual ~MYSQL_BIN_LOG() = default;
+  friend class MYSQL_BINARY_LOG;
+  friend class MYSQL_RELAY_LOG;
 };
 
 
 class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
 {
-  public:
-  MYSQL_BINARY_LOG(uint *sync_period, bool is_relay_log= 0)
-    :MYSQL_BIN_LOG(sync_period, is_relay_log) {}
+
+  struct group_commit_entry
+  {
+    struct group_commit_entry *next;
+    THD *thd;
+    binlog_cache_mngr *cache_mngr;
+    bool using_stmt_cache;
+    bool using_trx_cache;
+    /*
+      Extra events (COMMIT/ROLLBACK/XID, and possibly INCIDENT) to be
+      written during group commit. The incident_event is only valid if
+      trx_data->has_incident() is true.
+    */
+    Log_event *end_event;
+    Log_event *incident_event;
+    /* Set during group commit to record any per-thread error. */
+    int error;
+    int commit_errno;
+    IO_CACHE *error_cache;
+    /* This is the `all' parameter for ha_commit_ordered(). */
+    bool all;
+    /*
+      True if we need to increment xid_count in trx_group_commit_leader() and
+      decrement in unlog() (this is needed if there is a participating engine
+      that does not implement the commit_checkpoint_request() handlerton
+      method).
+    */
+    bool need_unlog;
+    /*
+      Fields used to pass the necessary information to the last thread in a
+      group commit, only used when opt_optimize_thread_scheduling is not set.
+    */
+    bool check_purge;
+    /* Flag used to optimise around wait_for_prior_commit. */
+    bool queued_by_other;
+    ulong binlog_id;
+    bool ro_1pc;  // passes the binlog_cache_mngr::ro_1pc value to Gtid ctor
+  };
+
+  // current file sequence number for load data infile binary logging
+  uint file_id;
+  /* Queue of transactions queued up to participate in group commit. */
+  group_commit_entry *group_commit_queue;
+  /*
+    Condition variable to mark that the group commit queue is busy.
+    Used when each thread does it's own commit_ordered() (when
+    binlog_optimize_thread_scheduling=1).
+    Used with the LOCK_commit_ordered mutex.
+  */
+  my_bool group_commit_queue_busy;
+  /* Total number of committed transactions. */
+  ulonglong num_commits;
+  /* Number of group commits done. */
+  ulonglong num_group_commits;
+  /* The reason why the group commit was grouped */
+  ulonglong group_commit_trigger_count, group_commit_trigger_timeout;
+  ulonglong group_commit_trigger_lock_wait;
+  int write_transaction_or_stmt(group_commit_entry *entry, uint64 commit_id);
+  int queue_for_group_commit(group_commit_entry *entry);
+  bool write_transaction_to_binlog_events(group_commit_entry *entry);
+  void trx_group_commit_leader(group_commit_entry *leader);
+public:
+  MYSQL_BINARY_LOG(uint *sync_period)
+    :MYSQL_BIN_LOG(sync_period)
+  {
+    is_relay_log= 0;
+    group_commit_queue= 0;
+    group_commit_queue_busy= FALSE;
+    num_commits= 0;
+    num_group_commits= 0;
+    group_commit_trigger_count= 0;
+    group_commit_trigger_timeout= 0;
+    group_commit_trigger_lock_wait= 0;
+    file_id= 1;
+  }
+  void wait_for_sufficient_commits();
+  void binlog_trigger_immediate_group_commit();
+  bool write_transaction_to_binlog(THD *thd, binlog_cache_mngr *cache_mngr,
+                                   Log_event *end_ev, bool all,
+                                   bool using_stmt_cache, bool using_trx_cache,
+                                   bool is_ro_1pc);
+  uint next_file_id();
+  void set_status_variables(THD *thd);
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
@@ -1183,9 +1194,12 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
 
 class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
 {
-  public:
-  MYSQL_RELAY_LOG(uint *sync_period, bool is_relay_log= 1)
-    :MYSQL_BIN_LOG(sync_period, is_relay_log) {}
+public:
+  MYSQL_RELAY_LOG(uint *sync_period)
+    :MYSQL_BIN_LOG(sync_period)
+  {
+    is_relay_log= 1;
+  }
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
