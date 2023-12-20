@@ -599,6 +599,7 @@ struct wait_for_commit;
 
 class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 {
+
   /** The instrumentation key to use for @ LOCK_index. */
   PSI_mutex_key m_key_LOCK_index;
   /** The instrumentation key to use for @ COND_relay_log_updated */
@@ -620,6 +621,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   */
   uint reset_master_pending;
   ulong mark_xid_done_waiting;
+
   /* LOCK_log and LOCK_index are inited by init_pthread_objects() */
   mysql_mutex_t LOCK_index;
   mysql_mutex_t LOCK_xid_list;
@@ -783,6 +785,7 @@ public:
     Tracks the number of times that the master has been reset
   */
   Atomic_counter<uint64> reset_master_count;
+
   MYSQL_BIN_LOG(uint *sync_period);
   /*
     note that there's no destructor ~MYSQL_BIN_LOG() !

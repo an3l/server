@@ -5641,7 +5641,6 @@ MYSQL_BINARY_LOG::can_purge_log(const char *log_file_name_arg)
   THD *thd= current_thd;                        // May be NULL at startup
   bool res;
 
-  DBUG_ASSERT(!is_relay_log || binlog_xid_count_list.is_empty());
   if (is_active(log_file_name_arg) ||
       (waiting_for_slave_to_change_binlog &&
        purge_sending_new_binlog_file == sending_new_binlog_file &&
@@ -5674,17 +5673,12 @@ MYSQL_BINARY_LOG::can_purge_log(const char *log_file_name_arg)
   return !res;
 }
 
-
 bool
 MYSQL_RELAY_LOG::can_purge_log(const char *log_file_name_arg)
 {
-  bool res;
-  DBUG_ASSERT(is_relay_log);
   if (is_active(log_file_name_arg))
       return false;
-
-  res= log_in_use(log_file_name_arg, 0);
-  return !res;
+  return !log_in_use(log_file_name_arg, 0);
 }
 #endif /* HAVE_REPLICATION */
 
