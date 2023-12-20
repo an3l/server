@@ -170,7 +170,7 @@ static SHOW_VAR binlog_status_vars_detail[]=
  */
 static bool binlog_background_thread_started= false;
 static bool binlog_background_thread_stop= false;
-static MYSQL_BIN_LOG::xid_count_per_binlog *
+static MYSQL_BINARY_LOG::xid_count_per_binlog *
     binlog_background_thread_queue= NULL;
 
 static bool start_binlog_background_thread();
@@ -3772,9 +3772,31 @@ void MYSQL_BIN_LOG::stop_background_thread()
   }
 }
 
-/* this is called only once */
+void MYSQL_BIN_LOG::close_and_destroy()
+{
+  mysql_mutex_lock(&LOCK_log);
+  close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
+  mysql_mutex_unlock(&LOCK_log);
+  mysql_mutex_destroy(&LOCK_log);
+  mysql_mutex_destroy(&LOCK_index);
+  mysql_mutex_destroy(&LOCK_binlog_end_pos);
+  mysql_cond_destroy(&COND_relay_log_updated);
+  mysql_cond_destroy(&COND_queue_busy);
+}
 
-void MYSQL_BIN_LOG::cleanup()
+/* this is called only once */
+void MYSQL_RELAY_LOG::cleanup()
+{
+  if (inited)
+  {
+    inited= 0;
+    close_and_destroy();
+    delete description_event_for_queue;
+    delete description_event_for_exec;
+  }
+}
+
+void MYSQL_BINARY_LOG::cleanup()
 {
   DBUG_ENTER("cleanup");
   if (inited)
@@ -3782,15 +3804,10 @@ void MYSQL_BIN_LOG::cleanup()
     xid_count_per_binlog *b;
 
     /* Wait for the binlog background thread to stop. */
-    if (!is_relay_log)
-      stop_background_thread();
+    stop_background_thread();
 
     inited= 0;
-    mysql_mutex_lock(&LOCK_log);
-    close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
-    mysql_mutex_unlock(&LOCK_log);
-    delete description_event_for_queue;
-    delete description_event_for_exec;
+    close_and_destroy();
 
     while ((b= binlog_xid_count_list.get()))
     {
@@ -3805,14 +3822,9 @@ void MYSQL_BIN_LOG::cleanup()
       delete b;
     }
 
-    mysql_mutex_destroy(&LOCK_log);
-    mysql_mutex_destroy(&LOCK_index);
     mysql_mutex_destroy(&LOCK_xid_list);
     mysql_mutex_destroy(&LOCK_binlog_background_thread);
-    mysql_mutex_destroy(&LOCK_binlog_end_pos);
-    mysql_cond_destroy(&COND_relay_log_updated);
     mysql_cond_destroy(&COND_bin_log_updated);
-    mysql_cond_destroy(&COND_queue_busy);
     mysql_cond_destroy(&COND_xid_list);
     mysql_cond_destroy(&COND_binlog_background_thread);
     mysql_cond_destroy(&COND_binlog_background_thread_end);
@@ -4014,8 +4026,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
                          bool null_created_arg,
                          bool need_mutex)
 {
-  File file= -1;
-  xid_count_per_binlog *new_xid_list_entry= NULL, *b;
+  MYSQL_BINARY_LOG::xid_count_per_binlog *new_xid_list_entry= NULL, *b;
   DBUG_ENTER("MYSQL_BIN_LOG::open");
 
   mysql_mutex_assert_owner(&LOCK_log);
@@ -4194,7 +4205,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
         */
         size_t off= dirname_length(log_file_name);
         uint len= static_cast<uint>(strlen(log_file_name) - off);
-        new_xid_list_entry= new xid_count_per_binlog(log_file_name+off, len);
+        new_xid_list_entry= new MYSQL_BINARY_LOG::xid_count_per_binlog(log_file_name+off, len);
         if (!new_xid_list_entry)
           goto err;
 
@@ -4207,7 +4218,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
           list will be empty.
         */
         mysql_mutex_lock(&LOCK_xid_list);
-        I_List_iterator<xid_count_per_binlog> it(binlog_xid_count_list);
+        I_List_iterator<MYSQL_BINARY_LOG::xid_count_per_binlog> it(MYSQL_BINARY_LOG::binlog_xid_count_list);
         while ((b= it++) && b->xid_count == 0)
           ;
         mysql_mutex_unlock(&LOCK_xid_list);
@@ -4372,8 +4383,6 @@ err:
   sql_print_error(fatal_log_error, (name) ? name : log_name, tmp_errno);
   if (new_xid_list_entry)
     delete new_xid_list_entry;
-  if (file >= 0)
-    mysql_file_close(file, MYF(0));
   close(LOG_CLOSE_INDEX);
   DBUG_RETURN(1);
 }
@@ -5751,7 +5760,7 @@ MYSQL_BIN_LOG::is_xidlist_idle()
 
 
 bool
-MYSQL_BIN_LOG::is_xidlist_idle_nolock()
+MYSQL_BINARY_LOG::is_xidlist_idle_nolock()
 {
   xid_count_per_binlog *b;
 
@@ -7654,8 +7663,8 @@ bool general_log_write(THD *thd, enum enum_server_command command,
 static void
 binlog_checkpoint_callback(void *cookie)
 {
-  MYSQL_BIN_LOG::xid_count_per_binlog *entry=
-    (MYSQL_BIN_LOG::xid_count_per_binlog *)cookie;
+  MYSQL_BINARY_LOG::xid_count_per_binlog *entry=
+    (MYSQL_BINARY_LOG::xid_count_per_binlog *)cookie;
   /*
     For every supporting engine, we increment the xid_count and issue a
     commit_checkpoint_request(). Then we can count when all
@@ -7676,7 +7685,7 @@ binlog_checkpoint_callback(void *cookie)
 void
 MYSQL_BIN_LOG::do_checkpoint_request(ulong binlog_id)
 {
-  xid_count_per_binlog *entry;
+  MYSQL_BINARY_LOG::xid_count_per_binlog *entry;
 
   /*
     Find the binlog entry, and invoke commit_checkpoint_request() on it in
@@ -7728,7 +7737,7 @@ MYSQL_BIN_LOG::do_checkpoint_request(ulong binlog_id)
   @retval
     nonzero - error in rotating routine.
 */
-int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
+int MYSQL_BINARY_LOG::rotate(bool force_rotate, bool* check_purge)
 {
   int error= 0;
   ulonglong binlog_pos;
@@ -11134,11 +11143,11 @@ TC_LOG_BINLOG::log_and_order(THD *thd, my_xid xid, bool all,
   binary log.
 */
 void
-TC_LOG_BINLOG::mark_xids_active(ulong binlog_id, uint xid_count)
+MYSQL_BINARY_LOG::mark_xids_active(ulong binlog_id, uint xid_count)
 {
   xid_count_per_binlog *b;
 
-  DBUG_ENTER("TC_LOG_BINLOG::mark_xids_active");
+  DBUG_ENTER("MYSQL_BINARY_LOG::mark_xids_active");
   DBUG_PRINT("info", ("binlog_id=%lu xid_count=%u", binlog_id, xid_count));
 
   mysql_mutex_lock(&LOCK_xid_list);
@@ -11330,7 +11339,7 @@ int TC_LOG_BINLOG::unlog_xa_prepare(THD *thd, bool all)
 
 
 void
-TC_LOG_BINLOG::commit_checkpoint_notify(void *cookie)
+MYSQL_BINARY_LOG::commit_checkpoint_notify(void *cookie)
 {
   xid_count_per_binlog *entry= static_cast<xid_count_per_binlog *>(cookie);
   bool found_entry= false;
@@ -11367,7 +11376,7 @@ pthread_handler_t
 binlog_background_thread(void *arg __attribute__((unused)))
 {
   bool stop;
-  MYSQL_BIN_LOG::xid_count_per_binlog *queue, *next;
+  MYSQL_BINARY_LOG::xid_count_per_binlog *queue, *next;
   THD *thd;
   my_thread_init();
   DBUG_ENTER("binlog_background_thread");

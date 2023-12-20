@@ -676,46 +676,10 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
     LOCK_log.
   */
   int new_file_impl();
-  void do_checkpoint_request(ulong binlog_id);
-  bool is_xidlist_idle_nolock();
+  void close_and_destroy();
 public:
   void purge(bool all);
   int new_file_without_locking();
-  /*
-    A list of struct xid_count_per_binlog is used to keep track of how many
-    XIDs are in prepared, but not committed, state in each binlog. And how
-    many commit_checkpoint_request()'s are pending.
-
-    When count drops to zero in a binlog after rotation, it means that there
-    are no more XIDs in prepared state, so that binlog is no longer needed
-    for XA crash recovery, and we can log a new binlog checkpoint event.
-
-    The list is protected against simultaneous access from multiple
-    threads by LOCK_xid_list.
-  */
-  struct xid_count_per_binlog : public ilink {
-    char *binlog_name;
-    uint binlog_name_len;
-    ulong binlog_id;
-    /* Total prepared XIDs and pending checkpoint requests in this binlog. */
-    long xid_count;
-    long notify_count;
-    /* For linking in requests to the binlog background thread. */
-    xid_count_per_binlog *next_in_queue;
-    xid_count_per_binlog(char *log_file_name, uint log_file_name_len)
-      :binlog_id(0), xid_count(0), notify_count(0)
-    {
-      binlog_name_len= log_file_name_len;
-      binlog_name= (char *) my_malloc(PSI_INSTRUMENT_ME, binlog_name_len, MYF(MY_ZEROFILL));
-      if (binlog_name)
-        memcpy(binlog_name, log_file_name, binlog_name_len);
-    }
-    ~xid_count_per_binlog()
-    {
-      my_free(binlog_name);
-    }
-  };
-  I_List<xid_count_per_binlog> binlog_xid_count_list;
   mysql_mutex_t LOCK_binlog_background_thread;
   mysql_cond_t COND_binlog_background_thread;
   mysql_cond_t COND_binlog_background_thread_end;
@@ -823,13 +787,13 @@ public:
 
   int open(const char *opt_name);
   void close();
-  virtual int generate_new_name(char *new_name, const char *log_name,
-                                ulong next_log_number);
+  int generate_new_name(char *new_name, const char *log_name,
+                              ulong next_log_number) override;
   int log_and_order(THD *thd, my_xid xid, bool all,
                     bool need_prepare_ordered, bool need_commit_ordered);
   int unlog(ulong cookie, my_xid xid);
   int unlog_xa_prepare(THD *thd, bool all);
-  void commit_checkpoint_notify(void *cookie);
+  virtual void commit_checkpoint_notify(void *cookie) = 0;
   int recover(LOG_INFO *linfo, const char *last_log_name, IO_CACHE *first_log,
               Format_description_log_event *fdle, bool do_xa);
   int do_binlog_recovery(const char *opt_name, bool do_xa_recovery);
@@ -904,7 +868,7 @@ public:
   void wait_for_update_relay_log(THD* thd);
   void init(ulong max_size);
   void init_pthread_objects();
-  void cleanup();
+  virtual void cleanup() = 0;
   bool open(const char *log_name,
             const char *new_name,
             ulong next_log_number,
@@ -940,13 +904,11 @@ public:
   bool append(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
   bool append_no_lock(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
 
-  void mark_xids_active(ulong cookie, uint xid_count);
   void mark_xid_done(ulong cookie, bool write_checkpoint);
   void make_log_name(char* buf, const char* log_ident);
   bool is_active(const char* log_file_name);
   virtual bool can_purge_log(const char *log_file_name) = 0;
   int update_log_index(LOG_INFO* linfo, bool need_update_threads);
-  int rotate(bool force_rotate, bool* check_purge);
   void checkpoint_and_purge(ulong binlog_id);
   int rotate_and_purge(bool force_rotate, DYNAMIC_ARRAY* drop_gtid_domain= NULL);
   /**
@@ -1179,6 +1141,39 @@ public:
     group_commit_trigger_lock_wait= 0;
     file_id= 1;
   }
+  /*
+    A list of struct xid_count_per_binlog is used to keep track of how many
+    XIDs are in prepared, but not committed, state in each binlog. And how
+    many commit_checkpoint_request()'s are pending.
+    When count drops to zero in a binlog after rotation, it means that there
+    are no more XIDs in prepared state, so that binlog is no longer needed
+    for XA crash recovery, and we can log a new binlog checkpoint event.
+    The list is protected against simultaneous access from multiple
+    threads by LOCK_xid_list.
+  */
+  struct xid_count_per_binlog : public ilink {
+    char *binlog_name;
+    uint binlog_name_len;
+    ulong binlog_id;
+    /* Total prepared XIDs and pending checkpoint requests in this binlog. */
+    long xid_count;
+    long notify_count;
+    /* For linking in requests to the binlog background thread. */
+    xid_count_per_binlog *next_in_queue;
+    xid_count_per_binlog(char *log_file_name, uint log_file_name_len)
+      :binlog_id(0), xid_count(0), notify_count(0)
+    {
+      binlog_name_len= log_file_name_len;
+      binlog_name= (char *) my_malloc(PSI_INSTRUMENT_ME, binlog_name_len, MYF(MY_ZEROFILL));
+      if (binlog_name)
+        memcpy(binlog_name, log_file_name, binlog_name_len);
+    }
+    ~xid_count_per_binlog()
+    {
+      my_free(binlog_name);
+    }
+  };
+  I_List<xid_count_per_binlog> binlog_xid_count_list;
   void wait_for_sufficient_commits();
   void binlog_trigger_immediate_group_commit();
   bool write_transaction_to_binlog(THD *thd, binlog_cache_mngr *cache_mngr,
@@ -1187,7 +1182,13 @@ public:
                                    bool is_ro_1pc);
   uint next_file_id();
   void set_status_variables(THD *thd);
+  void mark_xids_active(ulong cookie, uint xid_count);
+  void do_checkpoint_request(ulong binlog_id);
+  bool is_xidlist_idle_nolock();
+  int rotate(bool force_rotate, bool* check_purge);
   bool can_purge_log(const char *log_file_name) override;
+  void commit_checkpoint_notify(void *cookie) override;
+  void cleanup() override;
 };
 
 
@@ -1200,6 +1201,8 @@ public:
     is_relay_log= 1;
   }
   bool can_purge_log(const char *log_file_name) override;
+  void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
+  void cleanup() override;
 };
 
 
