@@ -3834,8 +3834,7 @@ void MYSQL_BINARY_LOG::cleanup()
     We can't do that automatically as we need to do this before
     safemalloc is shut down
   */
-  if (!is_relay_log)
-    rpl_global_gtid_binlog_state.free();
+  rpl_global_gtid_binlog_state.free();
   DBUG_VOID_RETURN;
 }
 
@@ -4800,9 +4799,7 @@ bool MYSQL_BIN_LOG::reset_logs(THD *thd, bool create_new_log,
   mysql_mutex_lock(&LOCK_index);
 
   if (!is_relay_log)
-  {
     mark_and_commit_reset_logs();
-  }
 
   /* Save variables so that we can reopen the log */
   save_name=name;
@@ -4915,9 +4912,7 @@ err:
     name= const_cast<char*>(save_name);
 
   if (!is_relay_log)
-  {
     remove_xid_except_last();
-  }
 
   mysql_mutex_unlock(&LOCK_index);
   mysql_mutex_unlock(&LOCK_log);
@@ -7550,7 +7545,6 @@ err:
     {
       my_off_t offset= my_b_tell(file);
       bool check_purge= false;
-      DBUG_ASSERT(!is_relay_log);
 
       if (likely(!error))
       {
