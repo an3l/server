@@ -612,7 +612,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 
   /* LOCK_log and LOCK_index are inited by init_pthread_objects() */
   mysql_mutex_t LOCK_index;
-  mysql_cond_t  COND_relay_log_updated;
   ulonglong bytes_written;
   IO_CACHE index_file;
   char index_file_name[FN_REFLEN];
@@ -637,7 +636,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
     closely with current_binlog_id
   */
   ulong last_used_log_number;
-  uint open_count;				// For replication
   mysql_cond_t COND_queue_busy;
 
   /* pointer to the sync period variable, for binlog this will be
@@ -704,7 +702,6 @@ public:
 
   /* This is relay log */
   bool is_relay_log;
-  ulong relay_signal_cnt;  // update of the counter is checked by heartbeat
   enum enum_binlog_checksum_alg checksum_alg_reset; // to contain a new value when binlog is rotated
   /*
     Holds the last seen in Relay-Log FD's checksum alg value.
@@ -809,18 +806,6 @@ public:
     DBUG_VOID_RETURN;
   }
   void set_max_size(ulong max_size_arg);
-
-  /* Handle signaling that relay has been updated */
-  void signal_relay_log_update()
-  {
-    mysql_mutex_assert_owner(&LOCK_log);
-    DBUG_ASSERT(is_relay_log);
-    DBUG_ENTER("MYSQL_BIN_LOG::signal_relay_log_update");
-    relay_signal_cnt++;
-    mysql_cond_broadcast(&COND_relay_log_updated);
-    DBUG_VOID_RETURN;
-  }
-  void wait_for_update_relay_log(THD* thd);
   virtual void init_pthread_objects();
   virtual void cleanup() = 0;
   bool open(const char *log_name,
@@ -834,7 +819,6 @@ public:
                        const char *log_name, bool need_mutex);
   /* Use this to start writing a new log file */
   int new_file();
-
   using Event_log::write_event;
 
   bool write_event(Log_event *ev, enum enum_binlog_checksum_alg checksum_alg)
@@ -904,7 +888,6 @@ public:
   inline void lock_index() { mysql_mutex_lock(&LOCK_index);}
   inline void unlock_index() { mysql_mutex_unlock(&LOCK_index);}
   inline IO_CACHE *get_index_file() { return &index_file;}
-  inline uint32 get_open_count() { return open_count; }
   bool write_gtid_event(THD *thd, bool standalone, bool is_transactional,
                         uint64 commit_id,
                         bool has_xid= false, bool ro_1pc= false);
@@ -950,6 +933,7 @@ public:
   virtual bool write_description_event_for_slave() { return 0; }
   virtual void set_last_commit_pos_file_and_offset(char *log_file_name,
                                                    my_off_t offset) {};
+  virtual void increment_open_count_slave() {};
 };
 
 
@@ -1212,6 +1196,7 @@ public:
 
 class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
 {
+  mysql_cond_t  COND_relay_log_updated;
 public:
   /*
     These describe the log's format. This is used only for relay logs.
@@ -1223,13 +1208,28 @@ public:
   */
   Format_description_log_event *description_event_for_exec,
     *description_event_for_queue;
+  ulong relay_signal_cnt;  // update of the counter is checked by heartbeat
+  uint open_count;				// For replication
   MYSQL_RELAY_LOG(uint *sync_period)
     :MYSQL_BIN_LOG(sync_period)
   {
     is_relay_log= 1;
     description_event_for_exec= 0;
     description_event_for_queue= 0;
+    relay_signal_cnt= 0;
+    open_count= 1;
   }
+  /* Handle signaling that relay has been updated */
+  void signal_relay_log_update()
+  {
+    mysql_mutex_assert_owner(&LOCK_log);
+    DBUG_ENTER("MYSQL_BIN_LOG::signal_relay_log_update");
+    relay_signal_cnt++;
+    mysql_cond_broadcast(&COND_relay_log_updated);
+    DBUG_VOID_RETURN;
+  }
+  void wait_for_update_relay_log(THD* thd);
+  inline uint32 get_open_count() { return open_count; }
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
@@ -1237,6 +1237,8 @@ public:
   void update_binlog_end_pos() override { signal_relay_log_update(); };
   void cleanup() override;
   bool write_description_event_for_slave() override;
+  void init_pthread_objects() override;
+  void increment_open_count_slave() override { open_count++; }
 };
 
 

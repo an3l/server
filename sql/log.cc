@@ -3735,10 +3735,9 @@ const char *MYSQL_LOG::generate_name(const char *log_name,
 
 MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
   :bytes_written(0),
-   last_used_log_number(0), open_count(1),
+   last_used_log_number(0),
    sync_period_ptr(sync_period), sync_counter(0),
    binlog_state_recover_done(false),
-   relay_signal_cnt(0),
    checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF),
    relay_log_checksum_alg(BINLOG_CHECKSUM_ALG_UNDEF)
 {
@@ -3778,7 +3777,6 @@ void MYSQL_BIN_LOG::close_log_and_destroy_mutex()
   mysql_mutex_destroy(&LOCK_log);
   mysql_mutex_destroy(&LOCK_index);
   mysql_mutex_destroy(&LOCK_binlog_end_pos);
-  mysql_cond_destroy(&COND_relay_log_updated);
   mysql_cond_destroy(&COND_queue_busy);
 }
 
@@ -3790,6 +3788,7 @@ void MYSQL_RELAY_LOG::cleanup()
   {
     inited= 0;
     close_log_and_destroy_mutex();
+    mysql_cond_destroy(&COND_relay_log_updated);
     delete description_event_for_queue;
     delete description_event_for_exec;
   }
@@ -3846,8 +3845,14 @@ void MYSQL_BIN_LOG::init_pthread_objects()
   Event_log::init_pthread_objects();
   mysql_mutex_init(m_key_LOCK_index, &LOCK_index, MY_MUTEX_INIT_SLOW);
   mysql_mutex_setflags(&LOCK_index, MYF_NO_DEADLOCK_DETECTION);
-  mysql_cond_init(m_key_relay_log_update, &COND_relay_log_updated, 0);
   mysql_cond_init(m_key_COND_queue_busy, &COND_queue_busy, 0);
+}
+
+
+void MYSQL_RELAY_LOG::init_pthread_objects()
+{
+  MYSQL_BIN_LOG::init_pthread_objects();
+  mysql_cond_init(m_key_relay_log_update, &COND_relay_log_updated, 0);
 }
 
 
@@ -4281,8 +4286,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
   }
 
   max_size= max_size_arg;
-  if (is_relay_log)
-    open_count++;
+  increment_open_count_slave();
 
   DBUG_ASSERT(log_type == LOG_BIN);
 
@@ -9674,7 +9678,7 @@ binlog_report_wait_for(THD *thd1, THD *thd2)
     THD::enter_cond() (see NOTES in sql_class.h).
 */
 
-void MYSQL_BIN_LOG::wait_for_update_relay_log(THD* thd)
+void MYSQL_RELAY_LOG::wait_for_update_relay_log(THD* thd)
 {
   PSI_stage_info old_stage;
   DBUG_ENTER("wait_for_update_relay_log");
