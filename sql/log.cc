@@ -5455,7 +5455,7 @@ err:
                                 mysql_file_stat() or mysql_file_delete()
 */
 
-int MYSQL_BIN_LOG::purge_logs_before_date(time_t purge_time)
+int MYSQL_BINARY_LOG::purge_logs_before_date(time_t purge_time)
 {
   int error;
   char to_log[FN_REFLEN];
@@ -5544,7 +5544,7 @@ err:
                         mysql_file_stat() or mysql_file_delete()
 */
 
-int MYSQL_BIN_LOG::real_purge_logs_by_size(ulonglong binlog_pos)
+int MYSQL_BINARY_LOG::real_purge_logs_by_size(ulonglong binlog_pos)
 {
   int error= 0;
   LOG_INFO log_info;
@@ -6170,7 +6170,7 @@ bool MYSQL_BIN_LOG::flush_and_sync(bool *synced)
   return err;
 }
 
-void MYSQL_BIN_LOG::start_union_events(THD *thd, query_id_t query_id_param)
+void MYSQL_BINARY_LOG::start_union_events(THD *thd, query_id_t query_id_param)
 {
   DBUG_ASSERT(!thd->binlog_evt_union.do_union);
   thd->binlog_evt_union.do_union= TRUE;
@@ -6179,13 +6179,13 @@ void MYSQL_BIN_LOG::start_union_events(THD *thd, query_id_t query_id_param)
   thd->binlog_evt_union.first_query_id= query_id_param;
 }
 
-void MYSQL_BIN_LOG::stop_union_events(THD *thd)
+void MYSQL_BINARY_LOG::stop_union_events(THD *thd)
 {
   DBUG_ASSERT(thd->binlog_evt_union.do_union);
   thd->binlog_evt_union.do_union= FALSE;
 }
 
-bool MYSQL_BIN_LOG::is_query_in_union(THD *thd, query_id_t query_id_param)
+bool MYSQL_BINARY_LOG::is_query_in_union(THD *thd, query_id_t query_id_param)
 {
   return (thd->binlog_evt_union.do_union && 
           query_id_param >= thd->binlog_evt_union.first_query_id);
@@ -6672,7 +6672,7 @@ bool THD::binlog_write_table_maps()
     nonzero if an error pops up when writing the table map event.
 */
 
-bool MYSQL_BIN_LOG::write_table_map(THD *thd, TABLE *table, bool with_annotate)
+bool MYSQL_BINARY_LOG::write_table_map(THD *thd, TABLE *table, bool with_annotate)
 {
   int error= 1;
   bool is_transactional= table->file->row_logging_has_trans;

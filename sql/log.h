@@ -914,11 +914,6 @@ public:
   /* Use this to start writing a new log file */
   int new_file();
 
-  bool write_table_map(THD *thd, TABLE *table, bool with_annotate);
-  void start_union_events(THD *thd, query_id_t query_id_param);
-  void stop_union_events(THD *thd);
-  bool is_query_in_union(THD *thd, query_id_t query_id_param);
-
   using Event_log::write_event;
 
   bool write_event(Log_event *ev, enum enum_binlog_checksum_alg checksum_alg)
@@ -926,7 +921,6 @@ public:
     return write_event(ev, checksum_alg, 0, &log_file);
   }
   bool write_event(Log_event *ev);
-
   bool write_event_buffer(uchar* buf,uint len);
   bool append(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
   bool append_no_lock(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
@@ -954,7 +948,6 @@ public:
   int purge_logs(const char *to_log, bool included,
                  bool need_mutex, bool need_update_threads,
                  ulonglong *decrease_log_space);
-  int purge_logs_before_date(time_t purge_time);
   int purge_first_log(Relay_log_info* rli, bool included);
   int count_binlog_space();
   void count_binlog_space_with_lock()
@@ -965,14 +958,6 @@ public:
   }
   void reset_binlog_space_total() { binlog_space_total= 0; }
   ulonglong get_binlog_space_total();
-  int real_purge_logs_by_size(ulonglong binlog_pos);
-  inline int purge_logs_by_size(ulonglong binlog_pos)
-  {
-    if (!binlog_space_total || is_relay_log || ! binlog_space_limit ||
-        binlog_space_total + binlog_pos <= binlog_space_limit)
-      return 0;
-    return real_purge_logs_by_size(binlog_pos);
-  }
   int set_purge_index_file_name(const char *base_file_name);
   int open_purge_index_file(bool destroy);
   bool truncate_and_remove_binlogs(const char *truncate_file,
@@ -1168,10 +1153,6 @@ public:
   }
   void wait_for_sufficient_commits();
   void binlog_trigger_immediate_group_commit();
-  bool write_transaction_to_binlog(THD *thd, binlog_cache_mngr *cache_mngr,
-                                   Log_event *end_ev, bool all,
-                                   bool using_stmt_cache, bool using_trx_cache,
-                                   bool is_ro_1pc);
   uint next_file_id();
   void set_status_variables(THD *thd);
   void mark_xids_active(ulong cookie, uint xid_count);
@@ -1185,9 +1166,26 @@ public:
   bool is_xidlist_idle();
   bool write(Log_event* event_info,
              my_bool *with_annotate= 0); // binary log write
+  bool write_transaction_to_binlog(THD *thd, binlog_cache_mngr *cache_mngr,
+                                   Log_event *end_ev, bool all,
+                                   bool using_stmt_cache, bool using_trx_cache,
+                                   bool is_ro_1pc);
   bool write_incident(THD *thd);
   bool write_incident_already_locked(THD *thd);
   void write_binlog_checkpoint_event_already_locked(const char *name, uint len);
+  bool write_table_map(THD *thd, TABLE *table, bool with_annotate);
+  void start_union_events(THD *thd, query_id_t query_id_param);
+  void stop_union_events(THD *thd);
+  bool is_query_in_union(THD *thd, query_id_t query_id_param);
+  int purge_logs_before_date(time_t purge_time);
+  int real_purge_logs_by_size(ulonglong binlog_pos);
+  inline int purge_logs_by_size(ulonglong binlog_pos)
+  {
+    if (!binlog_space_total || is_relay_log || ! binlog_space_limit ||
+        binlog_space_total + binlog_pos <= binlog_space_limit)
+      return 0;
+    return real_purge_logs_by_size(binlog_pos);
+  }
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
