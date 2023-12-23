@@ -4021,10 +4021,10 @@ bool MYSQL_BINARY_LOG::recovery_and_start_bgt()
 }
 
 
-bool MYSQL_BINARY_LOG::output_gtid_event(xid_count_per_binlog *& new_xid_list_entry,
-                                         xid_count_per_binlog *& b)
+bool MYSQL_BINARY_LOG::output_gtid_event(xid_count_per_binlog *& new_xid_list_entry)
 {
   char buf[FN_REFLEN];
+  xid_count_per_binlog *b= NULL;
 
   /*
     Output a Gtid_list_log_event at the start of the binlog file.
@@ -4114,9 +4114,9 @@ bool MYSQL_BINARY_LOG::output_gtid_event(xid_count_per_binlog *& new_xid_list_en
 }
 
 
-void MYSQL_BINARY_LOG::link_to_count_list(xid_count_per_binlog *& new_xid_list_entry,
-                                          xid_count_per_binlog *& b)
+void MYSQL_BINARY_LOG::link_to_count_list(xid_count_per_binlog *& new_xid_list_entry)
 {
+  xid_count_per_binlog *b= NULL;
   /*
     Now the file was created successfully, so we can link in the entry for
     the new binlog file in binlog_xid_count_list.
@@ -4215,7 +4215,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
                          bool null_created_arg,
                          bool need_mutex)
 {
-  xid_count_per_binlog *new_xid_list_entry= NULL, *b= NULL;
+  xid_count_per_binlog *new_xid_list_entry= NULL;
   DBUG_ENTER("MYSQL_BIN_LOG::open");
 
   mysql_mutex_assert_owner(&LOCK_log);
@@ -4329,7 +4329,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
 
       if (!is_relay_log)
       {
-        if (output_gtid_event(new_xid_list_entry, b))
+        if (output_gtid_event(new_xid_list_entry))
           goto err;
       }
     }
@@ -4383,7 +4383,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
   }
 
   if (!is_relay_log)
-    link_to_count_list(new_xid_list_entry, b);
+    link_to_count_list(new_xid_list_entry);
 
   log_state= LOG_OPENED;
 

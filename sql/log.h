@@ -882,7 +882,7 @@ public:
   inline char* get_index_fname() { return index_file_name;}
   inline char* get_log_fname() { return log_file_name; }
   using MYSQL_LOG::get_log_lock;
-
+  inline IO_CACHE* get_log_file() override { return &log_file; }
   inline void lock_index() { mysql_mutex_lock(&LOCK_index);}
   inline void unlock_index() { mysql_mutex_unlock(&LOCK_index);}
   inline IO_CACHE *get_index_file() { return &index_file;}
@@ -903,10 +903,10 @@ public:
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
   virtual bool recovery_and_start_bgt() { return 0; };
-  virtual bool output_gtid_event(xid_count_per_binlog *& new_xid_list_entry,
-                                 xid_count_per_binlog *& b) { return 0; };
-  virtual void link_to_count_list(xid_count_per_binlog *& new_xid_list_entry,
-                                  xid_count_per_binlog *& b) { DBUG_ASSERT(0); };
+  virtual bool output_gtid_event(xid_count_per_binlog *& new_xid_list_entry)
+  { return 0; };
+  virtual void link_to_count_list(xid_count_per_binlog *& new_xid_list_entry)
+  { };
   virtual void remove_xid_except_last() { DBUG_ASSERT(0); };
   virtual bool reset_master_in_progress(rpl_gtid *init_state) { return 0; };
   virtual void increment_binlog_space_total() { DBUG_ASSERT(0); }
@@ -1172,10 +1172,8 @@ public:
   int unlog(ulong cookie, my_xid xid) override;
   int unlog_xa_prepare(THD *thd, bool all) override;
   bool recovery_and_start_bgt() override;
-  bool output_gtid_event(xid_count_per_binlog *& new_xid_list_entry,
-                        xid_count_per_binlog *& b) override;
-  void link_to_count_list(xid_count_per_binlog *& new_xid_list_entry,
-                          xid_count_per_binlog *& b) override;
+  bool output_gtid_event(xid_count_per_binlog *& new_xid_list_entry) override;
+  void link_to_count_list(xid_count_per_binlog *& new_xid_list_entry) override;
   void remove_xid_except_last() override;
   bool reset_master_in_progress(rpl_gtid *init_state) override;
   void increment_binlog_space_total() override
