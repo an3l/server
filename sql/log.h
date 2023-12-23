@@ -612,9 +612,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 
   /* LOCK_log and LOCK_index are inited by init_pthread_objects() */
   mysql_mutex_t LOCK_index;
-  mysql_mutex_t LOCK_xid_list;
-  mysql_cond_t  COND_xid_list;
-  mysql_cond_t  COND_relay_log_updated, COND_bin_log_updated;
+  mysql_cond_t  COND_relay_log_updated;
   ulonglong bytes_written;
   IO_CACHE index_file;
   char index_file_name[FN_REFLEN];
@@ -662,6 +660,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
     LOCK_log.
   */
   int new_file_impl();
+  void close_log_and_destroy_mutex();
 public:
   int new_file_without_locking();
   /*
@@ -699,11 +698,6 @@ public:
     }
   };
   I_List<xid_count_per_binlog> binlog_xid_count_list;
-  mysql_mutex_t LOCK_binlog_background_thread;
-  mysql_cond_t COND_binlog_background_thread;
-  mysql_cond_t COND_binlog_background_thread_end;
-
-  void stop_background_thread();
 
   using MYSQL_LOG::generate_name;
   using MYSQL_LOG::is_open;
@@ -747,22 +741,11 @@ public:
   */
   enum enum_binlog_checksum_alg relay_log_checksum_alg;
   /*
-    These describe the log's format. This is used only for relay logs.
-    _for_exec is used by the SQL thread, _for_queue by the I/O thread. It's
-    necessary to have 2 distinct objects, because the I/O thread may be reading
-    events in a different format from what the SQL thread is reading (consider
-    the case of a master which has been upgraded from 5.0 to 5.1 without doing
-    RESET MASTER, or from 4.x to 5.0).
-  */
-  Format_description_log_event *description_event_for_exec,
-    *description_event_for_queue;
-  /*
     Binlog position of last commit (or non-transactional write) to the binlog.
     Access to this is protected by LOCK_commit_ordered.
   */
   char last_commit_pos_file[FN_REFLEN];
   my_off_t last_commit_pos_offset;
-  ulong current_binlog_id;
 
   MYSQL_BIN_LOG(uint *sync_period);
   /*
@@ -843,17 +826,9 @@ public:
     mysql_cond_broadcast(&COND_relay_log_updated);
     DBUG_VOID_RETURN;
   }
-  void signal_bin_log_update()
-  {
-    mysql_mutex_assert_owner(&LOCK_binlog_end_pos);
-    DBUG_ASSERT(!is_relay_log);
-    DBUG_ENTER("MYSQL_BIN_LOG::signal_bin_log_update");
-    mysql_cond_broadcast(&COND_bin_log_updated);
-    DBUG_VOID_RETURN;
-  }
   void wait_for_update_relay_log(THD* thd);
-  void init_pthread_objects();
-  void cleanup();
+  virtual void init_pthread_objects();
+  virtual void cleanup() = 0;
   bool open(const char *log_name,
             const char *new_name,
             ulong next_log_number,
@@ -930,7 +905,6 @@ public:
   inline char* get_index_fname() { return index_file_name;}
   inline char* get_log_fname() { return log_file_name; }
   using MYSQL_LOG::get_log_lock;
-  inline mysql_cond_t* get_bin_log_cond() { return &COND_bin_log_updated; }
   inline IO_CACHE* get_log_file() { return &log_file; }
 
   inline void lock_index() { mysql_mutex_lock(&LOCK_index);}
@@ -979,11 +953,15 @@ public:
   virtual void increment_binlog_space_total() { DBUG_ASSERT(0); }
   virtual void update_binlog_end_pos() = 0;
   virtual void reset_binlog_end_pos(const char file_name[FN_REFLEN], my_off_t pos){};
+  virtual bool write_description_event_for_slave() { return 0; }
 };
 
 
 class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
 {
+
+  mysql_mutex_t LOCK_xid_list;
+  mysql_cond_t  COND_xid_list, COND_bin_log_updated;
 
   struct group_commit_entry
   {
@@ -1073,6 +1051,10 @@ public:
     for the dump threads to be able to semi-sync the event.
   */
   my_off_t binlog_end_pos;
+  mysql_mutex_t LOCK_binlog_background_thread;
+  mysql_cond_t COND_binlog_background_thread;
+  mysql_cond_t COND_binlog_background_thread_end;
+  ulong current_binlog_id;
   MYSQL_BINARY_LOG(uint *sync_period)
     :MYSQL_BIN_LOG(sync_period)
   {
@@ -1090,6 +1072,7 @@ public:
     mark_xid_done_waiting= 0;
     state_file_deleted= FALSE;
     binlog_space_total= 0;
+    current_binlog_id= 0;
   }
   void wait_for_sufficient_commits();
   void binlog_trigger_immediate_group_commit();
@@ -1121,7 +1104,7 @@ public:
   int real_purge_logs_by_size(ulonglong binlog_pos);
   inline int purge_logs_by_size(ulonglong binlog_pos)
   {
-    if (!binlog_space_total || is_relay_log || ! binlog_space_limit ||
+    if (!binlog_space_total || ! binlog_space_limit ||
         binlog_space_total + binlog_pos <= binlog_space_limit)
       return 0;
     return real_purge_logs_by_size(binlog_pos);
@@ -1140,6 +1123,14 @@ public:
   void lock_binlog_end_pos() { mysql_mutex_lock(&LOCK_binlog_end_pos); }
   void unlock_binlog_end_pos() { mysql_mutex_unlock(&LOCK_binlog_end_pos); }
   mysql_mutex_t* get_binlog_end_pos_lock() { return &LOCK_binlog_end_pos; }
+  inline mysql_cond_t* get_bin_log_cond() { return &COND_bin_log_updated; }
+  void signal_bin_log_update()
+  {
+    mysql_mutex_assert_owner(&LOCK_binlog_end_pos);
+    DBUG_ENTER("MYSQL_BIN_LOG::signal_bin_log_update");
+    mysql_cond_broadcast(&COND_bin_log_updated);
+    DBUG_VOID_RETURN;
+  }
   void update_binlog_end_pos() override
   {
     lock_binlog_end_pos();
@@ -1187,6 +1178,7 @@ public:
     return binlog_end_pos;
   }
   int wait_for_update_binlog_end_pos(THD* thd, struct timespec * timeout);
+  void stop_background_thread();
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
@@ -1204,22 +1196,38 @@ public:
   {
     binlog_space_total+= binlog_end_pos;
   }
+  void cleanup() override;
+  void init_pthread_objects() override;
 };
 
 
 class MYSQL_RELAY_LOG: public MYSQL_BIN_LOG
 {
 public:
+  /*
+    These describe the log's format. This is used only for relay logs.
+    _for_exec is used by the SQL thread, _for_queue by the I/O thread. It's
+    necessary to have 2 distinct objects, because the I/O thread may be reading
+    events in a different format from what the SQL thread is reading (consider
+    the case of a master which has been upgraded from 5.0 to 5.1 without doing
+    RESET MASTER, or from 4.x to 5.0).
+  */
+  Format_description_log_event *description_event_for_exec,
+    *description_event_for_queue;
   MYSQL_RELAY_LOG(uint *sync_period)
     :MYSQL_BIN_LOG(sync_period)
   {
     is_relay_log= 1;
+    description_event_for_exec= 0;
+    description_event_for_queue= 0;
   }
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
   void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
   void update_binlog_end_pos() override { signal_relay_log_update(); };
+  void cleanup() override;
+  bool write_description_event_for_slave() override;
 };
 
 

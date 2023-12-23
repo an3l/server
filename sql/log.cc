@@ -3740,9 +3740,7 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
    binlog_state_recover_done(false),
    relay_signal_cnt(0),
    checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF),
-   relay_log_checksum_alg(BINLOG_CHECKSUM_ALG_UNDEF),
-   description_event_for_exec(0), description_event_for_queue(0),
-   current_binlog_id(0)
+   relay_log_checksum_alg(BINLOG_CHECKSUM_ALG_UNDEF)
 {
   /*
     We don't want to initialize locks here as such initialization depends on
@@ -3755,7 +3753,7 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
   bzero((char*) &purge_index_file, sizeof(purge_index_file));
 }
 
-void MYSQL_BIN_LOG::stop_background_thread()
+void MYSQL_BINARY_LOG::stop_background_thread()
 {
   if (binlog_background_thread_started)
   {
@@ -3771,9 +3769,34 @@ void MYSQL_BIN_LOG::stop_background_thread()
   }
 }
 
-/* this is called only once */
 
-void MYSQL_BIN_LOG::cleanup()
+void MYSQL_BIN_LOG::close_log_and_destroy_mutex()
+{
+  mysql_mutex_lock(&LOCK_log);
+  close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
+  mysql_mutex_unlock(&LOCK_log);
+  mysql_mutex_destroy(&LOCK_log);
+  mysql_mutex_destroy(&LOCK_index);
+  mysql_mutex_destroy(&LOCK_binlog_end_pos);
+  mysql_cond_destroy(&COND_relay_log_updated);
+  mysql_cond_destroy(&COND_queue_busy);
+}
+
+
+/* this is called only once */
+void MYSQL_RELAY_LOG::cleanup()
+{
+  if (inited)
+  {
+    inited= 0;
+    close_log_and_destroy_mutex();
+    delete description_event_for_queue;
+    delete description_event_for_exec;
+  }
+}
+
+
+void MYSQL_BINARY_LOG::cleanup()
 {
   DBUG_ENTER("cleanup");
   if (inited)
@@ -3781,15 +3804,10 @@ void MYSQL_BIN_LOG::cleanup()
     xid_count_per_binlog *b;
 
     /* Wait for the binlog background thread to stop. */
-    if (!is_relay_log)
-      stop_background_thread();
+    stop_background_thread();
 
     inited= 0;
-    mysql_mutex_lock(&LOCK_log);
-    close(LOG_CLOSE_INDEX|LOG_CLOSE_STOP_EVENT);
-    mysql_mutex_unlock(&LOCK_log);
-    delete description_event_for_queue;
-    delete description_event_for_exec;
+    close_log_and_destroy_mutex();
 
     while ((b= binlog_xid_count_list.get()))
     {
@@ -3804,14 +3822,9 @@ void MYSQL_BIN_LOG::cleanup()
       delete b;
     }
 
-    mysql_mutex_destroy(&LOCK_log);
-    mysql_mutex_destroy(&LOCK_index);
     mysql_mutex_destroy(&LOCK_xid_list);
     mysql_mutex_destroy(&LOCK_binlog_background_thread);
-    mysql_mutex_destroy(&LOCK_binlog_end_pos);
-    mysql_cond_destroy(&COND_relay_log_updated);
     mysql_cond_destroy(&COND_bin_log_updated);
-    mysql_cond_destroy(&COND_queue_busy);
     mysql_cond_destroy(&COND_xid_list);
     mysql_cond_destroy(&COND_binlog_background_thread);
     mysql_cond_destroy(&COND_binlog_background_thread_end);
@@ -3833,11 +3846,17 @@ void MYSQL_BIN_LOG::init_pthread_objects()
   Event_log::init_pthread_objects();
   mysql_mutex_init(m_key_LOCK_index, &LOCK_index, MY_MUTEX_INIT_SLOW);
   mysql_mutex_setflags(&LOCK_index, MYF_NO_DEADLOCK_DETECTION);
+  mysql_cond_init(m_key_relay_log_update, &COND_relay_log_updated, 0);
+  mysql_cond_init(m_key_COND_queue_busy, &COND_queue_busy, 0);
+}
+
+
+void MYSQL_BINARY_LOG::init_pthread_objects()
+{
+  MYSQL_BIN_LOG::init_pthread_objects();
   mysql_mutex_init(key_BINLOG_LOCK_xid_list,
                    &LOCK_xid_list, MY_MUTEX_INIT_FAST);
-  mysql_cond_init(m_key_relay_log_update, &COND_relay_log_updated, 0);
   mysql_cond_init(m_key_bin_log_update, &COND_bin_log_updated, 0);
-  mysql_cond_init(m_key_COND_queue_busy, &COND_queue_busy, 0);
   mysql_cond_init(key_BINLOG_COND_xid_list, &COND_xid_list, 0);
 
   mysql_mutex_init(key_BINLOG_LOCK_binlog_background_thread,
@@ -4133,6 +4152,43 @@ void MYSQL_BINARY_LOG::link_to_count_list(xid_count_per_binlog *& new_xid_list_e
     state_file_deleted= true;
   }
 }
+
+bool MYSQL_RELAY_LOG::write_description_event_for_slave()
+{
+  if (description_event_for_queue &&
+      description_event_for_queue->binlog_version>=4)
+  {
+    /*
+      This is a relay log written to by the I/O slave thread.
+      Write the event so that others can later know the format of this relay
+      log.
+      Note that this event is very close to the original event from the
+      master (it has binlog version of the master, event types of the
+      master), so this is suitable to parse the next relay log's event. It
+      has been produced by
+      Format_description_log_event::Format_description_log_event(char* buf,).
+      Why don't we want to write the description_event_for_queue if this
+      event is for format<4 (3.23 or 4.x): this is because in that case, the
+      description_event_for_queue describes the data received from the
+      master, but not the data written to the relay log (*conversion*),
+      which is in format 4 (slave's).
+    */
+    /*
+      Set 'created' to 0, so that in next relay logs this event does not
+      trigger cleaning actions on the slave in
+      Format_description_log_event::apply_event_impl().
+    */
+    description_event_for_queue->created= 0;
+    /* Don't set log_pos in event header */
+    description_event_for_queue->set_artificial_event();
+
+    if (write_event(description_event_for_queue,
+                    description_event_for_queue->used_checksum_alg))
+      return true;
+    bytes_written+= description_event_for_queue->data_written;
+  }
+  return false;
+}
 /**
   Open a (new) binlog file.
 
@@ -4274,38 +4330,8 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
           goto err;
       }
     }
-    if (description_event_for_queue &&
-        description_event_for_queue->binlog_version>=4)
-    {
-      /*
-        This is a relay log written to by the I/O slave thread.
-        Write the event so that others can later know the format of this relay
-        log.
-        Note that this event is very close to the original event from the
-        master (it has binlog version of the master, event types of the
-        master), so this is suitable to parse the next relay log's event. It
-        has been produced by
-        Format_description_log_event::Format_description_log_event(char* buf,).
-        Why don't we want to write the description_event_for_queue if this
-        event is for format<4 (3.23 or 4.x): this is because in that case, the
-        description_event_for_queue describes the data received from the
-        master, but not the data written to the relay log (*conversion*),
-        which is in format 4 (slave's).
-      */
-      /*
-        Set 'created' to 0, so that in next relay logs this event does not
-        trigger cleaning actions on the slave in
-        Format_description_log_event::apply_event_impl().
-      */
-      description_event_for_queue->created= 0;
-      /* Don't set log_pos in event header */
-      description_event_for_queue->set_artificial_event();
-
-      if (write_event(description_event_for_queue,
-                      description_event_for_queue->used_checksum_alg))
-        goto err;
-      bytes_written+= description_event_for_queue->data_written;
-    }
+    if (write_description_event_for_slave())
+      goto err;
     if (flush_io_cache(&log_file) ||
         mysql_file_sync(log_file.file, MYF(MY_WME)))
       goto err;
