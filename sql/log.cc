@@ -3734,7 +3734,7 @@ const char *MYSQL_LOG::generate_name(const char *log_name,
 #endif
 
 MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
-  :bytes_written(0), binlog_space_total(0),
+  :bytes_written(0),
    last_used_log_number(0), open_count(1),
    sync_period_ptr(sync_period), sync_counter(0),
    binlog_state_recover_done(false),
@@ -4364,10 +4364,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
 #endif
 
   /* Notify the io thread that binlog is rotated to a new file */
-  if (is_relay_log)
-    signal_relay_log_update();
-  else
-    update_binlog_end_pos();
+  update_binlog_end_pos();
   DBUG_RETURN(0);
 
 err:
@@ -5966,7 +5963,7 @@ int MYSQL_BIN_LOG::new_file_impl()
     close_flag|= LOG_CLOSE_DELAYED_CLOSE;
     delay_close= true;
     if (binlog_space_limit)
-      binlog_space_total+= binlog_end_pos;
+      increment_binlog_space_total();
   }
   close(close_flag);
   if (checksum_alg_reset != BINLOG_CHECKSUM_ALG_UNDEF)
@@ -9682,8 +9679,8 @@ void MYSQL_BIN_LOG::wait_for_update_relay_log(THD* thd)
     LOCK_log is released by the caller.
 */
 
-int MYSQL_BIN_LOG::wait_for_update_binlog_end_pos(THD* thd,
-                                                  struct timespec *timeout)
+int MYSQL_BINARY_LOG::wait_for_update_binlog_end_pos(THD* thd,
+                                                     struct timespec *timeout)
 {
   int ret= 0;
   DBUG_ENTER("wait_for_update_binlog_end_pos");

@@ -616,7 +616,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   mysql_cond_t  COND_xid_list;
   mysql_cond_t  COND_relay_log_updated, COND_bin_log_updated;
   ulonglong bytes_written;
-  ulonglong binlog_space_total;
   IO_CACHE index_file;
   char index_file_name[FN_REFLEN];
   /*
@@ -852,34 +851,6 @@ public:
     mysql_cond_broadcast(&COND_bin_log_updated);
     DBUG_VOID_RETURN;
   }
-  void update_binlog_end_pos()
-  {
-    if (is_relay_log)
-      signal_relay_log_update();
-    else
-    {
-      lock_binlog_end_pos();
-      binlog_end_pos= my_b_safe_tell(&log_file);
-      signal_bin_log_update();
-      unlock_binlog_end_pos();
-    }
-  }
-  void update_binlog_end_pos(my_off_t pos)
-  {
-    mysql_mutex_assert_owner(&LOCK_log);
-    mysql_mutex_assert_not_owner(&LOCK_binlog_end_pos);
-    lock_binlog_end_pos();
-    /*
-      Note: it would make more sense to assert(pos > binlog_end_pos)
-      but there are two places triggered by mtr that has pos == binlog_end_pos
-      i didn't investigate but accepted as it should do no harm
-    */
-    DBUG_ASSERT(pos >= binlog_end_pos);
-    binlog_end_pos= pos;
-    signal_bin_log_update();
-    unlock_binlog_end_pos();
-  }
-
   void wait_for_update_relay_log(THD* thd);
   void init_pthread_objects();
   void cleanup();
@@ -981,36 +952,6 @@ public:
   int bump_seq_no_counter_if_needed(uint32 domain_id, uint64 seq_no);
   bool check_strict_gtid_sequence(uint32 domain_id, uint32 server_id,
                                   uint64 seq_no, bool no_error= false);
-
-  /**
-   * used when opening new file, and binlog_end_pos moves backwards
-   */
-  void reset_binlog_end_pos(const char file_name[FN_REFLEN], my_off_t pos)
-  {
-    mysql_mutex_assert_owner(&LOCK_log);
-    mysql_mutex_assert_not_owner(&LOCK_binlog_end_pos);
-    lock_binlog_end_pos();
-    binlog_end_pos= pos;
-    strcpy(binlog_end_pos_file, file_name);
-    signal_bin_log_update();
-    unlock_binlog_end_pos();
-  }
-
-  /*
-    It is called by the threads(e.g. dump thread) which want to read
-    log without LOCK_log protection.
-  */
-  my_off_t get_binlog_end_pos(char file_name_buf[FN_REFLEN]) const
-  {
-    mysql_mutex_assert_not_owner(&LOCK_log);
-    mysql_mutex_assert_owner(&LOCK_binlog_end_pos);
-    strcpy(file_name_buf, binlog_end_pos_file);
-    return binlog_end_pos;
-  }
-  void lock_binlog_end_pos() { mysql_mutex_lock(&LOCK_binlog_end_pos); }
-  void unlock_binlog_end_pos() { mysql_mutex_unlock(&LOCK_binlog_end_pos); }
-  mysql_mutex_t* get_binlog_end_pos_lock() { return &LOCK_binlog_end_pos; }
-
   /*
     Ensures the log's state is either LOG_OPEN or LOG_CLOSED. If something
     failed along the desired path and left the log in invalid state, i.e.
@@ -1025,19 +966,6 @@ public:
     mysql_mutex_unlock(get_log_lock());
   }
 
-  int wait_for_update_binlog_end_pos(THD* thd, struct timespec * timeout);
-
-  /*
-    Binlog position of end of the binlog.
-    Access to this is protected by LOCK_binlog_end_pos
-
-    The difference between this and last_commit_pos_{file,offset} is that
-    the commit position is updated later. If semi-sync wait point is set
-    to WAIT_AFTER_SYNC, the commit pos is update after semi-sync-ack has
-    been received and the end point is updated after the write as it's needed
-    for the dump threads to be able to semi-sync the event.
-  */
-  my_off_t binlog_end_pos;
   char binlog_end_pos_file[FN_REFLEN];
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
@@ -1048,6 +976,9 @@ public:
                                   xid_count_per_binlog *& b) { DBUG_ASSERT(0); };
   virtual void remove_xid_except_last() { DBUG_ASSERT(0); };
   virtual bool reset_master_in_progress(rpl_gtid *init_state) { return 0; };
+  virtual void increment_binlog_space_total() { DBUG_ASSERT(0); }
+  virtual void update_binlog_end_pos() = 0;
+  virtual void reset_binlog_end_pos(const char file_name[FN_REFLEN], my_off_t pos){};
 };
 
 
@@ -1120,6 +1051,7 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   */
   uint reset_master_pending;
   ulong mark_xid_done_waiting;
+  ulonglong binlog_space_total;
   int write_transaction_or_stmt(group_commit_entry *entry, uint64 commit_id);
   int queue_for_group_commit(group_commit_entry *entry);
   bool write_transaction_to_binlog_events(group_commit_entry *entry);
@@ -1130,6 +1062,17 @@ public:
   */
   Atomic_counter<uint64> reset_master_count;
   bool state_file_deleted;
+  /*
+    Binlog position of end of the binlog.
+    Access to this is protected by LOCK_binlog_end_pos
+
+    The difference between this and last_commit_pos_{file,offset} is that
+    the commit position is updated later. If semi-sync wait point is set
+    to WAIT_AFTER_SYNC, the commit pos is update after semi-sync-ack has
+    been received and the end point is updated after the write as it's needed
+    for the dump threads to be able to semi-sync the event.
+  */
+  my_off_t binlog_end_pos;
   MYSQL_BINARY_LOG(uint *sync_period)
     :MYSQL_BIN_LOG(sync_period)
   {
@@ -1146,6 +1089,7 @@ public:
     reset_master_count= 0;
     mark_xid_done_waiting= 0;
     state_file_deleted= FALSE;
+    binlog_space_total= 0;
   }
   void wait_for_sufficient_commits();
   void binlog_trigger_immediate_group_commit();
@@ -1193,6 +1137,56 @@ public:
     mysql_mutex_unlock(&LOCK_index);
   }
   void wait_for_last_checkpoint_event();
+  void lock_binlog_end_pos() { mysql_mutex_lock(&LOCK_binlog_end_pos); }
+  void unlock_binlog_end_pos() { mysql_mutex_unlock(&LOCK_binlog_end_pos); }
+  mysql_mutex_t* get_binlog_end_pos_lock() { return &LOCK_binlog_end_pos; }
+  void update_binlog_end_pos() override
+  {
+    lock_binlog_end_pos();
+    binlog_end_pos= my_b_safe_tell(&log_file);
+    signal_bin_log_update();
+    unlock_binlog_end_pos();
+  }
+  void update_binlog_end_pos(my_off_t pos)
+  {
+    mysql_mutex_assert_owner(&LOCK_log);
+    mysql_mutex_assert_not_owner(&LOCK_binlog_end_pos);
+    lock_binlog_end_pos();
+    /*
+      Note: it would make more sense to assert(pos > binlog_end_pos)
+      but there are two places triggered by mtr that has pos == binlog_end_pos
+      i didn't investigate but accepted as it should do no harm
+    */
+    DBUG_ASSERT(pos >= binlog_end_pos);
+    binlog_end_pos= pos;
+    signal_bin_log_update();
+    unlock_binlog_end_pos();
+  }
+  /**
+   * used when opening new file, and binlog_end_pos moves backwards
+   */
+  void reset_binlog_end_pos(const char file_name[FN_REFLEN], my_off_t pos) override
+  {
+    mysql_mutex_assert_owner(&LOCK_log);
+    mysql_mutex_assert_not_owner(&LOCK_binlog_end_pos);
+    lock_binlog_end_pos();
+    binlog_end_pos= pos;
+    strcpy(binlog_end_pos_file, file_name);
+    signal_bin_log_update();
+    unlock_binlog_end_pos();
+  }
+  /*
+    It is called by the threads(e.g. dump thread) which want to read
+    log without LOCK_log protection.
+  */
+  my_off_t get_binlog_end_pos(char file_name_buf[FN_REFLEN]) const
+  {
+    mysql_mutex_assert_not_owner(&LOCK_log);
+    mysql_mutex_assert_owner(&LOCK_binlog_end_pos);
+    strcpy(file_name_buf, binlog_end_pos_file);
+    return binlog_end_pos;
+  }
+  int wait_for_update_binlog_end_pos(THD* thd, struct timespec * timeout);
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
@@ -1206,6 +1200,10 @@ public:
                           xid_count_per_binlog *& b) override;
   void remove_xid_except_last() override;
   bool reset_master_in_progress(rpl_gtid *init_state) override;
+  void increment_binlog_space_total() override
+  {
+    binlog_space_total+= binlog_end_pos;
+  }
 };
 
 
@@ -1221,6 +1219,7 @@ public:
   bool can_purge_log(const char *log_file_name) override;
 #endif
   void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
+  void update_binlog_end_pos() override { signal_relay_log_update(); };
 };
 
 
