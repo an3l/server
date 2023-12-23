@@ -740,12 +740,6 @@ public:
     FD.(A) - the value of (A) in FD
   */
   enum enum_binlog_checksum_alg relay_log_checksum_alg;
-  /*
-    Binlog position of last commit (or non-transactional write) to the binlog.
-    Access to this is protected by LOCK_commit_ordered.
-  */
-  char last_commit_pos_file[FN_REFLEN];
-  my_off_t last_commit_pos_offset;
 
   MYSQL_BIN_LOG(uint *sync_period);
   /*
@@ -954,6 +948,8 @@ public:
   virtual void update_binlog_end_pos() = 0;
   virtual void reset_binlog_end_pos(const char file_name[FN_REFLEN], my_off_t pos){};
   virtual bool write_description_event_for_slave() { return 0; }
+  virtual void set_last_commit_pos_file_and_offset(char *log_file_name,
+                                                   my_off_t offset) {};
 };
 
 
@@ -1055,6 +1051,12 @@ public:
   mysql_cond_t COND_binlog_background_thread;
   mysql_cond_t COND_binlog_background_thread_end;
   ulong current_binlog_id;
+ /*
+    Binlog position of last commit (or non-transactional write) to the binlog.
+    Access to this is protected by LOCK_commit_ordered.
+  */
+  char last_commit_pos_file[FN_REFLEN];
+  my_off_t last_commit_pos_offset;
   MYSQL_BINARY_LOG(uint *sync_period)
     :MYSQL_BIN_LOG(sync_period)
   {
@@ -1198,6 +1200,12 @@ public:
   }
   void cleanup() override;
   void init_pthread_objects() override;
+  void set_last_commit_pos_file_and_offset(char *log_file_name, my_off_t offset)
+    override
+  {
+    strmake_buf(last_commit_pos_file, log_file_name);
+    last_commit_pos_offset= offset;
+  }
 };
 
 

@@ -4344,8 +4344,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
       reset_binlog_end_pos(log_file_name, offset);
 
       mysql_mutex_lock(&LOCK_commit_ordered);
-      strmake_buf(last_commit_pos_file, log_file_name);
-      last_commit_pos_offset= offset;
+      set_last_commit_pos_file_and_offset(log_file_name, offset);
       mysql_mutex_unlock(&LOCK_commit_ordered);
     }
 
