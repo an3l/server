@@ -899,7 +899,6 @@ public:
   }
 
   void wait_for_update_relay_log(THD* thd);
-  void init(ulong max_size);
   void init_pthread_objects();
   void cleanup();
   bool open(const char *log_name,
