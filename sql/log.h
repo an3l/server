@@ -1070,6 +1070,11 @@ public:
   char binlog_end_pos_file[FN_REFLEN];
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
+  virtual bool recovery_and_start_bgt() { return 0; };
+  virtual bool output_gtid_event(xid_count_per_binlog *& new_xid_list_entry,
+                                 xid_count_per_binlog *& b) { return 0; };
+  virtual void link_to_count_list(xid_count_per_binlog *& new_xid_list_entry,
+                                  xid_count_per_binlog *& b) { DBUG_ASSERT(0); };
 };
 
 
@@ -1188,9 +1193,14 @@ public:
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
-void commit_checkpoint_notify(void *cookie) override;
-void mark_and_commit_reset_logs() override;
-int unlog(ulong cookie, my_xid xid) override;
+  void commit_checkpoint_notify(void *cookie) override;
+  void mark_and_commit_reset_logs() override;
+  int unlog(ulong cookie, my_xid xid) override;
+  bool recovery_and_start_bgt() override;
+  bool output_gtid_event(xid_count_per_binlog *& new_xid_list_entry,
+                        xid_count_per_binlog *& b) override;
+  void link_to_count_list(xid_count_per_binlog *& new_xid_list_entry,
+                          xid_count_per_binlog *& b) override;
 };
 
 
