@@ -3734,16 +3734,15 @@ const char *MYSQL_LOG::generate_name(const char *log_name,
 #endif
 
 MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
-  :reset_master_pending(0), mark_xid_done_waiting(0),
-   bytes_written(0), binlog_space_total(0),
+  :bytes_written(0), binlog_space_total(0),
    last_used_log_number(0), open_count(1),
    sync_period_ptr(sync_period), sync_counter(0),
-   state_file_deleted(false), binlog_state_recover_done(false),
+   binlog_state_recover_done(false),
    relay_signal_cnt(0),
    checksum_alg_reset(BINLOG_CHECKSUM_ALG_UNDEF),
    relay_log_checksum_alg(BINLOG_CHECKSUM_ALG_UNDEF),
    description_event_for_exec(0), description_event_for_queue(0),
-   current_binlog_id(0), reset_master_count(0)
+   current_binlog_id(0)
 {
   /*
     We don't want to initialize locks here as such initialization depends on
@@ -4674,6 +4673,63 @@ void MYSQL_BINARY_LOG::mark_and_commit_reset_logs()
   */
   mysql_mutex_unlock(&LOCK_xid_list);
 }
+
+
+void MYSQL_BINARY_LOG::remove_xid_except_last()
+{
+  xid_count_per_binlog *b;
+  /*
+    Remove all entries in the xid_count list except the last.
+    Normally we will just be deleting all the entries that we waited for to
+    drop to zero above. But if we fail during RESET MASTER for some reason
+    then we will not have created any new log file, and we may keep the last
+    of the old entries.
+  */
+  mysql_mutex_lock(&LOCK_xid_list);
+  for (;;)
+  {
+    b= binlog_xid_count_list.head();
+    DBUG_ASSERT(b /* List can never become empty. */);
+    if (b->binlog_id == current_binlog_id)
+      break;
+    DBUG_ASSERT(b->xid_count == 0);
+    WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::reset_logs(): Removing "
+                          "xid_list_entry for %s (%lu)", b);
+    delete binlog_xid_count_list.get();
+  }
+  mysql_cond_broadcast(&COND_xid_list);
+  reset_master_pending--;
+  reset_master_count++;
+  mysql_mutex_unlock(&LOCK_xid_list);
+  reset_binlog_space_total();
+}
+
+
+bool MYSQL_BINARY_LOG::reset_master_in_progress(rpl_gtid *init_state)
+{
+  if (init_state && !is_empty_state())
+  {
+    my_error(ER_BINLOG_MUST_BE_EMPTY, MYF(0));
+    return true;
+  }
+
+  /*
+    Mark that a RESET MASTER is in progress.
+    This ensures that a binlog checkpoint will not try to write binlog
+    checkpoint events, which would be useless (as we are deleting the binlog
+    anyway) and could deadlock, as we are holding LOCK_log.
+
+    Wait for any mark_xid_done() calls that might be already running to
+    complete (mark_xid_done_waiting counter to drop to zero); we need to
+    do this before we take the LOCK_log to not deadlock.
+  */
+  mysql_mutex_lock(&LOCK_xid_list);
+  reset_master_pending++;
+  while (mark_xid_done_waiting > 0)
+    mysql_cond_wait(&COND_xid_list, &LOCK_xid_list);
+  mysql_mutex_unlock(&LOCK_xid_list);
+  return false;
+}
 /**
   Delete all logs referred to in the index file.
 
@@ -4705,27 +4761,8 @@ bool MYSQL_BIN_LOG::reset_logs(THD *thd, bool create_new_log,
 
   if (!is_relay_log)
   {
-    if (init_state && !is_empty_state())
-    {
-      my_error(ER_BINLOG_MUST_BE_EMPTY, MYF(0));
+    if (reset_master_in_progress(init_state))
       DBUG_RETURN(1);
-    }
-
-    /*
-      Mark that a RESET MASTER is in progress.
-      This ensures that a binlog checkpoint will not try to write binlog
-      checkpoint events, which would be useless (as we are deleting the binlog
-      anyway) and could deadlock, as we are holding LOCK_log.
-
-      Wait for any mark_xid_done() calls that might be already running to
-      complete (mark_xid_done_waiting counter to drop to zero); we need to
-      do this before we take the LOCK_log to not deadlock.
-    */
-    mysql_mutex_lock(&LOCK_xid_list);
-    reset_master_pending++;
-    while (mark_xid_done_waiting > 0)
-      mysql_cond_wait(&COND_xid_list, &LOCK_xid_list);
-    mysql_mutex_unlock(&LOCK_xid_list);
   }
 
   DEBUG_SYNC_C_IF_THD(thd, "reset_logs_after_set_reset_master_pending");
@@ -4853,31 +4890,7 @@ err:
 
   if (!is_relay_log)
   {
-    xid_count_per_binlog *b;
-    /*
-      Remove all entries in the xid_count list except the last.
-      Normally we will just be deleting all the entries that we waited for to
-      drop to zero above. But if we fail during RESET MASTER for some reason
-      then we will not have created any new log file, and we may keep the last
-      of the old entries.
-    */
-    mysql_mutex_lock(&LOCK_xid_list);
-    for (;;)
-    {
-      b= binlog_xid_count_list.head();
-      DBUG_ASSERT(b /* List can never become empty. */);
-      if (b->binlog_id == current_binlog_id)
-        break;
-      DBUG_ASSERT(b->xid_count == 0);
-      WSREP_XID_LIST_ENTRY("MYSQL_BIN_LOG::reset_logs(): Removing "
-                           "xid_list_entry for %s (%lu)", b);
-      delete binlog_xid_count_list.get();
-    }
-    mysql_cond_broadcast(&COND_xid_list);
-    reset_master_pending--;
-    reset_master_count++;
-    mysql_mutex_unlock(&LOCK_xid_list);
-    reset_binlog_space_total();
+    remove_xid_except_last();
   }
 
   mysql_mutex_unlock(&LOCK_index);
@@ -4886,7 +4899,7 @@ err:
 }
 
 
-void MYSQL_BIN_LOG::wait_for_last_checkpoint_event()
+void MYSQL_BINARY_LOG::wait_for_last_checkpoint_event()
 {
   mysql_mutex_lock(&LOCK_xid_list);
   for (;;)
@@ -5705,7 +5718,7 @@ MYSQL_RELAY_LOG::can_purge_log(const char *log_file_name_arg)
                         mysql_file_stat() or mysql_file_delete()
 */
 
-int MYSQL_BIN_LOG::count_binlog_space()
+int MYSQL_BINARY_LOG::count_binlog_space()
 {
   int error;
   LOG_INFO log_info;
@@ -5737,7 +5750,7 @@ done:
 }
 
 
-ulonglong MYSQL_BIN_LOG::get_binlog_space_total()
+ulonglong MYSQL_BINARY_LOG::get_binlog_space_total()
 {
   ulonglong used_space= 0;
   mysql_mutex_lock(&LOCK_log);

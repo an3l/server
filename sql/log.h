@@ -611,17 +611,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 
   PSI_cond_key m_key_COND_queue_busy;
 
-  /*
-    When this is set, a RESET MASTER is in progress.
-
-    Then we should not write any binlog checkpoints into the binlog (that
-    could result in deadlock on LOCK_log, and we will delete all binlog files
-    anyway). Instead we should signal COND_xid_list whenever a new binlog
-    checkpoint arrives - when all have arrived, RESET MASTER will complete.
-  */
-  uint reset_master_pending;
-  ulong mark_xid_done_waiting;
-
   /* LOCK_log and LOCK_index are inited by init_pthread_objects() */
   mysql_mutex_t LOCK_index;
   mysql_mutex_t LOCK_xid_list;
@@ -661,7 +650,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
   */
   uint *sync_period_ptr;
   uint sync_counter;
-  bool state_file_deleted;
   bool binlog_state_recover_done;
 
   inline uint get_sync_period()
@@ -777,11 +765,6 @@ public:
   char last_commit_pos_file[FN_REFLEN];
   my_off_t last_commit_pos_offset;
   ulong current_binlog_id;
-
-  /*
-    Tracks the number of times that the master has been reset
-  */
-  Atomic_counter<uint64> reset_master_count;
 
   MYSQL_BIN_LOG(uint *sync_period);
   /*
@@ -948,15 +931,6 @@ public:
                  bool need_mutex, bool need_update_threads,
                  ulonglong *decrease_log_space);
   int purge_first_log(Relay_log_info* rli, bool included);
-  int count_binlog_space();
-  void count_binlog_space_with_lock()
-  {
-    mysql_mutex_lock(&LOCK_index);
-    count_binlog_space();
-    mysql_mutex_unlock(&LOCK_index);
-  }
-  void reset_binlog_space_total() { binlog_space_total= 0; }
-  ulonglong get_binlog_space_total();
   int set_purge_index_file_name(const char *base_file_name);
   int open_purge_index_file(bool destroy);
   bool truncate_and_remove_binlogs(const char *truncate_file,
@@ -974,7 +948,6 @@ public:
   bool reset_logs(THD* thd, bool create_new_log,
                   rpl_gtid *init_state, uint32 init_state_len,
                   ulong next_log_number);
-  void wait_for_last_checkpoint_event();
   void close(uint exiting);
   void clear_inuse_flag_when_closing(File file);
 
@@ -989,7 +962,6 @@ public:
   using MYSQL_LOG::get_log_lock;
   inline mysql_cond_t* get_bin_log_cond() { return &COND_bin_log_updated; }
   inline IO_CACHE* get_log_file() { return &log_file; }
-  inline uint64 get_reset_master_count() { return reset_master_count; }
 
   inline void lock_index() { mysql_mutex_lock(&LOCK_index);}
   inline void unlock_index() { mysql_mutex_unlock(&LOCK_index);}
@@ -1075,6 +1047,8 @@ public:
                                  xid_count_per_binlog *& b) { return 0; };
   virtual void link_to_count_list(xid_count_per_binlog *& new_xid_list_entry,
                                   xid_count_per_binlog *& b) { DBUG_ASSERT(0); };
+  virtual void remove_xid_except_last() { DBUG_ASSERT(0); };
+  virtual bool reset_master_in_progress(rpl_gtid *init_state) { return 0; };
 };
 
 
@@ -1137,11 +1111,26 @@ class MYSQL_BINARY_LOG: public MYSQL_BIN_LOG
   /* The reason why the group commit was grouped */
   ulonglong group_commit_trigger_count, group_commit_trigger_timeout;
   ulonglong group_commit_trigger_lock_wait;
+  /*
+    When this is set, a RESET MASTER is in progress.
+
+    Then we should not write any binlog checkpoints into the binlog (that
+    could result in deadlock on LOCK_log, and we will delete all binlog files
+    anyway). Instead we should signal COND_xid_list whenever a new binlog
+    checkpoint arrives - when all have arrived, RESET MASTER will complete.
+  */
+  uint reset_master_pending;
+  ulong mark_xid_done_waiting;
   int write_transaction_or_stmt(group_commit_entry *entry, uint64 commit_id);
   int queue_for_group_commit(group_commit_entry *entry);
   bool write_transaction_to_binlog_events(group_commit_entry *entry);
   void trx_group_commit_leader(group_commit_entry *leader);
 public:
+  /*
+    Tracks the number of times that the master has been reset
+  */
+  Atomic_counter<uint64> reset_master_count;
+  bool state_file_deleted;
   MYSQL_BINARY_LOG(uint *sync_period)
     :MYSQL_BIN_LOG(sync_period)
   {
@@ -1154,6 +1143,10 @@ public:
     group_commit_trigger_timeout= 0;
     group_commit_trigger_lock_wait= 0;
     file_id= 1;
+    reset_master_pending= 0;
+    reset_master_count= 0;
+    mark_xid_done_waiting= 0;
+    state_file_deleted= FALSE;
   }
   void wait_for_sufficient_commits();
   void binlog_trigger_immediate_group_commit();
@@ -1190,6 +1183,17 @@ public:
       return 0;
     return real_purge_logs_by_size(binlog_pos);
   }
+  void reset_binlog_space_total() { binlog_space_total= 0; }
+  ulonglong get_binlog_space_total();
+  inline uint64 get_reset_master_count() { return reset_master_count; }
+  int count_binlog_space();
+  void count_binlog_space_with_lock()
+  {
+    mysql_mutex_lock(&LOCK_index);
+    count_binlog_space();
+    mysql_mutex_unlock(&LOCK_index);
+  }
+  void wait_for_last_checkpoint_event();
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
@@ -1201,6 +1205,8 @@ public:
                         xid_count_per_binlog *& b) override;
   void link_to_count_list(xid_count_per_binlog *& new_xid_list_entry,
                           xid_count_per_binlog *& b) override;
+  void remove_xid_except_last() override;
+  bool reset_master_in_progress(rpl_gtid *init_state) override;
 };
 
 
