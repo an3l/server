@@ -11337,7 +11337,7 @@ static bool write_empty_xa_prepare(THD *thd, binlog_cache_mngr *cache_mngr)
   return binlog_commit_flush_xa_prepare(thd, true, cache_mngr);
 }
 
-int TC_LOG_BINLOG::unlog_xa_prepare(THD *thd, bool all)
+int MYSQL_BINARY_LOG::unlog_xa_prepare(THD *thd, bool all)
 {
   DBUG_ASSERT(is_preparing_xa(thd));
 
