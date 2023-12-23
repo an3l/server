@@ -676,10 +676,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private Event_log
     LOCK_log.
   */
   int new_file_impl();
-  void do_checkpoint_request(ulong binlog_id);
-  bool is_xidlist_idle_nolock();
 public:
-  void purge(bool all);
   int new_file_without_locking();
   /*
     A list of struct xid_count_per_binlog is used to keep track of how many
@@ -827,12 +824,12 @@ public:
                                 ulong next_log_number);
   int log_and_order(THD *thd, my_xid xid, bool all,
                     bool need_prepare_ordered, bool need_commit_ordered);
-  int unlog(ulong cookie, my_xid xid);
+  int unlog(ulong cookie, my_xid xid) override { DBUG_ASSERT(0); return 0;};
   int unlog_xa_prepare(THD *thd, bool all);
-  void commit_checkpoint_notify(void *cookie);
+  void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
   int recover(LOG_INFO *linfo, const char *last_log_name, IO_CACHE *first_log,
-              Format_description_log_event *fdle, bool do_xa);
-  int do_binlog_recovery(const char *opt_name, bool do_xa_recovery);
+              Format_description_log_event *fdle, bool do_xa); //shuld go
+  int do_binlog_recovery(const char *opt_name, bool do_xa_recovery); // should go
 #if !defined(MYSQL_CLIENT)
   static int remove_pending_rows_event(THD *thd, binlog_cache_data *cache_data);
 
@@ -917,12 +914,6 @@ public:
   /* Use this to start writing a new log file */
   int new_file();
 
-  bool write(Log_event* event_info,
-             my_bool *with_annotate= 0); // binary log write
-
-  bool write_incident_already_locked(THD *thd);
-  bool write_incident(THD *thd);
-  void write_binlog_checkpoint_event_already_locked(const char *name, uint len);
   bool write_table_map(THD *thd, TABLE *table, bool with_annotate);
   void start_union_events(THD *thd, query_id_t query_id_param);
   void stop_union_events(THD *thd);
@@ -940,17 +931,12 @@ public:
   bool append(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
   bool append_no_lock(Log_event* ev, enum enum_binlog_checksum_alg checksum_alg);
 
-  void mark_xids_active(ulong cookie, uint xid_count);
-  void mark_xid_done(ulong cookie, bool write_checkpoint);
   void make_log_name(char* buf, const char* log_ident);
   bool is_active(const char* log_file_name);
 #ifdef HAVE_REPLICATION
   virtual bool can_purge_log(const char *log_file_name) = 0;
 #endif
   int update_log_index(LOG_INFO* linfo, bool need_update_threads);
-  int rotate(bool force_rotate, bool* check_purge);
-  void checkpoint_and_purge(ulong binlog_id);
-  int rotate_and_purge(bool force_rotate, DYNAMIC_ARRAY* drop_gtid_domain= NULL);
   /**
      Flush binlog cache and synchronize to disk.
 
@@ -1000,6 +986,7 @@ public:
   int register_create_index_entry(const char* entry);
   int purge_index_entry(THD *thd, ulonglong *decrease_log_space,
                         bool need_mutex);
+  virtual void mark_and_commit_reset_logs() { DBUG_ASSERT(0); }
   bool reset_logs(THD* thd, bool create_new_log,
                   rpl_gtid *init_state, uint32 init_state_len,
                   ulong next_log_number);
@@ -1024,8 +1011,6 @@ public:
   inline void unlock_index() { mysql_mutex_unlock(&LOCK_index);}
   inline IO_CACHE *get_index_file() { return &index_file;}
   inline uint32 get_open_count() { return open_count; }
-  void set_status_variables(THD *thd);
-  bool is_xidlist_idle();
   bool write_gtid_event(THD *thd, bool standalone, bool is_transactional,
                         uint64 commit_id,
                         bool has_xid= false, bool ro_1pc= false);
@@ -1189,9 +1174,26 @@ public:
                                    bool is_ro_1pc);
   uint next_file_id();
   void set_status_variables(THD *thd);
+  void mark_xids_active(ulong cookie, uint xid_count);
+  void mark_xid_done(ulong cookie, bool write_checkpoint);
+  void do_checkpoint_request(ulong binlog_id);
+  bool is_xidlist_idle_nolock();
+  int rotate(bool force_rotate, bool* check_purge);
+  void checkpoint_and_purge(ulong binlog_id);
+  void purge(bool all);
+  int rotate_and_purge(bool force_rotate, DYNAMIC_ARRAY* drop_gtid_domain= NULL);
+  bool is_xidlist_idle();
+  bool write(Log_event* event_info,
+             my_bool *with_annotate= 0); // binary log write
+  bool write_incident(THD *thd);
+  bool write_incident_already_locked(THD *thd);
+  void write_binlog_checkpoint_event_already_locked(const char *name, uint len);
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
+void commit_checkpoint_notify(void *cookie) override;
+void mark_and_commit_reset_logs() override;
+int unlog(ulong cookie, my_xid xid) override;
 };
 
 
@@ -1206,6 +1208,7 @@ public:
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
+  void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
 };
 
 

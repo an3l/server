@@ -4620,6 +4620,53 @@ err:
 }
 
 
+void MYSQL_BINARY_LOG::mark_and_commit_reset_logs()
+{
+  /*
+    We are going to nuke all binary log files.
+    Without binlog, we cannot XA recover prepared-but-not-committed
+    transactions in engines. So force a commit checkpoint first.
+
+    Note that we take and immediately
+    release LOCK_after_binlog_sync/LOCK_commit_ordered. This has
+    the effect to ensure that any on-going group commit (in
+    trx_group_commit_leader()) has completed before we request the checkpoint,
+    due to the chaining of LOCK_log and LOCK_commit_ordered in that function.
+    (We are holding LOCK_log, so no new group commit can start).
+
+    Without this, it is possible (though perhaps unlikely) that the RESET
+    MASTER could run in-between the write to the binlog and the
+    commit_ordered() in the engine of some transaction, and then a crash
+    later would leave such transaction not recoverable.
+  */
+
+  mysql_mutex_lock(&LOCK_after_binlog_sync);
+  mysql_mutex_lock(&LOCK_commit_ordered);
+  mysql_mutex_unlock(&LOCK_after_binlog_sync);
+  mysql_mutex_unlock(&LOCK_commit_ordered);
+
+  mark_xids_active(current_binlog_id, 1);
+  do_checkpoint_request(current_binlog_id);
+
+  /* Now wait for all checkpoint requests and pending unlog() to complete. */
+  mysql_mutex_lock(&LOCK_xid_list);
+  for (;;)
+  {
+    if (is_xidlist_idle_nolock())
+      break;
+    /*
+      Wait until signalled that one more binlog dropped to zero, then check
+      again.
+    */
+    mysql_cond_wait(&COND_xid_list, &LOCK_xid_list);
+  }
+
+  /*
+    Now all XIDs are fully flushed to disk, and we are holding LOCK_log so
+    no new ones will be written. So we can proceed to delete the logs.
+  */
+  mysql_mutex_unlock(&LOCK_xid_list);
+}
 /**
   Delete all logs referred to in the index file.
 
@@ -4684,50 +4731,7 @@ bool MYSQL_BIN_LOG::reset_logs(THD *thd, bool create_new_log,
 
   if (!is_relay_log)
   {
-    /*
-      We are going to nuke all binary log files.
-      Without binlog, we cannot XA recover prepared-but-not-committed
-      transactions in engines. So force a commit checkpoint first.
-
-      Note that we take and immediately
-      release LOCK_after_binlog_sync/LOCK_commit_ordered. This has
-      the effect to ensure that any on-going group commit (in
-      trx_group_commit_leader()) has completed before we request the checkpoint,
-      due to the chaining of LOCK_log and LOCK_commit_ordered in that function.
-      (We are holding LOCK_log, so no new group commit can start).
-
-      Without this, it is possible (though perhaps unlikely) that the RESET
-      MASTER could run in-between the write to the binlog and the
-      commit_ordered() in the engine of some transaction, and then a crash
-      later would leave such transaction not recoverable.
-    */
-
-    mysql_mutex_lock(&LOCK_after_binlog_sync);
-    mysql_mutex_lock(&LOCK_commit_ordered);
-    mysql_mutex_unlock(&LOCK_after_binlog_sync);
-    mysql_mutex_unlock(&LOCK_commit_ordered);
-
-    mark_xids_active(current_binlog_id, 1);
-    do_checkpoint_request(current_binlog_id);
-
-    /* Now wait for all checkpoint requests and pending unlog() to complete. */
-    mysql_mutex_lock(&LOCK_xid_list);
-    for (;;)
-    {
-      if (is_xidlist_idle_nolock())
-        break;
-      /*
-        Wait until signalled that one more binlog dropped to zero, then check
-        again.
-      */
-      mysql_cond_wait(&COND_xid_list, &LOCK_xid_list);
-    }
-
-    /*
-      Now all XIDs are fully flushed to disk, and we are holding LOCK_log so
-      no new ones will be written. So we can proceed to delete the logs.
-    */
-    mysql_mutex_unlock(&LOCK_xid_list);
+    mark_and_commit_reset_logs();
   }
 
   /* Save variables so that we can reopen the log */
@@ -5740,7 +5744,7 @@ ulonglong MYSQL_BIN_LOG::get_binlog_space_total()
 }
 
 bool
-MYSQL_BIN_LOG::is_xidlist_idle()
+MYSQL_BINARY_LOG::is_xidlist_idle()
 {
   bool res;
   mysql_mutex_lock(&LOCK_xid_list);
@@ -5751,7 +5755,7 @@ MYSQL_BIN_LOG::is_xidlist_idle()
 
 
 bool
-MYSQL_BIN_LOG::is_xidlist_idle_nolock()
+MYSQL_BINARY_LOG::is_xidlist_idle_nolock()
 {
   xid_count_per_binlog *b;
 
@@ -7254,7 +7258,7 @@ MYSQL_BIN_LOG::check_strict_gtid_sequence(uint32 domain_id,
   (this should happen only if the event is a Table_map).
 */
 
-bool MYSQL_BIN_LOG::write(Log_event *event_info, my_bool *with_annotate)
+bool MYSQL_BINARY_LOG::write(Log_event *event_info, my_bool *with_annotate)
 {
   THD *thd= event_info->thd;
   bool error= 1;
@@ -7674,7 +7678,7 @@ binlog_checkpoint_callback(void *cookie)
   that the entry will not go away early despite LOCK_log not being held.
 */
 void
-MYSQL_BIN_LOG::do_checkpoint_request(ulong binlog_id)
+MYSQL_BINARY_LOG::do_checkpoint_request(ulong binlog_id)
 {
   xid_count_per_binlog *entry;
 
@@ -7728,7 +7732,7 @@ MYSQL_BIN_LOG::do_checkpoint_request(ulong binlog_id)
   @retval
     nonzero - error in rotating routine.
 */
-int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
+int MYSQL_BINARY_LOG::rotate(bool force_rotate, bool* check_purge)
 {
   int error= 0;
   ulonglong binlog_pos;
@@ -7814,7 +7818,7 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
     nonzero - error in rotating routine.
 */
 
-void MYSQL_BIN_LOG::purge(bool all)
+void MYSQL_BINARY_LOG::purge(bool all)
 {
   mysql_mutex_assert_not_owner(&LOCK_log);
 #ifdef HAVE_REPLICATION
@@ -7840,7 +7844,7 @@ void MYSQL_BIN_LOG::purge(bool all)
 #endif
 }
 
-void MYSQL_BIN_LOG::checkpoint_and_purge(ulong binlog_id)
+void MYSQL_BINARY_LOG::checkpoint_and_purge(ulong binlog_id)
 {
   do_checkpoint_request(binlog_id);
   purge(0);
@@ -7969,12 +7973,12 @@ end:
   @retval
     nonzero - error in rotating routine.
 */
-int MYSQL_BIN_LOG::rotate_and_purge(bool force_rotate,
-                                    DYNAMIC_ARRAY *domain_drop_lex)
+int MYSQL_BINARY_LOG::rotate_and_purge(bool force_rotate,
+                                       DYNAMIC_ARRAY *domain_drop_lex)
 {
   int err_gtid=0, error= 0;
   ulong prev_binlog_id;
-  DBUG_ENTER("MYSQL_BIN_LOG::rotate_and_purge");
+  DBUG_ENTER("MYSQL_BINARY_LOG::rotate_and_purge");
   bool check_purge= false;
 
   mysql_mutex_lock(&LOCK_log);
@@ -8348,7 +8352,7 @@ int query_error_code(THD *thd, bool not_killed)
 }
 
 
-bool MYSQL_BIN_LOG::write_incident_already_locked(THD *thd)
+bool MYSQL_BINARY_LOG::write_incident_already_locked(THD *thd)
 {
   uint error= 0;
   DBUG_ENTER("MYSQL_BIN_LOG::write_incident_already_locked");
@@ -8365,13 +8369,13 @@ bool MYSQL_BIN_LOG::write_incident_already_locked(THD *thd)
 }
 
 
-bool MYSQL_BIN_LOG::write_incident(THD *thd)
+bool MYSQL_BINARY_LOG::write_incident(THD *thd)
 {
   uint error= 0;
   my_off_t offset;
   bool check_purge= false;
   ulong prev_binlog_id;
-  DBUG_ENTER("MYSQL_BIN_LOG::write_incident");
+  DBUG_ENTER("MYSQL_BINARY_LOG::write_incident");
 
   mysql_mutex_lock(&LOCK_log);
   if (likely(is_open()))
@@ -8428,7 +8432,7 @@ bool MYSQL_BIN_LOG::write_incident(THD *thd)
 }
 
 void
-MYSQL_BIN_LOG::
+MYSQL_BINARY_LOG::
 write_binlog_checkpoint_event_already_locked(const char *name_arg, uint len)
 {
   my_off_t offset;
@@ -11134,11 +11138,11 @@ TC_LOG_BINLOG::log_and_order(THD *thd, my_xid xid, bool all,
   binary log.
 */
 void
-TC_LOG_BINLOG::mark_xids_active(ulong binlog_id, uint xid_count)
+MYSQL_BINARY_LOG::mark_xids_active(ulong binlog_id, uint xid_count)
 {
   xid_count_per_binlog *b;
 
-  DBUG_ENTER("TC_LOG_BINLOG::mark_xids_active");
+  DBUG_ENTER("MYSQL_BINARY_LOG::mark_xids_active");
   DBUG_PRINT("info", ("binlog_id=%lu xid_count=%u", binlog_id, xid_count));
 
   mysql_mutex_lock(&LOCK_xid_list);
@@ -11171,7 +11175,7 @@ TC_LOG_BINLOG::mark_xids_active(ulong binlog_id, uint xid_count)
   checkpoint.
 */
 void
-TC_LOG_BINLOG::mark_xid_done(ulong binlog_id, bool write_checkpoint)
+MYSQL_BINARY_LOG::mark_xid_done(ulong binlog_id, bool write_checkpoint)
 {
   xid_count_per_binlog *b;
   bool first;
@@ -11271,9 +11275,9 @@ TC_LOG_BINLOG::mark_xid_done(ulong binlog_id, bool write_checkpoint)
   DBUG_VOID_RETURN;
 }
 
-int TC_LOG_BINLOG::unlog(ulong cookie, my_xid xid)
+int MYSQL_BINARY_LOG::unlog(ulong cookie, my_xid xid)
 {
-  DBUG_ENTER("TC_LOG_BINLOG::unlog");
+  DBUG_ENTER("MYSQL_BINARY_LOG::unlog");
   if (!xid)
     DBUG_RETURN(0);
 
@@ -11330,7 +11334,7 @@ int TC_LOG_BINLOG::unlog_xa_prepare(THD *thd, bool all)
 
 
 void
-TC_LOG_BINLOG::commit_checkpoint_notify(void *cookie)
+MYSQL_BINARY_LOG::commit_checkpoint_notify(void *cookie)
 {
   xid_count_per_binlog *entry= static_cast<xid_count_per_binlog *>(cookie);
   bool found_entry= false;
