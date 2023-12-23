@@ -599,7 +599,6 @@ struct wait_for_commit;
 
 class MYSQL_BIN_LOG: public TC_LOG, private Event_log
 {
-
   /** The instrumentation key to use for @ LOCK_index. */
   PSI_mutex_key m_key_LOCK_index;
   /** The instrumentation key to use for @ COND_relay_log_updated */
@@ -811,8 +810,8 @@ public:
   int unlog_xa_prepare(THD *thd, bool all);
   void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
   int recover(LOG_INFO *linfo, const char *last_log_name, IO_CACHE *first_log,
-              Format_description_log_event *fdle, bool do_xa); //shuld go
-  int do_binlog_recovery(const char *opt_name, bool do_xa_recovery); // should go
+              Format_description_log_event *fdle, bool do_xa);
+  int do_binlog_recovery(const char *opt_name, bool do_xa_recovery);
 #if !defined(MYSQL_CLIENT)
   static int remove_pending_rows_event(THD *thd, binlog_cache_data *cache_data);
 
