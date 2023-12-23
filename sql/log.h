@@ -773,14 +773,14 @@ public:
     return this;
   }
 
-  int open(const char *opt_name);
-  void close();
-  virtual int generate_new_name(char *new_name, const char *log_name,
-                                ulong next_log_number);
+  int open(const char *opt_name) override;
+  void close() override;
+  int generate_new_name(char *new_name, const char *log_name,
+                        ulong next_log_number) override;
   int log_and_order(THD *thd, my_xid xid, bool all,
-                    bool need_prepare_ordered, bool need_commit_ordered);
-  int unlog(ulong cookie, my_xid xid) override { DBUG_ASSERT(0); return 0;};
-  virtual int unlog_xa_prepare(THD *thd, bool all) { return 0; }
+                    bool need_prepare_ordered, bool need_commit_ordered) override;
+  int unlog(ulong cookie, my_xid xid) override { return 0;};
+  int unlog_xa_prepare(THD *thd, bool all) override { return 0; }
   void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
   int recover(LOG_INFO *linfo, const char *last_log_name, IO_CACHE *first_log,
               Format_description_log_event *fdle, bool do_xa);
@@ -853,7 +853,6 @@ public:
   int purge_logs(const char *to_log, bool included,
                  bool need_mutex, bool need_update_threads,
                  ulonglong *decrease_log_space);
-  int purge_first_log(Relay_log_info* rli, bool included);
   int set_purge_index_file_name(const char *base_file_name);
   int open_purge_index_file(bool destroy);
   bool truncate_and_remove_binlogs(const char *truncate_file,
@@ -883,26 +882,10 @@ public:
   inline char* get_index_fname() { return index_file_name;}
   inline char* get_log_fname() { return log_file_name; }
   using MYSQL_LOG::get_log_lock;
-  inline IO_CACHE* get_log_file() { return &log_file; }
 
   inline void lock_index() { mysql_mutex_lock(&LOCK_index);}
   inline void unlock_index() { mysql_mutex_unlock(&LOCK_index);}
   inline IO_CACHE *get_index_file() { return &index_file;}
-  bool write_gtid_event(THD *thd, bool standalone, bool is_transactional,
-                        uint64 commit_id,
-                        bool has_xid= false, bool ro_1pc= false);
-  int read_state_from_file();
-  int write_state_to_file();
-  int get_most_recent_gtid_list(rpl_gtid **list, uint32 *size);
-  bool append_state_pos(String *str);
-  bool append_state(String *str);
-  bool is_empty_state();
-  bool find_in_binlog_state(uint32 domain_id, uint32 server_id,
-                            rpl_gtid *out_gtid);
-  bool lookup_domain_in_binlog_state(uint32 domain_id, rpl_gtid *out_gtid);
-  int bump_seq_no_counter_if_needed(uint32 domain_id, uint64 seq_no);
-  bool check_strict_gtid_sequence(uint32 domain_id, uint32 server_id,
-                                  uint64 seq_no, bool no_error= false);
   /*
     Ensures the log's state is either LOG_OPEN or LOG_CLOSED. If something
     failed along the desired path and left the log in invalid state, i.e.
@@ -917,7 +900,6 @@ public:
     mysql_mutex_unlock(get_log_lock());
   }
 
-  char binlog_end_pos_file[FN_REFLEN];
   friend class MYSQL_BINARY_LOG;
   friend class MYSQL_RELAY_LOG;
   virtual bool recovery_and_start_bgt() { return 0; };
@@ -934,6 +916,8 @@ public:
   virtual void set_last_commit_pos_file_and_offset(char *log_file_name,
                                                    my_off_t offset) {};
   virtual void increment_open_count_slave() {};
+  virtual int write_state_to_file() { return 0; }
+  virtual int read_state_from_file() { return 0; }
 };
 
 
@@ -1041,6 +1025,7 @@ public:
   */
   char last_commit_pos_file[FN_REFLEN];
   my_off_t last_commit_pos_offset;
+  char binlog_end_pos_file[FN_REFLEN];
   MYSQL_BINARY_LOG(uint *sync_period)
     :MYSQL_BIN_LOG(sync_period)
   {
@@ -1165,6 +1150,20 @@ public:
   }
   int wait_for_update_binlog_end_pos(THD* thd, struct timespec * timeout);
   void stop_background_thread();
+  bool write_gtid_event(THD *thd, bool standalone, bool is_transactional,
+                        uint64 commit_id,
+                        bool has_xid= false, bool ro_1pc= false);
+  int read_state_from_file();
+  int get_most_recent_gtid_list(rpl_gtid **list, uint32 *size);
+  bool append_state_pos(String *str);
+  bool append_state(String *str);
+  bool is_empty_state();
+  bool find_in_binlog_state(uint32 domain_id, uint32 server_id,
+                            rpl_gtid *out_gtid);
+  bool lookup_domain_in_binlog_state(uint32 domain_id, rpl_gtid *out_gtid);
+  int bump_seq_no_counter_if_needed(uint32 domain_id, uint64 seq_no);
+  bool check_strict_gtid_sequence(uint32 domain_id, uint32 server_id,
+                                  uint64 seq_no, bool no_error= false);
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
 #endif
@@ -1191,6 +1190,7 @@ public:
     strmake_buf(last_commit_pos_file, log_file_name);
     last_commit_pos_offset= offset;
   }
+  int write_state_to_file() override;
 };
 
 
@@ -1229,6 +1229,7 @@ public:
     DBUG_VOID_RETURN;
   }
   void wait_for_update_relay_log(THD* thd);
+  int purge_first_log(Relay_log_info* rli, bool included);
   inline uint32 get_open_count() { return open_count; }
 #ifdef HAVE_REPLICATION
   bool can_purge_log(const char *log_file_name) override;
