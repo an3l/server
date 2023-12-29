@@ -43,7 +43,6 @@
 #define PUSH_WARNING(M) htrc(M)
 #endif
 
-static XGETREST getRestFnc = NULL;
 static int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename);
 
 /***********************************************************************/
@@ -140,73 +139,6 @@ int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename)
 	return rc;
 } // end of Xcurl
 
-/***********************************************************************/
-/*  GetREST: load the Rest lib and get the Rest function.              */
-/***********************************************************************/
-XGETREST GetRestFunction(PGLOBAL g)
-{
-	if (getRestFnc)
-		return getRestFnc;
-	
-#if !defined(REST_SOURCE)
-	if (trace(515))
-		htrc("Looking for GetRest library\n");
-
-#if defined(_WIN32) || defined(_WINDOWS)
-	HANDLE Hdll;
-	const char* soname = "GetRest.dll";   // Module name
-
-	if (!(Hdll = LoadLibrary(soname))) {
-		char  buf[256];
-		DWORD rc = GetLastError();
-
-		snprintf(g->Message, sizeof(g->Message), MSG(DLL_LOAD_ERROR), rc, soname);
-		FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
-			FORMAT_MESSAGE_IGNORE_INSERTS, NULL, rc, 0,
-			(LPTSTR)buf, sizeof(buf), NULL);
-		strcat(strcat(g->Message, ": "), buf);
-		return NULL;
-	} // endif Hdll
-
-// Get the function returning an instance of the external DEF class
-	if (!(getRestFnc = (XGETREST)GetProcAddress((HINSTANCE)Hdll, "restGetFile"))) {
-		char  buf[256];
-		DWORD rc = GetLastError();
-
-		snprintf(g->Message, sizeof(g->Message), MSG(PROCADD_ERROR), rc, "restGetFile");
-		FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
-			FORMAT_MESSAGE_IGNORE_INSERTS, NULL, rc, 0,
-			(LPTSTR)buf, sizeof(buf), NULL);
-		strcat(strcat(g->Message, ": "), buf);
-		FreeLibrary((HMODULE)Hdll);
-		return NULL;
-	} // endif getRestFnc
-#else   // !_WIN32
-	void* Hso;
-	const char* error = NULL;
-	const char* soname = "GetRest.so";   // Module name
-
-	// Load the desired shared library
-	if (!(Hso = dlopen(soname, RTLD_LAZY))) {
-		error = dlerror();
-		snprintf(g->Message, sizeof(g->Message), MSG(SHARED_LIB_ERR), soname, SVP(error));
-		return NULL;
-	} // endif Hdll
-
-// Get the function returning an instance of the external DEF class
-	if (!(getRestFnc = (XGETREST)dlsym(Hso, "restGetFile"))) {
-		error = dlerror();
-		snprintf(g->Message, sizeof(g->Message), MSG(GET_FUNC_ERR), "restGetFile", SVP(error));
-		dlclose(Hso);
-		return NULL;
-	} // endif getdef
-#endif  // !_WIN32
-#else   // REST_SOURCE
-	getRestFnc = restGetFile;
-#endif	// REST_SOURCE
-
-	return getRestFnc;
-} // end of GetRestFunction
 
 /***********************************************************************/
 /*  Return the columns definition to MariaDB.                          */
@@ -217,10 +149,9 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
   char     filename[_MAX_PATH + 1];  // MAX PATH ???
 	int      rc;
   PCSZ     http, uri, fn, ftype;
-	XGETREST grf = NULL;
 	bool     curl = GetBooleanTableOption(g, tp, "Curl", false);
 
-	if (!curl && !(grf = GetRestFunction(g)))
+	if (!curl)
 		curl = true;
 
   http = GetStringTableOption(g, tp, "Http", NULL);
@@ -251,11 +182,9 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
   // Retrieve the file from the web and copy it locally
 	if (curl)
 		rc = Xcurl(g, http, uri, filename);
-	else
-		rc = grf(g->Message, trace(515), http, uri, filename);
 
 	if (rc) {
-		strcpy(g->Message, "Cannot access to curl nor casablanca");
+		strcpy(g->Message, "Cannot access to curl.");
 		return NULL;
 	} else if (!stricmp(ftype, "JSON"))
     qrp = JSONColumns(g, db, NULL, tp, info);
@@ -282,10 +211,9 @@ bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
   int      rc = 0, n;
 	bool     xt = trace(515);
 	LPCSTR   ftype;
-	XGETREST grf = NULL;
 	bool     curl = GetBoolCatInfo("Curl", false);
 
-	if (!curl && !(grf = GetRestFunction(g)))
+	if (!curl)
 		curl = true;
 
   ftype = GetStringCatInfo(g, "Type", "JSON");
@@ -317,13 +245,9 @@ bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
 	if (curl) {
 		rc = Xcurl(g, Http, Uri, filename);
 		xtrc(515, "Return from Xcurl: rc=%d\n", rc);
-	} else {
-		rc = grf(g->Message, xt, Http, Uri, filename);
-		xtrc(515, "Return from restGetFile: rc=%d\n", rc);
-	} // endelse
+	}
 
 	if (rc) {
-		// strcpy(g->Message, "Cannot access to curl nor casablanca");
 		return true;
 	} else switch (n) {
     case 1: Tdp = new (g) JSONDEF; break;
