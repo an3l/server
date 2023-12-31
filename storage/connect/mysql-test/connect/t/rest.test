@@ -14,4 +14,4 @@ DROP TABLE t1;
 #
 # Clean up
 #
---remove_file $MYSQLD_DATADIR/test/users.json
+# --remove_file $MYSQLD_DATADIR/test/users.json

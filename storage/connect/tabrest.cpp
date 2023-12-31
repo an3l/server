@@ -78,15 +78,11 @@ void RESTDEF::deinit()
 }
 
 
-static size_t write_response_memory (void *contents, size_t size, size_t nmemb,
-                                     void *userp)
+
+static size_t
+write_cb(void *contents, size_t size, size_t nmemb, FILE *userp)
 {
-  size_t realsize = size * nmemb;
-  std::ostringstream *read_data = static_cast<std::ostringstream *>(userp);
-  read_data->write(static_cast<char *>(contents), realsize);
-  if (!read_data->good())
-    return 0;
-  return realsize;
+  return fwrite(contents, size, nmemb, userp);
 }
 
 
@@ -96,10 +92,10 @@ static size_t write_response_memory (void *contents, size_t size, size_t nmemb,
 int RESTDEF::curl_run(PGLOBAL g)
 {
   CURL *curl = curl_easy_init();
-  std::ostringstream read_data_stream;
   CURLcode curl_res = CURLE_OK;
-  char  buf[512];
+  char buf[512];
   long http_code = 0;
+  FILE *fp= fopen(Fn, "wb");
   char curl_errbuf[CURL_ERROR_SIZE];
   if (curl == NULL)
   {
@@ -116,38 +112,42 @@ int RESTDEF::curl_run(PGLOBAL g)
   }
   else
     my_snprintf(buf, sizeof(buf)-1, "%s", Http);
-
-  if ((curl_res= curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) !=
-          CURLE_OK ||
- //     (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
- //                                 write_response_memory)) != CURLE_OK ||
- //     (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEDATA,
- //                                 &read_data_stream)) !=
- //         CURLE_OK ||
-      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, buf)) != CURLE_OK ||
-      (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
-      (curl_res = curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE,
-                                     &http_code)) != CURLE_OK)
-  {
-    curl_easy_cleanup(curl);
-    if (curl_res)
-    {
-      char msg[512];
-      snprintf(msg, 512, "curl returned this error code: %u "
-                         "with the following error message: %s", curl_res,
-                         curl_errbuf[0] ? curl_errbuf : curl_easy_strerror(curl_res));
-      strcpy(g->Message, msg);
-      return 1;
-    }
-  }
+  curl_easy_setopt(curl, CURLOPT_URL, buf);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,write_cb);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+  curl_easy_perform(curl);
+//   if ((curl_res= curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) !=
+//           CURLE_OK ||
+//      (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
+//                                  write_cb)) != CURLE_OK ||
+//      (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEDATA,
+//                                  fp)) !=
+//          CURLE_OK ||
+//       (curl_res = curl_easy_setopt(curl, CURLOPT_URL, buf)) != CURLE_OK ||
+//       (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
+//       (curl_res = curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE,
+//                                      &http_code)) != CURLE_OK)
+//   {
+//     curl_easy_cleanup(curl);
+//     if (curl_res)
+//     {
+//       char msg[512];
+//       snprintf(msg, 512, "curl returned this error code: %u "
+//                          "with the following error message: %s", curl_res,
+//                          curl_errbuf[0] ? curl_errbuf : curl_easy_strerror(curl_res));
+//       strcpy(g->Message, msg);
+//       return 1;
+//     }
+//   }
   curl_easy_cleanup(curl);
+  fclose(fp);
   bool is_error = http_code < 200 || http_code >= 300;
   if (is_error)
   {
     char msg[512];
     snprintf(msg, 512, "server error");
     strcpy(g->Message, msg);
-    return 1;
+    return 0;
   }
   return 0;
 }
@@ -186,14 +186,12 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
 
   //  We used the file name relative to recorded datapath
   PlugSetPath(filename, fn, db);
-  remove(filename);
   restObject.Http= http;
   restObject.Uri= uri;
   restObject.Fn= filename;
   // Retrieve the file from the web and copy it locally
   restObject.init(g);
   rc = restObject.curl_run(g);
-  restObject.deinit();
   if (rc)
   {
     strcpy(g->Message, "Cannot access to curl.");
@@ -209,7 +207,8 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
 #endif   // XML_SUPPORT
   else
     snprintf(g->Message, sizeof(g->Message), "Usupported file type %s", ftype);
-
+  //remove(filename);
+  restObject.deinit();
   return qrp;
 } // end of RESTColumns
 
