@@ -36,6 +36,8 @@
 #include "tabjson.h"
 #include "tabfmt.h"
 #include "tabrest.h"
+#include <curl/curl.h>
+#include <sstream>
 
 #if defined(connect_EXPORTS)
 #define PUSH_WARNING(M) push_warning(current_thd, Sql_condition::WARN_LEVEL_NOTE, ER_UNKNOWN_ERROR, M)
@@ -43,101 +45,112 @@
 #define PUSH_WARNING(M) htrc(M)
 #endif
 
-static int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename);
 
-/***********************************************************************/
-/*  Xcurl: retrieve the REST answer by executing cURL.                 */
-/***********************************************************************/
-int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename)
+int RESTDEF::init(PGLOBAL g)
 {
-	char  buf[512];
-	int   rc = 0;
+  /* Initialize curl: */
+  CURLcode curl_res = curl_global_init(CURL_GLOBAL_ALL);
+  if (curl_res != CURLE_OK)
+  {
+    if (curl_res)
+    {
+      char msg[512];
+      snprintf(msg, 512, "unable to initialize curl library, "
+                         "curl returned this error code: %u "
+                         "with the following error message: %s",
+                         curl_res, curl_easy_strerror(curl_res));
+      strcpy(g->Message, msg);
+      return 1;
+    }
+  }
+  curl_inited = true;
+  return 0;
+}
 
-	if (strchr(filename, '"')) {
-		strcpy(g->Message, "Invalid file name");
-		return 1;
-	} // endif filename
 
-	if (Uri) {
-		if (*Uri == '/' || Http[strlen(Http) - 1] == '/')
-			my_snprintf(buf, sizeof(buf)-1, "%s%s", Http, Uri);
-		else
-			my_snprintf(buf, sizeof(buf)-1, "%s/%s", Http, Uri);
+void RESTDEF::deinit()
+{
+  if (curl_inited)
+  {
+    curl_global_cleanup();
+    curl_inited = false;
+  }
+}
 
-	} else
-		my_snprintf(buf, sizeof(buf)-1, "%s", Http);
 
-#if defined(_WIN32)
-	char cmd[1024];
-	STARTUPINFO si;
-	PROCESS_INFORMATION pi;
+static size_t write_response_memory (void *contents, size_t size, size_t nmemb,
+                                     void *userp)
+{
+  size_t realsize = size * nmemb;
+  std::ostringstream *read_data = static_cast<std::ostringstream *>(userp);
+  read_data->write(static_cast<char *>(contents), realsize);
+  if (!read_data->good())
+    return 0;
+  return realsize;
+}
 
-	sprintf(cmd, "curl \"%s\" -o \"%s\"", buf, filename);
 
-	ZeroMemory(&si, sizeof(si));
-	si.cb = sizeof(si);
-	ZeroMemory(&pi, sizeof(pi));
+/***********************************************************************/
+/*  curl_run: retrieve the REST answer by executing cURL.                 */
+/***********************************************************************/
+int RESTDEF::curl_run(PGLOBAL g)
+{
+  CURL *curl = curl_easy_init();
+  std::ostringstream read_data_stream;
+  CURLcode curl_res = CURLE_OK;
+  char  buf[512];
+  long http_code = 0;
+  char curl_errbuf[CURL_ERROR_SIZE];
+  if (curl == NULL)
+  {
+    strcpy(g->Message, "Cannot initilize curl session.");
+    return 1;
+  }
+  curl_errbuf[0] = '\0';
+  if (Uri)
+  {
+    if (*Uri == '/' || Http[strlen(Http) - 1] == '/')
+      my_snprintf(buf, sizeof(buf)-1, "%s%s", Http, Uri);
+    else
+      my_snprintf(buf, sizeof(buf)-1, "%s/%s", Http, Uri);
+  }
+  else
+    my_snprintf(buf, sizeof(buf)-1, "%s", Http);
 
-	// Start the child process. 
-	if (CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-		// Wait until child process exits.
-		WaitForSingleObject(pi.hProcess, INFINITE);
-
-		// Close process and thread handles. 
-		CloseHandle(pi.hProcess);
-		CloseHandle(pi.hThread);
-	} else {
-		snprintf(g->Message, sizeof(g->Message), "CreateProcess curl failed (%d)", GetLastError());
-		rc = 1;
-	}	// endif CreateProcess
-#else   // !_WIN32
-	char  fn[600];
-	pid_t pID;
-
-	// Check if curl package is availabe by executing subprocess
-	FILE *f= popen("command -v curl", "r");
-
-	if (!f) {
-			strcpy(g->Message, "Problem in allocating memory.");
-			return 1;
-	} else {
-		char   temp_buff[50];
-		size_t len = fread(temp_buff,1, 50, f);
-
-		if(!len) {
-			strcpy(g->Message, "Curl not installed.");
-			return 1;
-		}	else
-			pclose(f);
-
-	} // endif f
-	
-#ifdef HAVE_VFORK
-       pID = vfork();
-#else
-       pID = fork();
-#endif
-	sprintf(fn, "-o%s", filename);
-
-	if (pID == 0) {
-		// Code executed by child process
-		execlp("curl", "curl", buf, fn, (char*)NULL);
-
-		// If execlp() is successful, we should not reach this next line.
-		strcpy(g->Message, "Unsuccessful execlp from vfork()");
-		exit(1);
-	} else if (pID < 0) {
-		// failed to fork
-		strcpy(g->Message, "Failed to fork");
-		rc = 1;
-	} else {
-		// Parent process
-		wait(NULL);  // Wait for the child to terminate
-	}	// endif pID
-#endif  // !_WIN32
-
-	return rc;
-} // end of Xcurl
+  if ((curl_res= curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) !=
+          CURLE_OK ||
+ //     (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
+ //                                 write_response_memory)) != CURLE_OK ||
+ //     (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEDATA,
+ //                                 &read_data_stream)) !=
+ //         CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, buf)) != CURLE_OK ||
+      (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
+      (curl_res = curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE,
+                                     &http_code)) != CURLE_OK)
+  {
+    curl_easy_cleanup(curl);
+    if (curl_res)
+    {
+      char msg[512];
+      snprintf(msg, 512, "curl returned this error code: %u "
+                         "with the following error message: %s", curl_res,
+                         curl_errbuf[0] ? curl_errbuf : curl_easy_strerror(curl_res));
+      strcpy(g->Message, msg);
+      return 1;
+    }
+  }
+  curl_easy_cleanup(curl);
+  bool is_error = http_code < 200 || http_code >= 300;
+  if (is_error)
+  {
+    char msg[512];
+    snprintf(msg, 512, "server error");
+    strcpy(g->Message, msg);
+    return 1;
+  }
+  return 0;
+}
 
 
 /***********************************************************************/
@@ -146,55 +159,55 @@ int Xcurl(PGLOBAL g, PCSZ Http, PCSZ Uri, PCSZ filename)
 PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
 {
   PQRYRES  qrp= NULL;
+  RESTDEF  restObject;
   char     filename[_MAX_PATH + 1];  // MAX PATH ???
-	int      rc;
+  int      rc;
   PCSZ     http, uri, fn, ftype;
-	bool     curl = GetBooleanTableOption(g, tp, "Curl", false);
 
-	if (!curl)
-		curl = true;
 
   http = GetStringTableOption(g, tp, "Http", NULL);
   uri = GetStringTableOption(g, tp, "Uri", NULL);
   ftype = GetStringTableOption(g, tp, "Type", "JSON");
-	fn = GetStringTableOption(g, tp, "Filename", NULL);
+  fn = GetStringTableOption(g, tp, "Filename", NULL);
 
-	if (!fn) {
-		int n, m = strlen(ftype) + 1;
-
-		strcat(strcpy(filename, tab), ".");
-		n = strlen(filename);
-
-		// Fold ftype to lower case
-		for (int i = 0; i < m; i++)
-			filename[n + i] = tolower(ftype[i]);
-
-		fn = filename;
-		tp->subtype = PlugDup(g, fn);
-		snprintf(g->Message, sizeof(g->Message), "No file name. Table will use %s", fn);
-		PUSH_WARNING(g->Message);
-	}	// endif fn
+  if (!fn)
+  {
+    int n, m = strlen(ftype) + 1;
+    strcat(strcpy(filename, tab), ".");
+    n = strlen(filename);
+    // Fold ftype to lower case
+    for (int i = 0; i < m; i++)
+    filename[n + i] = tolower(ftype[i]);
+    fn = filename;
+    tp->subtype = PlugDup(g, fn);
+    snprintf(g->Message, sizeof(g->Message), "No file name. Table will use %s", fn);
+    PUSH_WARNING(g->Message);
+  } // endif fn
 
   //  We used the file name relative to recorded datapath
-	PlugSetPath(filename, fn, db);
-	remove(filename);
-
+  PlugSetPath(filename, fn, db);
+  remove(filename);
+  restObject.Http= http;
+  restObject.Uri= uri;
+  restObject.Fn= filename;
   // Retrieve the file from the web and copy it locally
-	if (curl)
-		rc = Xcurl(g, http, uri, filename);
-
-	if (rc) {
-		strcpy(g->Message, "Cannot access to curl.");
-		return NULL;
-	} else if (!stricmp(ftype, "JSON"))
+  restObject.init(g);
+  rc = restObject.curl_run(g);
+  restObject.deinit();
+  if (rc)
+  {
+    strcpy(g->Message, "Cannot access to curl.");
+    return NULL;
+  }
+  else if (!stricmp(ftype, "JSON"))
     qrp = JSONColumns(g, db, NULL, tp, info);
   else if (!stricmp(ftype, "CSV"))
     qrp = CSVColumns(g, NULL, tp, info);
 #if defined(XML_SUPPORT)
-	else if (!stricmp(ftype, "XML"))
-		qrp = XMLColumns(g, db, tab, tp, info);
+  else if (!stricmp(ftype, "XML"))
+    qrp = XMLColumns(g, db, tab, tp, info);
 #endif   // XML_SUPPORT
-	else
+  else
     snprintf(g->Message, sizeof(g->Message), "Usupported file type %s", ftype);
 
   return qrp;
@@ -207,17 +220,12 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
 /***********************************************************************/
 bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
 {
-	char     filename[_MAX_PATH + 1];
+  char     filename[_MAX_PATH + 1];
   int      rc = 0, n;
-	bool     xt = trace(515);
-	LPCSTR   ftype;
-	bool     curl = GetBoolCatInfo("Curl", false);
-
-	if (!curl)
-		curl = true;
+  bool     xt = trace(515);
+  LPCSTR   ftype;
 
   ftype = GetStringCatInfo(g, "Type", "JSON");
-
   if (xt)
     htrc("ftype = %s am = %s\n", ftype, SVP(am));
 
@@ -227,7 +235,8 @@ bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
 #endif   // XML_SUPPORT
     : (!stricmp(ftype, "CSV"))  ? 3 : 0;
 
-  if (n == 0) {
+  if (n == 0)
+  {
     htrc("DefineAM: Unsupported REST table type %s\n", ftype);
     snprintf(g->Message, sizeof(g->Message), "Unsupported REST table type %s", ftype);
     return true;
@@ -239,23 +248,18 @@ bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
 
   //  We used the file name relative to recorded datapath
   PlugSetPath(filename, Fn, GetPath());
-	remove(filename);
-
-  // Retrieve the file from the web and copy it locally
-	if (curl) {
-		rc = Xcurl(g, Http, Uri, filename);
-		xtrc(515, "Return from Xcurl: rc=%d\n", rc);
-	}
-
-	if (rc) {
-		return true;
-	} else switch (n) {
-    case 1: Tdp = new (g) JSONDEF; break;
+  remove(filename);
+  switch (n)
+  {
+    case 1:
+      Tdp = new (g) JSONDEF; break;
 #if defined(XML_SUPPORT)
-		case 2: Tdp = new (g) XMLDEF;  break;
+    case 2:
+      Tdp = new (g) XMLDEF;  break;
 #endif   // XML_SUPPORT
-    case 3: Tdp = new (g) CSVDEF;  break;
-    default: Tdp = NULL;
+    case 3:
+      Tdp = new (g) CSVDEF;  break;
+      default: Tdp = NULL;
   } // endswitch n
 
   // Do make the table/view definition

@@ -22,21 +22,29 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char* tab, char* db, bool info);
 /*  Restest table.                                                     */
 /***********************************************************************/
 class RESTDEF : public TABDEF {         /* Table description */
+private:
+  bool curl_inited;
 public:
-	// Constructor
-	RESTDEF(void) { Tdp = NULL; Http = Uri = Fn = NULL; }
+// Constructor
+  RESTDEF()
+    :curl_inited(false),
+     Tdp(NULL),
+     Http(NULL),
+     Uri(NULL),
+     Fn(NULL)
+  {}
+  int init (PGLOBAL g);
+  void deinit ();
+  // Implementation
+  virtual const char *GetType(void) { return "REST"; }
 
-	// Implementation
-	virtual const char *GetType(void) { return "REST"; }
-
-	// Methods
-	virtual bool DefineAM(PGLOBAL g, LPCSTR am, int poff);
-	virtual PTDB GetTable(PGLOBAL g, MODE m);
-
-protected:
-	// Members
-	PRELDEF Tdp;
-	PCSZ    Http;										/* Web connection HTTP               */
-	PCSZ    Uri;							      /* Web connection URI                */
-	PCSZ    Fn;                     /* The intermediate file name        */
+  // Methods
+  virtual bool DefineAM(PGLOBAL g, LPCSTR am, int poff);
+  virtual PTDB GetTable(PGLOBAL g, MODE m);
+  int curl_run(PGLOBAL g);
+  // Members
+  PRELDEF Tdp;
+  PCSZ    Http;										/* Web connection HTTP               */
+  PCSZ    Uri;							      /* Web connection URI                */
+  PCSZ    Fn;                     /* The intermediate file name        */
 }; // end of class RESTDEF
