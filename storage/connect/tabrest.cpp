@@ -37,7 +37,8 @@
 #include "tabfmt.h"
 #include "tabrest.h"
 #include <curl/curl.h>
-#include <sstream>
+#include <iostream>
+#include <fstream>
 
 #if defined(connect_EXPORTS)
 #define PUSH_WARNING(M) push_warning(current_thd, Sql_condition::WARN_LEVEL_NOTE, ER_UNKNOWN_ERROR, M)
@@ -79,10 +80,29 @@ void RESTDEF::deinit()
 
 
 
-static size_t
-write_cb(void *contents, size_t size, size_t nmemb, FILE *userp)
-{
-  return fwrite(contents, size, nmemb, userp);
+// Struktura za praćenje podataka tokom preuzimanja
+struct MemoryStruct {
+    char *memory;
+    size_t size;
+};
+
+// Funkcija za upisivanje podataka tokom preuzimanja
+static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t realsize = size * nmemb;
+    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+
+    char *ptr = (char *)realloc(mem->memory, mem->size + realsize + 1);
+    if (ptr == NULL) {
+        // Greška u alokaciji memorije
+        return 0;
+    }
+
+    mem->memory = ptr;
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+
+    return realsize;
 }
 
 
@@ -112,10 +132,37 @@ int RESTDEF::curl_run(PGLOBAL g)
   }
   else
     my_snprintf(buf, sizeof(buf)-1, "%s", Http);
-  curl_easy_setopt(curl, CURLOPT_URL, buf);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,write_cb);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-  curl_easy_perform(curl);
+
+struct MemoryStruct chunk;
+        chunk.memory = (char *)malloc(1);  // početna alokacija
+        chunk.size = 0;
+
+        // Postavljanje opcija za libcurl
+        curl_easy_setopt(curl, CURLOPT_URL, buf);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+
+        // Izvršavanje HTTP zahteva
+        curl_res = curl_easy_perform(curl);
+
+        if (curl_res != CURLE_OK) {
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(curl_res));
+        } else {
+            // Čuvanje preuzetih podataka u lokalni fajl
+            std::ofstream outFile(Fn, std::ofstream::binary);
+            if (outFile) {
+                outFile.write(chunk.memory, chunk.size);
+                outFile.close();
+                std::cout << "Fajl je uspešno preuzet i sačuvan u " << Fn << std::endl;
+            } else {
+                std::cerr << "Nije moguće otvoriti lokalni fajl za pisanje." << std::endl;
+            }
+        }
+
+        // Oslobađanje resursa
+        curl_easy_cleanup(curl);
+        free(chunk.memory);
+
 //   if ((curl_res= curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) !=
 //           CURLE_OK ||
 //      (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
@@ -139,16 +186,16 @@ int RESTDEF::curl_run(PGLOBAL g)
 //       return 1;
 //     }
 //   }
-  curl_easy_cleanup(curl);
-  fclose(fp);
-  bool is_error = http_code < 200 || http_code >= 300;
-  if (is_error)
-  {
-    char msg[512];
-    snprintf(msg, 512, "server error");
-    strcpy(g->Message, msg);
-    return 0;
-  }
+//   curl_easy_cleanup(curl);
+//   fclose(fp);
+//   bool is_error = http_code < 200 || http_code >= 300;
+//   if (is_error)
+//   {
+//     char msg[512];
+//     snprintf(msg, 512, "server error");
+//     strcpy(g->Message, msg);
+//     return 0;
+//   }
   return 0;
 }
 
