@@ -294,8 +294,11 @@ bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
 
   //  We used the file name relative to recorded datapath
   PlugSetPath(filename, Fn, GetPath());
+  Fn= filename;
   remove(filename);
-  switch (n)
+  if (curl_run(g))
+    return 1;
+  else switch (n)
   {
     case 1:
       Tdp = new (g) JSONDEF; break;
