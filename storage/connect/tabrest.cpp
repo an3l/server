@@ -37,8 +37,6 @@
 #include "tabfmt.h"
 #include "tabrest.h"
 #include <curl/curl.h>
-#include <iostream>
-#include <fstream>
 
 #if defined(connect_EXPORTS)
 #define PUSH_WARNING(M) push_warning(current_thd, Sql_condition::WARN_LEVEL_NOTE, ER_UNKNOWN_ERROR, M)
@@ -87,22 +85,18 @@ struct MemoryStruct {
 };
 
 // Funkcija za upisivanje podataka tokom preuzimanja
-static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
-    size_t realsize = size * nmemb;
+static size_t WriteMemoryCallback(void *contents, size_t size __attribute__((unused)), size_t nmemb, void *userp) {
     struct MemoryStruct *mem = (struct MemoryStruct *)userp;
-
-    char *ptr = (char *)realloc(mem->memory, mem->size + realsize + 1);
-    if (ptr == NULL) {
-        // Greška u alokaciji memorije
+    char *ptr = (char *)realloc(mem->memory, mem->size + nmemb + 1);
+    if (ptr == NULL)
         return 0;
-    }
 
     mem->memory = ptr;
-    memcpy(&(mem->memory[mem->size]), contents, realsize);
-    mem->size += realsize;
+    memcpy(&(mem->memory[mem->size]), contents, nmemb);
+    mem->size += nmemb;
     mem->memory[mem->size] = 0;
 
-    return realsize;
+    return nmemb;
 }
 
 
@@ -133,35 +127,30 @@ int RESTDEF::curl_run(PGLOBAL g)
   else
     my_snprintf(buf, sizeof(buf)-1, "%s", Http);
 
-struct MemoryStruct chunk;
-        chunk.memory = (char *)malloc(1);  // početna alokacija
-        chunk.size = 0;
+  struct MemoryStruct chunk;
+  chunk.memory = (char *)malloc(1);
+  chunk.size = 0;
 
-        // Postavljanje opcija za libcurl
-        curl_easy_setopt(curl, CURLOPT_URL, buf);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+  curl_easy_setopt(curl, CURLOPT_URL, buf);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
 
-        // Izvršavanje HTTP zahteva
-        curl_res = curl_easy_perform(curl);
+  curl_res = curl_easy_perform(curl);
 
-        if (curl_res != CURLE_OK) {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(curl_res));
-        } else {
-            // Čuvanje preuzetih podataka u lokalni fajl
-            std::ofstream outFile(Fn, std::ofstream::binary);
-            if (outFile) {
-                outFile.write(chunk.memory, chunk.size);
-                outFile.close();
-                std::cout << "Fajl je uspešno preuzet i sačuvan u " << Fn << std::endl;
-            } else {
-                std::cerr << "Nije moguće otvoriti lokalni fajl za pisanje." << std::endl;
-            }
-        }
+  if (curl_res != CURLE_OK)
+  {
+    fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(curl_res));
+  }
+  else
+  {
+    FILE *f= fopen(Fn, "wb");
+    fprintf(f, "%s", chunk.memory);
+    fclose(f);
+  }
 
-        // Oslobađanje resursa
-        curl_easy_cleanup(curl);
-        free(chunk.memory);
+  // Oslobađanje resursa
+  curl_easy_cleanup(curl);
+  free(chunk.memory);
 
 //   if ((curl_res= curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) !=
 //           CURLE_OK ||
