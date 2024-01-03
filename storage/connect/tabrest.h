@@ -19,9 +19,18 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char* tab, char* db, bool info);
 
 
 /***********************************************************************/
+/*  Data structure for curl callback function                          */
+/***********************************************************************/
+struct MemoryStruct {
+    char *memory;
+    size_t size;
+};
+
+
+/***********************************************************************/
 /*  Restest table.                                                     */
 /***********************************************************************/
-class RESTDEF : public TABDEF {         /* Table description */
+class RESTDEF : public TABDEF { /* Table description */
 private:
   bool curl_inited;
 public:
@@ -44,7 +53,11 @@ public:
   int curl_run(PGLOBAL g);
   // Members
   PRELDEF Tdp;
-  PCSZ    Http;										/* Web connection HTTP               */
-  PCSZ    Uri;							      /* Web connection URI                */
+  PCSZ    Http;                   /* Web connection HTTP               */
+  PCSZ    Uri;                    /* Web connection URI                */
   PCSZ    Fn;                     /* The intermediate file name        */
+  ~RESTDEF()
+  {
+    deinit();
+  }
 }; // end of class RESTDEF

@@ -77,14 +77,7 @@ void RESTDEF::deinit()
 }
 
 
-
-// Struktura za praćenje podataka tokom preuzimanja
-struct MemoryStruct {
-    char *memory;
-    size_t size;
-};
-
-// Funkcija za upisivanje podataka tokom preuzimanja
+// Curl callback function
 static size_t WriteMemoryCallback(void *contents, size_t size __attribute__((unused)), size_t nmemb, void *userp) {
     struct MemoryStruct *mem = (struct MemoryStruct *)userp;
     char *ptr = (char *)realloc(mem->memory, mem->size + nmemb + 1);
@@ -101,7 +94,7 @@ static size_t WriteMemoryCallback(void *contents, size_t size __attribute__((unu
 
 
 /***********************************************************************/
-/*  curl_run: retrieve the REST answer by executing cURL.                 */
+/*  curl_run: retrieve the REST answer by executing cURL.              */
 /***********************************************************************/
 int RESTDEF::curl_run(PGLOBAL g)
 {
@@ -131,60 +124,43 @@ int RESTDEF::curl_run(PGLOBAL g)
   chunk.memory = (char *)malloc(1);
   chunk.size = 0;
 
-  curl_easy_setopt(curl, CURLOPT_URL, buf);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
-
-  curl_res = curl_easy_perform(curl);
-
-  if (curl_res != CURLE_OK)
+  if ((curl_res= curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) !=
+          CURLE_OK ||
+     (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
+                                 WriteMemoryCallback)) != CURLE_OK ||
+     (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEDATA,
+                                 (void *)&chunk)) !=
+         CURLE_OK ||
+      (curl_res = curl_easy_setopt(curl, CURLOPT_URL, buf)) != CURLE_OK ||
+      (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
+      (curl_res = curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE,
+                                     &http_code)) != CURLE_OK)
   {
-    fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(curl_res));
+    curl_easy_cleanup(curl);
+    free(chunk.memory);
+    if (curl_res)
+    {
+      char msg[512];
+      snprintf(msg, 512, "curl returned this error code: %u "
+                         "with the following error message: %s", curl_res,
+                         curl_errbuf[0] ? curl_errbuf : curl_easy_strerror(curl_res));
+      strcpy(g->Message, msg);
+      return 1;
+    }
   }
-  else
-  {
-    FILE *f= fopen(Fn, "wb");
-    fprintf(f, "%s", chunk.memory);
-    fclose(f);
-  }
-
-  // Oslobađanje resursa
   curl_easy_cleanup(curl);
+  FILE *f= fopen(Fn, "wb");
+  fprintf(f, "%s", chunk.memory);
+  fclose(f);
   free(chunk.memory);
-
-//   if ((curl_res= curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) !=
-//           CURLE_OK ||
-//      (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
-//                                  write_cb)) != CURLE_OK ||
-//      (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEDATA,
-//                                  fp)) !=
-//          CURLE_OK ||
-//       (curl_res = curl_easy_setopt(curl, CURLOPT_URL, buf)) != CURLE_OK ||
-//       (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
-//       (curl_res = curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE,
-//                                      &http_code)) != CURLE_OK)
-//   {
-//     curl_easy_cleanup(curl);
-//     if (curl_res)
-//     {
-//       char msg[512];
-//       snprintf(msg, 512, "curl returned this error code: %u "
-//                          "with the following error message: %s", curl_res,
-//                          curl_errbuf[0] ? curl_errbuf : curl_easy_strerror(curl_res));
-//       strcpy(g->Message, msg);
-//       return 1;
-//     }
-//   }
-//   curl_easy_cleanup(curl);
-//   fclose(fp);
-//   bool is_error = http_code < 200 || http_code >= 300;
-//   if (is_error)
-//   {
-//     char msg[512];
-//     snprintf(msg, 512, "server error");
-//     strcpy(g->Message, msg);
-//     return 0;
-//   }
+  bool is_error = http_code < 200 || http_code >= 300;
+  if (is_error)
+  {
+    char msg[512];
+    snprintf(msg, 512, "server error");
+    strcpy(g->Message, msg);
+    return 0;
+  }
   return 0;
 }
 
@@ -225,8 +201,13 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
   restObject.Http= http;
   restObject.Uri= uri;
   restObject.Fn= filename;
+  remove(filename);
   // Retrieve the file from the web and copy it locally
-  restObject.init(g);
+  if (restObject.init(g))
+  {
+    strcpy(g->Message, "Initialization of curl failed.");
+    return NULL;
+  }
   rc = restObject.curl_run(g);
   if (rc)
   {
@@ -243,8 +224,7 @@ PQRYRES RESTColumns(PGLOBAL g, PTOS tp, char *tab, char *db, bool info)
 #endif   // XML_SUPPORT
   else
     snprintf(g->Message, sizeof(g->Message), "Usupported file type %s", ftype);
-  //remove(filename);
-  restObject.deinit();
+  //restObject.deinit();
   return qrp;
 } // end of RESTColumns
 
@@ -285,8 +265,13 @@ bool RESTDEF::DefineAM(PGLOBAL g, LPCSTR am, int poff)
   PlugSetPath(filename, Fn, GetPath());
   Fn= filename;
   remove(filename);
+  if (init(g))
+  {
+    strcpy(g->Message, "Initialization of curl failed.");
+    return true;
+  }
   if (curl_run(g))
-    return 1;
+    return true;
   else switch (n)
   {
     case 1:
