@@ -1628,6 +1628,15 @@ rpl_binlog_state_base::load_nolock(rpl_binlog_state_base *orig_state)
 }
 
 
+void rpl_binlog_state::set_state(rpl_gtid *init_state, uint32 init_state_len)
+{
+  if (init_state)
+    load(init_state, init_state_len);
+  else
+    reset();
+}
+
+
 /*
   Update replication state with a new GTID.
 
