@@ -919,7 +919,6 @@ public:
   { };
   virtual void remove_xid_except_last() { DBUG_ASSERT(0); };
   virtual void increment_binlog_space_total() { DBUG_ASSERT(0); }
-  virtual void update_binlog_end_pos() = 0;
   virtual void reset_binlog_end_pos(const char file_name[FN_REFLEN], my_off_t pos){};
   virtual bool write_description_event_for_slave() { return 0; }
   virtual void set_last_commit_pos_file_and_offset(char *log_file_name,
@@ -927,6 +926,7 @@ public:
   virtual void increment_open_count_slave() {};
   virtual int binlog_write_state_to_file() { return 0; }
   virtual int read_state_from_file() { return 0; }
+  virtual void log_signal_update() = 0;
 };
 
 
@@ -1111,7 +1111,7 @@ public:
     mysql_cond_broadcast(&COND_bin_log_updated);
     DBUG_VOID_RETURN;
   }
-  void update_binlog_end_pos() override
+  void update_binlog_end_pos()
   {
     lock_binlog_end_pos();
     binlog_end_pos= my_b_safe_tell(&log_file);
@@ -1201,6 +1201,7 @@ public:
   bool reset_logs(THD* thd, bool create_new_log,
                   rpl_gtid *init_state, uint32 init_state_len,
                   ulong next_log_number) override;
+  void log_signal_update() override { update_binlog_end_pos(); };
 };
 
 
@@ -1245,11 +1246,11 @@ public:
   bool can_purge_log(const char *log_file_name) override;
 #endif
   void commit_checkpoint_notify(void *cookie) override { DBUG_ASSERT(0); };
-  void update_binlog_end_pos() override { signal_relay_log_update(); };
   void cleanup() override;
   bool write_description_event_for_slave() override;
   void init_pthread_objects() override;
   void increment_open_count_slave() override { open_count++; }
+  void log_signal_update() override { signal_relay_log_update(); };
 };
 
 
