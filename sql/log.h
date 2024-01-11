@@ -811,13 +811,13 @@ public:
   }
   void set_max_size(ulong max_size_arg);
   virtual void init_pthread_objects();
-  bool open(const char *log_name,
-            const char *new_name,
-            ulong next_log_number,
-	    enum cache_type io_cache_type_arg,
-	    ulong max_size,
-            bool null_created,
-            bool need_mutex);
+  virtual bool open(const char *log_name,
+                    const char *new_name,
+                    ulong next_log_number,
+                    enum cache_type io_cache_type_arg,
+                    ulong max_size,
+                    bool null_created,
+                    bool need_mutex);
   bool open_index_file(const char *index_file_name_arg,
                        const char *log_name, bool need_mutex);
   /* Use this to start writing a new log file */
@@ -1142,6 +1142,9 @@ public:
     strcpy(binlog_end_pos_file, file_name);
     signal_bin_log_update();
     unlock_binlog_end_pos();
+    mysql_mutex_lock(&LOCK_commit_ordered);
+    set_last_commit_pos_file_and_offset(log_file_name, pos);
+    mysql_mutex_unlock(&LOCK_commit_ordered);
   }
   /*
     It is called by the threads(e.g. dump thread) which want to read
@@ -1201,6 +1204,14 @@ public:
   void log_signal_update() override { update_binlog_end_pos(); };
   int new_file_impl() override;
   void new_file_impl_close_log() override;
+  using MYSQL_BIN_LOG::open;
+  virtual bool open(const char *log_name,
+                    const char *new_name,
+                    ulong next_log_number,
+                    enum cache_type io_cache_type_arg,
+                    ulong max_size,
+                    bool null_created,
+                    bool need_mutex);
 };
 
 
@@ -1251,6 +1262,14 @@ public:
   void increment_open_count_slave() override { open_count++; }
   void log_signal_update() override { signal_relay_log_update(); };
   int new_file_impl() override;
+  using MYSQL_BIN_LOG::open;
+  virtual bool open(const char *log_name,
+                    const char *new_name,
+                    ulong next_log_number,
+                    enum cache_type io_cache_type_arg,
+                    ulong max_size,
+                    bool null_created,
+                    bool need_mutex);
 };
 
 
