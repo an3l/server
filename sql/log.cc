@@ -3961,6 +3961,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
   if (init_and_set_log_file_name(log_name, new_name, next_log_number,
                                  LOG_BIN, io_cache_type_arg))
   {
+// BINARY: Specific error handling for error
     sql_print_error("MYSQL_BIN_LOG::open failed to generate new file name.");
     if (!is_relay_log)
       goto err;
@@ -4016,7 +4017,6 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
   }
 
   max_size= max_size_arg;
-  increment_open_count_slave();
 
   DBUG_ASSERT(log_type == LOG_BIN);
 
@@ -4039,48 +4039,25 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
     }
 
     {
-      enum_binlog_checksum_alg alg;
-
-      if (is_relay_log)
-      {
-        if (relay_log_checksum_alg == BINLOG_CHECKSUM_ALG_UNDEF)
-          relay_log_checksum_alg=
-            opt_slave_sql_verify_checksum ? (enum_binlog_checksum_alg) binlog_checksum_options
-                                          : BINLOG_CHECKSUM_ALG_OFF;
-        alg= relay_log_checksum_alg;
-      }
-      else
-        alg= (enum_binlog_checksum_alg)binlog_checksum_options;
-
-      longlong written= write_description_event(alg, encrypt_binlog,
+      longlong written= write_description_event(checksum_alg, encrypt_binlog,
                                                 null_created_arg, is_relay_log);
       if (written == -1)
         goto err;
       bytes_written+= written;
 
-      if (!is_relay_log)
-      {
-        if (output_gtid_event(&new_xid_list_entry))
-          goto err;
-      }
+      if (output_gtid_event(&new_xid_list_entry))
+        goto err;
+
     }
-    if (write_description_event_for_slave())
-      goto err;
+
     if (flush_io_cache(&log_file) ||
         mysql_file_sync(log_file.file, MYF(MY_WME)))
       goto err;
 
     my_off_t offset= my_b_tell(&log_file);
 
-    if (!is_relay_log)
-    {
-      /* update binlog_end_pos so that it can be read by after sync hook */
-      reset_binlog_end_pos(log_file_name, offset);
-
-      mysql_mutex_lock(&LOCK_commit_ordered);
-      set_last_commit_pos_file_and_offset(log_file_name, offset);
-      mysql_mutex_unlock(&LOCK_commit_ordered);
-    }
+    /* update binlog_end_pos so that it can be read by after sync hook */
+    reset_binlog_end_pos(log_file_name, offset);
 
     if (write_file_name_to_index_file)
     {
@@ -4113,8 +4090,7 @@ bool MYSQL_BIN_LOG::open(const char *log_name,
     }
   }
 
-  if (!is_relay_log)
-    link_to_count_list(&new_xid_list_entry);
+  link_to_count_list(&new_xid_list_entry);
 
   log_state= LOG_OPENED;
 
@@ -4138,6 +4114,45 @@ err:
     delete new_xid_list_entry;
   close(LOG_CLOSE_INDEX);
   DBUG_RETURN(1);
+}
+
+
+bool MYSQL_BINARY_LOG::open(const char *log_name,
+                            const char *new_name,
+                            ulong next_log_number,
+                            enum cache_type io_cache_type_arg,
+                            ulong max_size_arg,
+                            bool null_created_arg,
+                            bool need_mutex)
+{
+  DBUG_ENTER("MYSQL_BINARY_LOG::open");
+  if (recovery_and_start_bgt())
+    DBUG_RETURN(1);
+  checksum_alg= (enum_binlog_checksum_alg)binlog_checksum_options;
+  DBUG_RETURN(MYSQL_BIN_LOG::open(log_name, new_name, next_log_number,
+                                  io_cache_type_arg, max_size_arg,
+                                  null_created_arg, need_mutex));
+}
+
+
+bool MYSQL_RELAY_LOG::open(const char *log_name,
+                           const char *new_name,
+                           ulong next_log_number,
+                           enum cache_type io_cache_type_arg,
+                           ulong max_size_arg,
+                           bool null_created_arg,
+                           bool need_mutex)
+{
+  DBUG_ENTER("MYSQL_RELAY_LOG::open");
+  increment_open_count_slave();
+  if (relay_log_checksum_alg == BINLOG_CHECKSUM_ALG_UNDEF)
+    relay_log_checksum_alg=
+      opt_slave_sql_verify_checksum ? (enum_binlog_checksum_alg) binlog_checksum_options
+                                    : BINLOG_CHECKSUM_ALG_OFF;
+  checksum_alg= relay_log_checksum_alg;
+  DBUG_RETURN(MYSQL_BIN_LOG::open(log_name, new_name, next_log_number,
+                                io_cache_type_arg, max_size_arg,
+                                null_created_arg, need_mutex));
 }
 
 
