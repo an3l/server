@@ -230,25 +230,6 @@ void RESTDEF::curl_deinit()
 
 
 /***********************************************************************/
-/*  WriteMemoryCallback: Curl callback function                        */
-/***********************************************************************/
-static size_t WriteMemoryCallback(void *contents,
-                                  size_t size __attribute__((unused)),
-                                  size_t nmemb, void *userp)
-{
-  struct MemoryStruct *mem = (struct MemoryStruct *)userp;
-  char *ptr = (char *)realloc(mem->memory, mem->size + nmemb + 1);
-  if (ptr == NULL)
-      return 0;
-  mem->memory = ptr;
-  memcpy(&(mem->memory[mem->size]), contents, nmemb);
-  mem->size += nmemb;
-  mem->memory[mem->size] = 0;
-  return nmemb;
-}
-
-
-/***********************************************************************/
 /*  curl_run: Retrieve the REST answer by executing cURL.              */
 /***********************************************************************/
 int RESTDEF::curl_run(PGLOBAL g)
@@ -274,17 +255,13 @@ int RESTDEF::curl_run(PGLOBAL g)
   else
     my_snprintf(buf, sizeof(buf)-1, "%s", Http);
 
-  struct MemoryStruct chunk;
-  chunk.memory = (char *)malloc(1);
-  chunk.size = 0;
-
+  FILE *f= fopen(Fn, "wb");
   if ((curl_res= curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf)) !=
         CURLE_OK ||
       (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,
-                                  WriteMemoryCallback)) !=
+                                   NULL)) !=
         CURLE_OK ||
-      (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEDATA,
-                                 (void *)&chunk)) !=
+      (curl_res= curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) f)) !=
         CURLE_OK ||
       (curl_res = curl_easy_setopt(curl, CURLOPT_URL, buf)) != CURLE_OK ||
       (curl_res = curl_easy_perform(curl)) != CURLE_OK ||
@@ -292,7 +269,6 @@ int RESTDEF::curl_run(PGLOBAL g)
                                      &http_code)) != CURLE_OK)
   {
     curl_easy_cleanup(curl);
-    free(chunk.memory);
     if (curl_res)
     {
       snprintf(g->Message, sizeof(g->Message),
@@ -303,10 +279,7 @@ int RESTDEF::curl_run(PGLOBAL g)
     }
   }
   curl_easy_cleanup(curl);
-  FILE *f= fopen(Fn, "wb");
-  fprintf(f, "%s", chunk.memory);
   fclose(f);
-  free(chunk.memory);
   bool is_error = http_code < 200 || http_code >= 300;
   if (is_error)
   {
