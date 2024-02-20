@@ -428,7 +428,7 @@ int flush_master_info(Master_info* mi,
                       bool need_lock_relay_log);
 void copy_filter_setting(Rpl_filter* dst_filter, Rpl_filter* src_filter);
 void update_change_master_ids(DYNAMIC_ARRAY *new_ids, DYNAMIC_ARRAY *old_ids);
-void prot_store_ids(THD *thd, DYNAMIC_ARRAY *ids);
+void prot_store_ids(THD *thd, DYNAMIC_ARRAY *ids, Field *field);
 
 /*
   Multi master are handled trough this struct.
