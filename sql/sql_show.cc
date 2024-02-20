@@ -114,7 +114,7 @@ enum enum_i_s_events_fields
   ISE_DB_CL
 };
 
-
+static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table);
 static const LEX_CSTRING trg_action_time_type_names[]=
 {
   { STRING_WITH_LEN("BEFORE") },
@@ -8602,6 +8602,27 @@ get_referential_constraints_record(THD *thd, TABLE_LIST *tables,
 }
 
 
+static my_bool slave_list_callback(THD *tmp, processlist_callback_arg *arg)
+{
+  LEX_MASTER_INFO *lex_mi= &tmp->lex->mi;
+  Master_info *mi;
+  bool result= 1;
+  if (!tmp->slave_thread)
+    return 0;
+  /* Accept one of two privileges */
+  if (check_global_access(tmp, PRIV_STMT_SHOW_SLAVE_STATUS))
+    return 1;
+
+  if ((mi= get_master_info(&lex_mi->connection_name,
+                          Sql_condition::WARN_LEVEL_ERROR)))
+  {
+    result= store_master_info_in_table(tmp, mi, arg->table);
+    mi->release();
+  }
+  return result;
+
+}
+
 
 // send_show_master_info_data
 static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
@@ -8623,6 +8644,7 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
 
   if (mi->host[0])
   {
+    restore_record(table, s->default_values);
     table->field[0]->store(mi->connection_name.str, mi->connection_name.length, cs);
     mysql_mutex_lock(&mi->run_lock);
     msg= (mi->rli.sql_driver_thd ? mi->rli.sql_driver_thd->get_proc_info() : "");
@@ -8746,21 +8768,7 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
 
 
 /*
-  Fill and store records into I_S.referential_constraints table
-
-  SYNOPSIS
-    get_slave_status_record()
-    thd                 thread handle
-    tables              table list struct(processed table)
-    table               I_S table
-    res                 1 means the error during opening of the processed table
-                        0 means processed table is opened without error
-    base_name           db name
-    file_name           table name
-
-  RETURN
-    0	ok
-    #   error
+  Fill and store records into I_S.get_slave_status_record table
 */
 
 static int
@@ -8774,22 +8782,11 @@ get_slave_status_record(THD *thd, TABLE_LIST *tables,
   return false;
 #else
   DBUG_ENTER("get_slave_status_record");
-  LEX_MASTER_INFO *lex_mi= &thd->lex->mi;
-  Master_info *mi;
-  bool result= false;
-  if (thd->system_thread == SYSTEM_THREAD_SLAVE_IO || thd->system_thread == SYSTEM_THREAD_SLAVE_SQL)
-  {
-    /* Accept one of two privileges */
-    if (check_global_access(thd, PRIV_STMT_SHOW_SLAVE_STATUS))
-      DBUG_RETURN(1);
-    if ((mi= get_master_info(&lex_mi->connection_name,
-                            Sql_condition::WARN_LEVEL_ERROR)))
-    {
-      result= store_master_info_in_table(thd, mi, table);
-      mi->release();
-    }
-  }
-  DBUG_RETURN(result);
+  processlist_callback_arg arg(thd, tables->table);
+  if (!thd->killed &&
+      server_threads.iterate(slave_list_callback, &arg))
+    DBUG_RETURN(1);
+  DBUG_RETURN(0);
 #endif
 }
 
