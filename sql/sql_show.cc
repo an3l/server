@@ -8777,8 +8777,8 @@ get_slave_status_record(THD *thd, TABLE_LIST *tables,
   LEX_MASTER_INFO *lex_mi= &thd->lex->mi;
   Master_info *mi;
   bool result= false;
-  // if (thd->slave_thread)
-  // {
+  if (thd->system_thread == SYSTEM_THREAD_SLAVE_IO || thd->system_thread == SYSTEM_THREAD_SLAVE_SQL)
+  {
     /* Accept one of two privileges */
     if (check_global_access(thd, PRIV_STMT_SHOW_SLAVE_STATUS))
       DBUG_RETURN(1);
@@ -8788,7 +8788,7 @@ get_slave_status_record(THD *thd, TABLE_LIST *tables,
       result= store_master_info_in_table(thd, mi, table);
       mi->release();
     }
-  //}
+  }
   DBUG_RETURN(result);
 #endif
 }
