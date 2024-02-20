@@ -69,7 +69,14 @@
 #include "key.h"
 
 #include "lex_symbol.h"
+#include "slave.h"
+#include "rpl_mi.h"
+#include "sql_repl.h"
 #define KEYWORD_SIZE 64
+/**
+   Maximum size of an error message from a slave thread.
+ */
+#define MAX_SLAVE_ERRMSG      1024
 
 extern SYMBOL symbols[];
 extern size_t symbols_length;
@@ -2096,7 +2103,6 @@ int show_create_table_ex(THD *thd, TABLE_LIST *table_list,
                          Table_specification_st *create_info_arg,
                          enum_with_db_name with_db_name)
 {
-  List<Item> field_list;
   char tmp[MAX_FIELD_WIDTH], *for_str, def_value_buf[MAX_FIELD_WIDTH];
   LEX_CSTRING alias;
   String type;
@@ -8595,6 +8601,194 @@ get_referential_constraints_record(THD *thd, TABLE_LIST *tables,
   DBUG_RETURN(0);
 }
 
+
+
+// send_show_master_info_data
+static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
+{
+  DBUG_ENTER("store_master_info_in_table");
+  CHARSET_INFO *cs= system_charset_info;
+  Rpl_filter *rpl_filter= mi->rpl_filter;
+  String gtid_pos;
+  String str;
+  const char *msg;
+
+  gtid_pos.length(0);
+  str.length(0);
+  if (rpl_append_gtid_state(&gtid_pos, true))
+  {
+    my_error(ER_OUT_OF_RESOURCES, MYF(0));
+    DBUG_RETURN(TRUE);
+  }
+
+  if (mi->host[0])
+  {
+    restore_record(table, s->default_values);
+    table->field[0]->store(mi->connection_name.str, mi->connection_name.length, cs);
+    mysql_mutex_lock(&mi->run_lock);
+    msg= (mi->rli.sql_driver_thd ? mi->rli.sql_driver_thd->get_proc_info() : "");
+    table->field[1]->store(msg, strlen(msg), cs);
+    msg= mi->io_thd ? mi->io_thd->get_proc_info() : "";
+    table->field[2]->store(msg, strlen(msg), cs);
+    mysql_mutex_unlock(&mi->run_lock);
+    mysql_mutex_lock(&mi->data_lock);
+    mysql_mutex_lock(&mi->rli.data_lock);
+    /* err_lock is to protect mi->last_error() */
+    mysql_mutex_lock(&mi->err_lock);
+    /* err_lock is to protect mi->rli.last_error() */
+    mysql_mutex_lock(&mi->rli.err_lock);
+
+    table->field[3]->store(mi->host, strlen(mi->host), cs);
+    table->field[4]->store(mi->user, strlen(mi->user), cs);
+    table->field[5]->store((uint32) mi->port);
+    table->field[6]->store((uint32) mi->connect_retry);
+    table->field[7]->store(mi->master_log_name, strlen(mi->master_log_name), cs);
+    table->field[8]->store((ulonglong) mi->master_log_pos);
+    msg= (mi->rli.group_relay_log_name +
+          dirname_length(mi->rli.group_relay_log_name));
+    table->field[9]->store(msg, strlen(msg), cs);
+    table->field[10]->store((ulonglong) mi->rli.group_relay_log_pos);
+    table->field[11]->store(mi->rli.group_master_log_name,
+                            strlen(mi->rli.group_master_log_name), cs);
+    table->field[12]->store(&slave_running[mi->slave_running], cs);
+    table->field[13]->store(mi->rli.slave_running ? &msg_yes : &msg_no, cs);
+    rpl_filter->get_rewrite_db(&str);
+    table->field[14]->store(str.ptr(), str.length(), cs);
+    str.length(0);
+    rpl_filter->get_do_db(&str);
+    table->field[15]->store(str.ptr(), str.length(), cs);
+    str.length(0);
+    rpl_filter->get_ignore_db(&str);
+    table->field[16]->store(str.ptr(), str.length(), cs);
+    str.length(0);
+    rpl_filter->get_do_table(&str);
+    table->field[17]->store(str.ptr(), str.length(), cs);
+    str.length(0);
+    rpl_filter->get_ignore_table(&str);
+    table->field[18]->store(str.ptr(), str.length(), cs);
+    str.length(0);
+    rpl_filter->get_wild_do_table(&str);
+    table->field[19]->store(str.ptr(), str.length(), cs);
+    str.length(0);
+    rpl_filter->get_wild_ignore_table(&str);
+    table->field[20]->store(str.ptr(), str.length(), cs);
+    table->field[21]->store(mi->rli.last_error().number);
+    msg= (mi->rli.last_error().message ? mi->rli.last_error().message : "");
+    table->field[22]->store(msg, strlen(msg), cs);
+    table->field[23]->store((uint32) mi->rli.slave_skip_counter);
+    table->field[24]->store((ulonglong) mi->rli.group_master_log_pos);
+    table->field[25]->store((ulonglong) mi->rli.log_space_total);
+    msg= (mi->rli.until_condition==Relay_log_info::UNTIL_NONE ? "None" :
+          (mi->rli.until_condition==Relay_log_info::UNTIL_MASTER_POS? "Master":
+          (mi->rli.until_condition==Relay_log_info::UNTIL_RELAY_POS? "Relay":
+          "Gtid")));
+    table->field[26]->store(msg, strlen(msg), cs);
+    table->field[27]->store(mi->rli.until_log_name,
+                            strlen(mi->rli.until_log_name), cs);
+    table->field[28]->store((ulonglong) mi->rli.until_log_pos);
+  #ifdef HAVE_OPENSSL
+    table->field[29]->store(mi->ssl ? &msg_yes : &msg_no, cs);
+  #else
+    table->field[29]->store(mi->ssl ? &msg_ignored: &msg_no, cs);
+  #endif
+    table->field[30]->store(mi->ssl_ca, strlen(mi->ssl_ca), cs);
+    table->field[31]->store(mi->ssl_capath, strlen(mi->ssl_capath), cs);
+    table->field[32]->store(mi->ssl_cert, strlen(mi->ssl_cert), cs);
+    table->field[33]->store(mi->ssl_cipher, strlen(mi->ssl_cipher), cs);
+    table->field[34]->store(mi->ssl_key, strlen(mi->ssl_key), cs);
+    // SBM
+    if ((mi->slave_running == MYSQL_SLAVE_RUN_READING) &&
+        mi->rli.slave_running)
+    {
+      long time_diff;
+      bool idle;
+      time_t stamp= mi->rli.last_master_timestamp;
+
+      if (!stamp)
+        idle= true;
+      else
+      {
+        idle= mi->rli.sql_thread_caught_up;
+        if (mi->using_parallel() && idle && !rpl_parallel::workers_idle(&mi->rli))
+          idle= false;
+      }
+      if (idle)
+        time_diff= 0;
+      else
+      {
+        time_diff= ((long)(time(0) - stamp) - mi->clock_diff_with_master);
+        if (time_diff < 0)
+          time_diff= 0;
+      }
+      table->field[35]->store((longlong) time_diff);
+    }
+
+    table->field[36]->store(mi->ssl_verify_server_cert? &msg_yes : &msg_no, cs);
+    table->field[37]->store(mi->last_error().number);
+    msg= (mi->last_error().message ? mi->last_error().message : "");
+    table->field[38]->store(msg, strlen(msg), cs);
+    table->field[39]->store(mi->rli.last_error().number);
+    msg= (mi->rli.last_error().message ? mi->rli.last_error().message : "");
+    table->field[38]->store(msg, strlen(msg), cs);
+    prot_store_ids(thd, &mi->ignore_server_ids, table->field[41]);
+    table->field[42]->store((uint32) mi->master_id);
+    // table->field[43]->store();
+    // table->field[44]->store();
+    
+    mysql_mutex_unlock(&mi->rli.err_lock);
+    mysql_mutex_unlock(&mi->err_lock);
+    mysql_mutex_unlock(&mi->rli.data_lock);
+    mysql_mutex_unlock(&mi->data_lock);
+    if (schema_table_store_record(thd, table))
+      DBUG_RETURN(1);
+  }
+  DBUG_RETURN(0);
+}
+
+
+/*
+  Fill and store records into I_S.referential_constraints table
+
+  SYNOPSIS
+    get_slave_status_record()
+    thd                 thread handle
+    tables              table list struct(processed table)
+    table               I_S table
+    res                 1 means the error during opening of the processed table
+                        0 means processed table is opened without error
+    base_name           db name
+    file_name           table name
+
+  RETURN
+    0	ok
+    #   error
+*/
+
+static int
+get_slave_status_record(THD *thd, TABLE_LIST *tables, COND *cond)
+{
+#ifndef HAVE_REPLICATION
+  my_ok(thd);
+  return false;
+#else
+  DBUG_ENTER("get_slave_status_record");
+  LEX_MASTER_INFO *lex_mi= &thd->lex->mi;
+  Master_info *mi;
+  bool result= false;
+  /* Accept one of two privileges */
+  if (check_global_access(thd, PRIV_STMT_SHOW_SLAVE_STATUS))
+    DBUG_RETURN(1);
+  if ((mi= get_master_info(&lex_mi->connection_name,
+                            Sql_condition::WARN_LEVEL_ERROR)))
+  {
+    result= store_master_info_in_table(thd, mi, tables->table);
+    mi->release();
+  }
+  DBUG_RETURN(result);
+#endif
+}
+
+
 struct schema_table_ref
 {
   const char *table_name;
@@ -10156,6 +10350,68 @@ ST_FIELD_INFO referential_constraints_fields_info[]=
 };
 
 
+ST_FIELD_INFO replica_status_info[]=
+{
+  Column("Connection_name",   Varchar(MAX_CONNECTION_NAME),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Slave_SQL_State",                    Varchar(30),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Slave_IO_State",                     Varchar(30),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_Host",  Varchar(LIST_PROCESS_HOST_LEN),              NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_User",                        Name(),                NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_Port",                        ULong(7),              NOT_NULL, OPEN_FULL_TABLE),
+  Column("Connect_Retry",                      ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_Log_File",                    Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Read_Master_Log_Pos",                ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Relay_Log_File",                     Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Relay_Log_Pos",                      ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Relay_Master_Log_File",              Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Slave_IO_Running",                   Varchar(3),            NOT_NULL, OPEN_FULL_TABLE),
+  Column("Slave_SQL_Running",                  Varchar(3),            NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Rewrite_DB",               Varchar(23),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Do_DB",                    Varchar(20),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Ignore_DB",                Varchar(20),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Do_Table",                 Varchar(20),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Ignore_Table",             Varchar(23),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Wild_Do_Table",            Varchar(24),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Wild_Ignore_Table",        Varchar(28),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Last_Errno",                         ULong(4),              NOT_NULL, OPEN_FULL_TABLE),
+  Column("Last_Error",           Varchar(MAX_SLAVE_ERRMSG),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Skip_Counter",                       ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Exec_Master_Log_Pos",                ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Relay_Log_Space",                    ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Until_Condition",                    Varchar(6),            NOT_NULL, OPEN_FULL_TABLE),
+  Column("Until_Log_File",                     Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Until_Log_Pos",                      ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_Allowed",                 Varchar(7),            NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_CA_File",                 Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_CA_Path",                 Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_Cert",                    Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_Cipher",                  Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_Key",                     Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Seconds_Behind_Master",              ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_Verify_Server_Cert",      Varchar(3),            NOT_NULL, OPEN_FULL_TABLE),
+  Column("Last_IO_Errno",                      ULong(4),              NOT_NULL, OPEN_FULL_TABLE),
+  Column("Last_IO_Error",                      Varchar(20),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Last_SQL_Errno",                     ULong(4),              NOT_NULL, OPEN_FULL_TABLE),
+  Column("Last_SQL_Error",                     Varchar(20),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Ignore_Server_Ids",        Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_Server_Id",                   ULong(),               NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_Crl",                     Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Master_SSL_Crlpath",                 Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Using_Gtid",    Varchar(sizeof("Current_Pos")-1),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Gtid_IO_Pos",                        Varchar(30),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Do_Domain_Ids",            Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Replicate_Ignore_Domain_Ids",        Varchar(FN_REFLEN),    NOT_NULL, OPEN_FULL_TABLE),
+  Column("Parallel_Mode", Varchar(sizeof("conservative")-1),          NOT_NULL, OPEN_FULL_TABLE),
+  Column("SQL_Delay",                          ULong(10),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("SQL_Remaining_Delay",                ULong(8),              NOT_NULL, OPEN_FULL_TABLE),
+  Column("Slave_SQL_Running_State",            Varchar(20),           NOT_NULL, OPEN_FULL_TABLE),
+  Column("Slave_DDL_Groups",                   ULong(20),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Slave_Non_Transactional_Groups",     ULong(20),             NOT_NULL, OPEN_FULL_TABLE),
+  Column("Slave_Transactional_Groups",         ULong(20),             NOT_NULL, OPEN_FULL_TABLE),
+  CEnd()
+};
+
+
 ST_FIELD_INFO parameters_fields_info[]=
 {
   Column("SPECIFIC_CATALOG",        Catalog(),       NOT_NULL, OPEN_FULL_TABLE),
@@ -10393,6 +10649,8 @@ ST_SCHEMA_TABLE schema_tables[]=
   {"REFERENTIAL_CONSTRAINTS", Show::referential_constraints_fields_info,
    0, get_all_tables, 0, get_referential_constraints_record,
    1, 9, 0, OPTIMIZE_I_S_TABLE|OPEN_TABLE_ONLY},
+  {"REPLICA_STATUS", Show::replica_status_info, 0,
+   get_slave_status_record, make_old_format, 0, -1, -1, 0, 0},
   {"ROUTINES", Show::proc_fields_info, 0,
    fill_schema_proc, make_proc_old_format, 0, 2, 3, 0, 0},
   {"SCHEMATA", Show::schema_fields_info, 0,

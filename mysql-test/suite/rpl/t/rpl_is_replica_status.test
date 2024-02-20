@@ -1,0 +1,18 @@
+-- source include/master-slave.inc
+-- source include/have_binlog_format_row.inc
+
+--echo #
+--echo # MDEV-x: Create IS.replica_status
+--echo #
+
+connection slave;
+--let $rpl_server_id= `select @@session.server_id`
+select @@session.server_id;
+# --vertical_results
+SHOW SLAVE STATUS;
+# let $rewrite_db_sss= query_get_value(SHOW SLAVE STATUS, Replicate_Rewrite_DB, 1);
+# --horizontal_results
+# --vertical_results
+SELECT * FROM information_schema.replica_status;
+-- source include/rpl_end.inc
+# end of 11.4 tests
