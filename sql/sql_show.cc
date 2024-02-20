@@ -8607,7 +8607,7 @@ static my_bool slave_list_callback(THD *tmp, processlist_callback_arg *arg)
   LEX_MASTER_INFO *lex_mi= &tmp->lex->mi;
   Master_info *mi;
   bool result= 1;
-  if (!tmp->slave_thread)
+  if (!arg->thd->slave_thread)
     return 0;
   /* Accept one of two privileges */
   if (check_global_access(tmp, PRIV_STMT_SHOW_SLAVE_STATUS))
