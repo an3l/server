@@ -1,0 +1,15 @@
+--source include/not_embedded.inc
+-- source include/have_binlog_format_row.inc
+-- source include/master-slave.inc
+
+--echo #
+--echo # MDEV-x: Create IS.replica_status
+--echo #
+
+connection slave;
+--echo # Check values between show slave hosts an IS.replica_status
+--source include/check_show_slave_status_and_is_replica_status.inc
+
+
+-- source include/rpl_end.inc
+# end of 11.4 tests

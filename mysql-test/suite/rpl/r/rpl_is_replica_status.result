@@ -1,0 +1,8 @@
+include/master-slave.inc
+[connection master]
+#
+# MDEV-x: Create IS.replica_status
+#
+connection slave;
+# Check values between show slave hosts an IS.replica_status
+include/rpl_end.inc
