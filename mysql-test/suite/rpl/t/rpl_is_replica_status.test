@@ -10,6 +10,5 @@ connection slave;
 --echo # Check values between show slave hosts an IS.replica_status
 --source include/check_show_slave_status_and_is_replica_status.inc
 
-
 -- source include/rpl_end.inc
 # end of 11.4 tests
