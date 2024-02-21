@@ -52,6 +52,7 @@ PLUGINS
 PROCESSLIST
 PROFILING
 REFERENTIAL_CONSTRAINTS
+REPLICA_STATUS
 ROUTINES
 SCHEMATA
 SCHEMA_PRIVILEGES
@@ -136,6 +137,7 @@ PLUGINS	PLUGIN_NAME
 PROCESSLIST	ID
 PROFILING	QUERY_ID
 REFERENTIAL_CONSTRAINTS	CONSTRAINT_SCHEMA
+REPLICA_STATUS	Connection_name
 ROUTINES	ROUTINE_SCHEMA
 SCHEMATA	SCHEMA_NAME
 SCHEMA_PRIVILEGES	TABLE_SCHEMA
@@ -220,6 +222,7 @@ PLUGINS	PLUGIN_NAME
 PROCESSLIST	ID
 PROFILING	QUERY_ID
 REFERENTIAL_CONSTRAINTS	CONSTRAINT_SCHEMA
+REPLICA_STATUS	Connection_name
 ROUTINES	ROUTINE_SCHEMA
 SCHEMATA	SCHEMA_NAME
 SCHEMA_PRIVILEGES	TABLE_SCHEMA
@@ -272,8 +275,6 @@ ENGINES	information_schema.ENGINES	1
 EVENTS	information_schema.EVENTS	1
 FILES	information_schema.FILES	1
 GEOMETRY_COLUMNS	information_schema.GEOMETRY_COLUMNS	1
-GLOBAL_STATUS	information_schema.GLOBAL_STATUS	1
-GLOBAL_VARIABLES	information_schema.GLOBAL_VARIABLES	1
 INDEX_STATISTICS	information_schema.INDEX_STATISTICS	1
 INNODB_BUFFER_PAGE	information_schema.INNODB_BUFFER_PAGE	1
 INNODB_BUFFER_PAGE_LRU	information_schema.INNODB_BUFFER_PAGE_LRU	1
@@ -308,11 +309,10 @@ PLUGINS	information_schema.PLUGINS	1
 PROCESSLIST	information_schema.PROCESSLIST	1
 PROFILING	information_schema.PROFILING	1
 REFERENTIAL_CONSTRAINTS	information_schema.REFERENTIAL_CONSTRAINTS	1
+REPLICA_STATUS	information_schema.REPLICA_STATUS	1
 ROUTINES	information_schema.ROUTINES	1
 SCHEMATA	information_schema.SCHEMATA	1
 SCHEMA_PRIVILEGES	information_schema.SCHEMA_PRIVILEGES	1
-SESSION_STATUS	information_schema.SESSION_STATUS	1
-SESSION_VARIABLES	information_schema.SESSION_VARIABLES	1
 SPATIAL_REF_SYS	information_schema.SPATIAL_REF_SYS	1
 STATISTICS	information_schema.STATISTICS	1
 SYSTEM_VARIABLES	information_schema.SYSTEM_VARIABLES	1
@@ -381,6 +381,7 @@ Database: information_schema
 | PROCESSLIST                           |
 | PROFILING                             |
 | REFERENTIAL_CONSTRAINTS               |
+| REPLICA_STATUS                        |
 | ROUTINES                              |
 | SCHEMATA                              |
 | SCHEMA_PRIVILEGES                     |
@@ -455,6 +456,7 @@ Database: INFORMATION_SCHEMA
 | PROCESSLIST                           |
 | PROFILING                             |
 | REFERENTIAL_CONSTRAINTS               |
+| REPLICA_STATUS                        |
 | ROUTINES                              |
 | SCHEMATA                              |
 | SCHEMA_PRIVILEGES                     |
@@ -481,5 +483,5 @@ Wildcard: inf_rmation_schema
 | information_schema |
 SELECT table_schema, count(*) FROM information_schema.TABLES WHERE table_schema IN ('mysql', 'INFORMATION_SCHEMA', 'test', 'mysqltest') GROUP BY TABLE_SCHEMA;
 table_schema	count(*)
-information_schema	69
+information_schema	70
 mysql	31
