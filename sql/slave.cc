@@ -3340,7 +3340,7 @@ static bool send_show_master_info_data(THD *thd, Master_info *mi, bool full,
     }
 
     // Replicate_Do_Domain_Ids & Replicate_Ignore_Domain_Ids
-    mi->domain_id_filter.store_ids(thd);
+    mi->domain_id_filter.store_ids(thd, NULL);
 
     // Parallel_Mode
     {

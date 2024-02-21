@@ -1900,11 +1900,11 @@ bool Domain_id_filter::update_ids(DYNAMIC_ARRAY *do_ids,
 
   @retval void
 */
-void Domain_id_filter::store_ids(THD *thd)
+void Domain_id_filter::store_ids(THD *thd, Field *field)
 {
   for (int i= DO_DOMAIN_IDS; i <= IGNORE_DOMAIN_IDS; i ++)
   {
-    prot_store_ids(thd, &m_domain_ids[i], NULL);
+    prot_store_ids(thd, &m_domain_ids[i], field);
   }
 }
 
