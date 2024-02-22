@@ -8724,6 +8724,8 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
       }
       table->field[35]->store((longlong) time_diff);
     }
+    else
+      table->field[35]->store(STRING_WITH_LEN(""), cs);
 
     table->field[36]->store(mi->ssl_verify_server_cert? &msg_yes : &msg_no, cs);
     table->field[37]->store(mi->last_error().number);
@@ -8744,7 +8746,7 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
     mi->gtid_current_pos.to_string(&str);
     table->field[46]->store(str.ptr(), str.length(), cs);
     str.length(0);
-    // Replicate_Do_Domain_Ids & Replicate_Ignore_Domain_Ids
+    // Replicate_Ignore_Domain_Ids
     mi->domain_id_filter.store_ids(thd, table->field[47]);
     {
       const char *mode_name= get_type(&slave_parallel_mode_typelib,
@@ -8756,7 +8758,10 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
     {
       time_t t= my_time(0), sql_delay_end= mi->rli.get_sql_delay_end();
       table->field[50]->store((uint32)(t < sql_delay_end ? sql_delay_end - t : 0));
-    }    
+    }
+    else
+      table->field[50]->store(STRING_WITH_LEN("NULL"), cs);
+
     table->field[51]->store(slave_sql_running_state,
                             strlen(slave_sql_running_state), cs);
     table->field[52]->store(mi->total_ddl_groups);
@@ -10384,8 +10389,8 @@ ST_FIELD_INFO referential_constraints_fields_info[]=
 ST_FIELD_INFO replica_status_info[]=
 {
   Column("Connection_name",   Varchar(MAX_CONNECTION_NAME),           NOT_NULL),
-  Column("Slave_SQL_State",                    Varchar(30),           NOT_NULL),
-  Column("Slave_IO_State",                     Varchar(30),           NOT_NULL),
+  Column("Slave_SQL_State",                    Varchar(FN_REFLEN),    NOT_NULL),
+  Column("Slave_IO_State",                     Varchar(FN_REFLEN),    NOT_NULL),
   Column("Master_Host",        Varchar(HOSTNAME_LENGTH),              NOT_NULL),
   Column("Master_User",   Varchar(USERNAME_CHAR_LENGTH),              NOT_NULL),
   Column("Master_Port",                        ULong(7),              NOT_NULL),
@@ -10430,12 +10435,11 @@ ST_FIELD_INFO replica_status_info[]=
   Column("Master_SSL_Crlpath",                 Varchar(FN_REFLEN),    NOT_NULL),
   Column("Using_Gtid",    Varchar(sizeof("Current_Pos")-1),           NOT_NULL),
   Column("Gtid_IO_Pos",                        Varchar(30),           NOT_NULL),
-  Column("Replicate_Do_Domain_Ids",            Varchar(FN_REFLEN),    NOT_NULL),
   Column("Replicate_Ignore_Domain_Ids",        Varchar(FN_REFLEN),    NOT_NULL),
   Column("Parallel_Mode", Varchar(sizeof("conservative")-1),          NOT_NULL),
   Column("SQL_Delay",                          ULong(10),             NOT_NULL),
   Column("SQL_Remaining_Delay",                ULong(8),              NULLABLE),
-  Column("Slave_SQL_Running_State",            Varchar(20),           NOT_NULL),
+  Column("Slave_SQL_Running_State",            Varchar(FN_REFLEN),    NOT_NULL),
   Column("Slave_DDL_Groups",                   ULong(20),             NOT_NULL),
   Column("Slave_Non_Transactional_Groups",     ULong(20),             NOT_NULL),
   Column("Slave_Transactional_Groups",         ULong(20),             NOT_NULL),
@@ -10681,7 +10685,7 @@ ST_SCHEMA_TABLE schema_tables[]=
    0, get_all_tables, 0, get_referential_constraints_record,
    1, 9, 0, OPTIMIZE_I_S_TABLE|OPEN_TABLE_ONLY},
   {"REPLICA_STATUS", Show::replica_status_info, 0,
-   get_slave_status_record, make_old_format, 0, -1, -1, 0, 0},
+   get_slave_status_record, 0, 0, -1, -1, 0, 0},
   {"ROUTINES", Show::proc_fields_info, 0,
    fill_schema_proc, make_proc_old_format, 0, 2, 3, 0, 0},
   {"SCHEMATA", Show::schema_fields_info, 0,
