@@ -8,10 +8,6 @@
 
 connection slave;
 
-#--vertical_results
-#let status_items=SQL_Remaining_Delay;
-#--source include/show_slave_status.inc
-
 --echo # Check values between show slave hosts an IS.replica_status
 --source include/check_show_slave_status_and_is_replica_status.inc
 
