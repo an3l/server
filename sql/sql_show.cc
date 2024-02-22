@@ -10384,7 +10384,7 @@ ST_FIELD_INFO referential_constraints_fields_info[]=
 ST_FIELD_INFO replica_status_info[]=
 {
   Column("Connection_name",   Varchar(MAX_CONNECTION_NAME),           NOT_NULL),
-  Column("Slave_SQL_State",                    Varchar(30),           NOT_NULL),
+  Column("Slave_SQL_State",                    Varchar(FN_REFLEN),    NOT_NULL),
   Column("Slave_IO_State",                     Varchar(30),           NOT_NULL),
   Column("Master_Host",        Varchar(HOSTNAME_LENGTH),              NOT_NULL),
   Column("Master_User",   Varchar(USERNAME_CHAR_LENGTH),              NOT_NULL),
