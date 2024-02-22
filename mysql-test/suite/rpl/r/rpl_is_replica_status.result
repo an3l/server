@@ -41,7 +41,6 @@ connection slave;
 # Check Master_SSL_Cipher
 # Check Master_SSL_Key
 # Check Seconds_Behind_Master
-# Check Master_SSL_Verify_Server_Cert
 # Check Last_IO_Errno
 # Check Last_IO_Error
 # Check Last_SQL_Errno
@@ -55,7 +54,6 @@ connection slave;
 # Check Replicate_Ignore_Domain_Ids
 # Check Parallel_Mode
 # Check SQL_Delay
-# Check SQL_Remaining_Delay
 # Check Slave_SQL_Running_State
 # Check Slave_DDL_Groups
 # Check Slave_Non_Transactional_Groups
