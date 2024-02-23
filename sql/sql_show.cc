@@ -8642,11 +8642,11 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
   table->field[5]->store((uint32) mi->port);
   table->field[6]->store((uint32) mi->connect_retry);
   table->field[7]->store(mi->master_log_name, strlen(mi->master_log_name), cs);
-  table->field[8]->store((ulonglong) mi->master_log_pos);
+  table->field[8]->store((ulonglong) mi->master_log_pos, TRUE);
   msg= (mi->rli.group_relay_log_name +
         dirname_length(mi->rli.group_relay_log_name));
   table->field[9]->store(msg, strlen(msg), cs);
-  table->field[10]->store((ulonglong) mi->rli.group_relay_log_pos);
+  table->field[10]->store((ulonglong) mi->rli.group_relay_log_pos, TRUE);
   table->field[11]->store(mi->rli.group_master_log_name,
                           strlen(mi->rli.group_master_log_name), cs);
   table->field[12]->store(&slave_running[mi->slave_running], cs);
@@ -8675,8 +8675,8 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
   table->field[22]->store(mi->rli.last_error().message,
                           strlen(mi->rli.last_error().message ), cs);
   table->field[23]->store((uint32) mi->rli.slave_skip_counter);
-  table->field[24]->store((ulonglong) mi->rli.group_master_log_pos);
-  table->field[25]->store((ulonglong) mi->rli.log_space_total);
+  table->field[24]->store((ulonglong) mi->rli.group_master_log_pos, TRUE);
+  table->field[25]->store((ulonglong) mi->rli.log_space_total, TRUE);
   msg= (mi->rli.until_condition==Relay_log_info::UNTIL_NONE ? "None" :
         (mi->rli.until_condition==Relay_log_info::UNTIL_MASTER_POS? "Master":
         (mi->rli.until_condition==Relay_log_info::UNTIL_RELAY_POS? "Relay":
@@ -8684,7 +8684,7 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
   table->field[26]->store(msg, strlen(msg), cs);
   table->field[27]->store(mi->rli.until_log_name,
                           strlen(mi->rli.until_log_name), cs);
-  table->field[28]->store((ulonglong) mi->rli.until_log_pos);
+  table->field[28]->store((ulonglong) mi->rli.until_log_pos, TRUE);
 #ifdef HAVE_OPENSSL
   table->field[29]->store(mi->ssl ? &msg_yes : &msg_no, cs);
 #else
@@ -8719,7 +8719,7 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
       if (time_diff < 0)
         time_diff= 0;
     }
-    table->field[35]->store((longlong) time_diff);
+    table->field[35]->store((longlong) time_diff, TRUE);
   }
   else
     table->field[35]->store(STRING_WITH_LEN(""), cs);
@@ -8734,8 +8734,7 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
   prot_store_ids(thd, &mi->ignore_server_ids, table->field[41]);
   table->field[42]->store((uint32) mi->master_id);
   table->field[43]->store(mi->ssl_crl , strlen(mi->ssl_crl), cs);
-  msg= (mi->ssl_crlpath ? mi->ssl_crlpath : "");
-  table->field[44]->store(msg, strlen(msg), cs);
+  table->field[44]->store(mi->ssl_crlpath, strlen(mi->ssl_crlpath), cs);
   msg= (mi->using_gtid_astext(mi->using_gtid)?
         mi->using_gtid_astext(mi->using_gtid) : "");
   table->field[45]->store(msg, strlen(msg), cs);
@@ -8760,9 +8759,9 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
 
   table->field[51]->store(slave_sql_running_state,
                           strlen(slave_sql_running_state), cs);
-  table->field[52]->store(mi->total_ddl_groups);
-  table->field[53]->store(mi->total_non_trans_groups);
-  table->field[54]->store(mi->total_trans_groups);
+  table->field[52]->store((ulonglong) mi->total_ddl_groups, TRUE);
+  table->field[53]->store((ulonglong) mi->total_non_trans_groups, TRUE);
+  table->field[54]->store((ulonglong) mi->total_trans_groups, TRUE);
 
   mysql_mutex_unlock(&mi->rli.err_lock);
   mysql_mutex_unlock(&mi->err_lock);
