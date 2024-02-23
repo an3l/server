@@ -10384,7 +10384,7 @@ ST_FIELD_INFO referential_constraints_fields_info[]=
 };
 
 
-ST_FIELD_INFO replica_status_info[]=
+ST_FIELD_INFO slave_status_info[]=
 {
   Column("Connection_name",   Varchar(MAX_CONNECTION_NAME),           NOT_NULL),
   Column("Slave_SQL_State",                    Varchar(FN_REFLEN),    NOT_NULL),
@@ -10682,7 +10682,7 @@ ST_SCHEMA_TABLE schema_tables[]=
   {"REFERENTIAL_CONSTRAINTS", Show::referential_constraints_fields_info,
    0, get_all_tables, 0, get_referential_constraints_record,
    1, 9, 0, OPTIMIZE_I_S_TABLE|OPEN_TABLE_ONLY},
-  {"REPLICA_STATUS", Show::replica_status_info, 0,
+  {"SLAVE_STATUS", Show::slave_status_info, 0,
    get_slave_status_record, 0, 0, -1, -1, 0, 0},
   {"ROUTINES", Show::proc_fields_info, 0,
    fill_schema_proc, make_proc_old_format, 0, 2, 3, 0, 0},

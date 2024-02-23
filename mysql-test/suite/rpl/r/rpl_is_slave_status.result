@@ -1,8 +1,8 @@
 include/master-slave.inc
 [connection master]
 #
-# MDEV-33526: Create IS.replica_status table 
-#             as alias for show replica status command
+# MDEV-33526: Create IS.slave_status table
+#             as alias for show slave status command
 #
 connection slave;
 # Check values between show slave hosts an IS.replica_status
