@@ -8615,6 +8615,7 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
   mysql_mutex_assert_owner(&LOCK_active_mi);
   gtid_pos.length(0);
   str.length(0);
+  mysql_mutex_lock(&mi->run_lock);
   if (rpl_append_gtid_state(&gtid_pos, true))
   {
     my_error(ER_OUT_OF_RESOURCES, MYF(0));
@@ -8622,14 +8623,13 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
   }
 
   table->field[0]->store(mi->connection_name.str, mi->connection_name.length, cs);
-  mysql_mutex_lock(&mi->run_lock);
+ 
   const char *slave_sql_running_state=
     (mi->rli.sql_driver_thd ? mi->rli.sql_driver_thd->get_proc_info() : "");
   table->field[1]->store(slave_sql_running_state,
                           strlen(slave_sql_running_state), cs);
   msg= mi->io_thd ? mi->io_thd->get_proc_info() : "";
   table->field[2]->store(msg, strlen(msg), cs);
-  mysql_mutex_unlock(&mi->run_lock);
   mysql_mutex_lock(&mi->data_lock);
   mysql_mutex_lock(&mi->rli.data_lock);
   /* err_lock is to protect mi->last_error() */
@@ -8762,13 +8762,11 @@ static int store_master_info_in_table(THD *thd, Master_info *mi, TABLE *table)
   table->field[52]->store((ulonglong) mi->total_ddl_groups, TRUE);
   table->field[53]->store((ulonglong) mi->total_non_trans_groups, TRUE);
   table->field[54]->store((ulonglong) mi->total_trans_groups, TRUE);
-
+  mysql_mutex_unlock(&mi->run_lock);
   mysql_mutex_unlock(&mi->rli.err_lock);
   mysql_mutex_unlock(&mi->err_lock);
   mysql_mutex_unlock(&mi->rli.data_lock);
   mysql_mutex_unlock(&mi->data_lock);
-  if (schema_table_store_record(thd, table))
-    DBUG_RETURN(1);
   DBUG_RETURN(0);
 }
 #endif
@@ -8796,7 +8794,6 @@ static int get_slave_status_record(THD *thd, TABLE_LIST *tables,
 #else
   DBUG_ENTER("get_slave_status_record");
   Master_info *mi;
-  bool result= false;
   uint i, elements;
   /* Accept one of two privileges */
   if (check_global_access(thd, PRIV_STMT_SHOW_SLAVE_STATUS))
@@ -8812,11 +8809,16 @@ static int get_slave_status_record(THD *thd, TABLE_LIST *tables,
     mi= (Master_info *) my_hash_element(&master_info_index->
                                         master_info_hash, i);
     if (mi->host[0])
-      result= store_master_info_in_table(thd, mi, tables->table);
+    {
+      if (store_master_info_in_table(thd, mi, tables->table))
+        DBUG_RETURN(1);
+      if (schema_table_store_record(thd, tables->table))
+        DBUG_RETURN(1);
+    }
     mi->release();
   }
   mysql_mutex_unlock(&LOCK_active_mi);
-  DBUG_RETURN(result);
+  DBUG_RETURN(0);
 #endif
 }
 
