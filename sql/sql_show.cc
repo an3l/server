@@ -8808,6 +8808,9 @@ static int get_slave_status_record(THD *thd, TABLE_LIST *tables,
   {
     mi= (Master_info *) my_hash_element(&master_info_index->
                                         master_info_hash, i);
+    mysql_mutex_lock(&mi->sleep_lock);
+    mi->users++;                                // Mark used
+    mysql_mutex_unlock(&mi->sleep_lock);
     if (mi->host[0])
     {
       if (store_master_info_in_table(thd, mi, tables->table))

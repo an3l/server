@@ -5,7 +5,7 @@ include/master-slave.inc
 #             as alias for show slave status command
 #
 connection slave;
-# Check values between show slave hosts an IS.replica_status
+# Check values between show slave hosts an IS.slave_status
 # Check Connection_name
 # Check Slave_SQL_State
 # Check Slave_IO_State

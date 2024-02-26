@@ -9,7 +9,7 @@
 
 connection slave;
 
---echo # Check values between show slave hosts an IS.replica_status
+--echo # Check values between show slave hosts an IS.slave_status
 let $is_slave_status_fields= Connection_name, Slave_SQL_State, Slave_IO_State, Master_Host, Master_User, Master_Port, Connect_Retry, Master_Log_File, Read_Master_Log_Pos, Relay_Log_File, Relay_Log_Pos;
 --source include/check_show_slave_status_and_is_slave_status.inc
 
