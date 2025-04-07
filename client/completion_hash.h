@@ -1,20 +1,9 @@
-/* Copyright (c) 2000-2002, 2006 MySQL AB
-   Use is subject to license terms
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Library General Public
-   License as published by the Free Software Foundation; version 2
-   of the License.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Library General Public License for more details.
-
-   You should have received a copy of the GNU Library General Public
-   License along with this library; if not, write to the Free
-   Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-   MA 02110-1335  USA */
+/*
+ * Copyright (c) 2000-2002, 2006 MySQL AB
+ * SPDX-FileCopyrightText: 2025 MariaDB Foundation
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 
 #ifndef _HASH_
 #define _HASH_
